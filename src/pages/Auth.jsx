@@ -113,7 +113,11 @@ export default function Auth() {
     if (!email || !email.includes("@")) { setError("Please enter a valid email address."); return; }
     setOtpSending(true); setError("");
     try {
-      await base44.functions.invoke("sendAuthOTP", { action: "send", email: email.trim().toLowerCase(), purpose: mode });
+      if (mode === "reset") {
+                await base44.auth.resetPasswordRequest(email.trim().toLowerCase());
+      } else {
+                await base44.functions.invoke("sendAuthOTP", { action: "send", email: email.trim().toLowerCase(), purpose: mode });
+      }
       setFlow("otp");
     } catch (err) {
       setError(err?.message || "Failed to send verification code. Please try again.");
@@ -136,7 +140,9 @@ export default function Auth() {
     if (finalCode.length < 6) return;
     setLoading(true); setError("");
     try {
-      await base44.functions.invoke("sendAuthOTP", { action: "verify", email: email.trim().toLowerCase(), otp: finalCode.trim(), purpose: mode });
+      if (mode !== "reset") {
+        await base44.functions.invoke("sendAuthOTP", { action: "verify", email: email.trim().toLowerCase(), otp: finalCode, purpose: mode });
+      }
       setFlow("password");
     } catch (err) {
       setError(err?.message || "Incorrect code. Please try again.");
@@ -194,9 +200,13 @@ export default function Auth() {
       // email; reset "resets" the password by re-registering the
       // already-verified email with a fresh one, rather than a separate
       // reset-token mechanism.
-      try {
-        await base44.auth.register({ email: email.trim().toLowerCase(), password, full_name: mode === "signup" ? name.trim() : email.split("@")[0] });
-      } catch (_) { /* already registered — fall through to login below */ }
+      if (mode === "reset") {
+        await base44.auth.resetPassword({ resetToken: otp.trim(), newPassword: password });
+      } else {
+        try {
+          await base44.auth.register({ email: email.trim().toLowerCase(), password, full_name: name });
+        } catch (_) { /* already registered — fall through to login below */ }
+      }
       await base44.auth.loginViaEmailPassword(email.trim().toLowerCase(), password);
       // Hard navigation — see submitLogin's comment above for why.
       window.location.href = safeFrom;
