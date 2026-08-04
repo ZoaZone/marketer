@@ -150,9 +150,9 @@ export default function Auth() {
     if (finalCode.length < 6) return;
     setLoading(true); setError("");
     try {
-      if (mode !== "reset") {
-        await base44.functions.invoke("sendAuthOTP", { action: "verify", email: email.trim().toLowerCase(), otp: finalCode, purpose: mode });
-      }
+      // Only signup reaches the OTP step now (reset uses a native reset
+      // token collected on the password step), so always verify the code.
+      await base44.functions.invoke("sendAuthOTP", { action: "verify", email: email.trim().toLowerCase(), otp: finalCode, purpose: mode });
       setFlow("password");
     } catch (err) {
       setError(err?.message || "Incorrect code. Please try again.");
