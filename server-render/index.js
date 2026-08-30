@@ -73,7 +73,7 @@ let processing = false;
 // sized to a realistic worst case; short kinds keep the original hour.
 const ONE_HOUR_MS = 60 * 60 * 1000;
 const LONG_FORM_RETENTION_MS = 8 * ONE_HOUR_MS;
-const LONG_FORM_KINDS = new Set(["dub-video", "dub-audio", "render"]);
+const LONG_FORM_KINDS = new Set(["dubVideo", "dubAudio", "render"]);
 
 function retentionFor(id) {
   const job = jobs.get(id);
@@ -231,6 +231,7 @@ app.post("/render", requireSecret, (req, res) => {
   const id = nanoid();
   jobs.set(id, {
     id,
+    kind: "render",
     status: "queued",
     progress: 0,
     sceneIndex: null,
@@ -262,6 +263,7 @@ app.post("/lane1-video", requireSecret, (req, res) => {
   const id = nanoid();
   jobs.set(id, {
     id,
+    kind: "lane1Video",
     status: "queued",
     progress: 0,
     url: null,
@@ -285,6 +287,7 @@ app.post("/music", requireSecret, (req, res) => {
   const id = nanoid();
   jobs.set(id, {
     id,
+    kind: "music",
     status: "queued",
     progress: 0,
     url: null,
@@ -307,6 +310,7 @@ app.post("/video", requireSecret, (req, res) => {
   const id = nanoid();
   jobs.set(id, {
     id,
+    kind: "video",
     status: "queued",
     progress: 0,
     url: null,
@@ -336,6 +340,7 @@ app.post("/dub-audio", requireSecret, (req, res) => {
   const id = nanoid();
   jobs.set(id, {
     id,
+    kind: "dubAudio",
     status: "queued",
     progress: 0,
     url: null,
@@ -356,6 +361,7 @@ app.post("/dub-video", requireSecret, (req, res) => {
   const id = nanoid();
   jobs.set(id, {
     id,
+    kind: "dubVideo",
     status: "queued",
     progress: 0,
     url: null,
