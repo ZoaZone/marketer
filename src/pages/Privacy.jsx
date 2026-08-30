@@ -653,8 +653,78 @@ export default function PrivacyConsentPage() {
             </p>
           </Section>
 
-          {/* 14. CONTACT */}
-          <Section id="contact" title="14. Contact & Data Requests">
+          {/* 14. AI PROCESSING, VOICE & DUBBING — mirrors §6 of the Terms of
+              Service. The Terms allocate legal responsibility; this section
+              explains the data handling behind it. If one changes, change both. */}
+          <Section id="ai-voice" title="14. AI Processing, Voice & Dubbing">
+            <AlertBox type="warning">
+              <strong>A voice is personal data — and in some places, biometric data.</strong> If you
+              upload material containing someone else&rsquo;s voice or likeness, you are responsible
+              for holding their consent before you do. See{" "}
+              <a href="/terms" className="text-indigo-400 underline">§6 of our Terms of Service</a>.
+            </AlertBox>
+
+            <h4 className="text-white font-semibold mt-5 mb-2">What we process, and who receives it</h4>
+            <p>
+              To generate or dub the media you ask for, the files you upload — and the speech, voice
+              and video they contain — are stored on our platform and sent to the specialist AI
+              providers that do the work. For {BRAND.name} these currently include ElevenLabs (speech,
+              voice and dubbing), Replicate (video, music and lip-sync models) and our application
+              platform&rsquo;s built-in AI. They process the material on our instructions to return
+              your result, under their own terms and security commitments. Processing takes place in
+              the United States and other countries where those providers operate, so uploading
+              material involves an international transfer of that data.
+            </p>
+
+            <h4 className="text-white font-semibold mt-5 mb-2">Voice cloning and dubbing</h4>
+            <p>
+              Dubbing Studio reproduces the vocal characteristics of the speakers in your source
+              file so the dubbed version sounds like the original performers. A recording of a
+              person&rsquo;s voice identifies that person, and several jurisdictions treat a voiceprint
+              as biometric or otherwise specially protected data.
+            </p>
+            <p className="mt-3">
+              <strong className="text-white">Who is responsible for whom.</strong> We handle your
+              account data as controller. For third-party voices inside the media you upload —
+              actors, narrators, singers, interviewees — you decide why and how that material is
+              processed, so as between us you are responsible for the lawful basis and for consent,
+              and we act on your instructions. Our Terms require you to hold each identifiable
+              person&rsquo;s documented consent for the territories of distribution, and a signed
+              release from performers, which is mandatory where the voice belongs to a celebrity,
+              recording artist or other widely recognisable person.
+            </p>
+            <p className="mt-3">
+              <strong className="text-white">We do not use your uploads or generated output to train
+              our own models.</strong> Third-party providers&rsquo; use of data submitted to them is
+              governed by their own terms; we select providers on the basis that customer content is
+              not used for their model training, and will update this policy if that changes.
+            </p>
+
+            <h4 className="text-white font-semibold mt-5 mb-2">Retention, and the rights of people in your media</h4>
+            <p>
+              Source files, generated output and job records are kept in your library until you
+              delete them, plus a limited period in encrypted backups. Deleting a project or asset
+              removes it from the Service; provider-side copies are removed on the providers&rsquo;
+              own retention schedules.
+            </p>
+            <p className="mt-3">
+              If you are a performer, or anyone else whose voice or likeness appears in material
+              someone has uploaded here, you may write to{" "}
+              <a href={`mailto:${BRAND.supportEmail}`} className="text-indigo-400 underline">{BRAND.supportEmail}</a>{" "}
+              to ask what is held, to object, or to ask for it to be deleted. In most cases the
+              customer who uploaded it is the controller, so we will normally refer your request to
+              them and support them in answering it — but tell us if you believe material was
+              uploaded without your consent and we will act on it, including suspending or removing
+              the affected job.
+            </p>
+            <p className="mt-3">
+              We may refuse, suspend or remove any dub where we reasonably believe the necessary
+              consent is absent.
+            </p>
+          </Section>
+
+          {/* 15. CONTACT */}
+          <Section id="contact" title="15. Contact & Data Requests">
             <div className="grid sm:grid-cols-2 gap-4">
               {[
                 { title: "General Privacy Inquiries", email: BRAND.supportEmail, icon: "📧" },
