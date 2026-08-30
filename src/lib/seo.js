@@ -115,6 +115,11 @@ export const SEO = {
     title: "Privacy Policy",
     description: `How ${BRAND.name} collects, uses, stores and protects your data, including AI-generated content, connected social accounts and payment information.`,
   },
+  terms: {
+    path: "/terms",
+    title: "Terms of Service",
+    description: `The terms governing your use of ${BRAND.name}, operated by ZoaZone Services LLC — accounts, plans and billing, acceptable use, AI-generated content, and rights in what you upload.`,
+  },
   freeTrial: {
     path: "/free-trial",
     title: "Start your free trial",
