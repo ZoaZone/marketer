@@ -7,6 +7,7 @@
   "dependencies": {
     "express": "^4.19.2",
     "cors": "^2.8.5",
-    "nanoid": "^5.0.7"
+    "nanoid": "^5.0.7",
+    "redis": "^4.7.0"
   }
 }
