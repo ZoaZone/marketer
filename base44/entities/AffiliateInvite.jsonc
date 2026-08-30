@@ -12,7 +12,10 @@
     },
     "proposed_tier": {
       "type": "number",
-      "enum": [1, 2]
+      "enum": [
+        1,
+        2
+      ]
     },
     "proposed_share_pct": {
       "type": "number",
@@ -28,7 +31,11 @@
     },
     "status": {
       "type": "string",
-      "enum": ["pending", "accepted", "expired"],
+      "enum": [
+        "pending",
+        "accepted",
+        "expired"
+      ],
       "default": "pending"
     },
     "expires_at": {
@@ -36,5 +43,31 @@
       "format": "date-time"
     }
   },
-  "required": ["email", "proposed_tier", "token"]
+  "required": [
+    "email",
+    "proposed_tier",
+    "token"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
 }

@@ -14,7 +14,12 @@
     },
     "status": {
       "type": "string",
-      "enum": ["pending", "processing", "paid", "failed"],
+      "enum": [
+        "pending",
+        "processing",
+        "paid",
+        "failed"
+      ],
       "default": "pending"
     },
     "provider_ref": {
@@ -26,5 +31,30 @@
       "format": "date-time"
     }
   },
-  "required": ["affiliate_id", "total_amount"]
+  "required": [
+    "affiliate_id",
+    "total_amount"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
 }

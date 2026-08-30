@@ -2,15 +2,67 @@
   "name": "BetaInvite",
   "type": "object",
   "properties": {
-    "email":         { "type": "string" },
-    "token":         { "type": "string" },
-    "invited_by":    { "type": "string" },
-    "note":          { "type": "string" },
-    "status":        { "type": "string", "enum": ["pending","clicked","registered"], "default": "pending" },
-    "expires_at":    { "type": "string" },
-    "clicked_at":    { "type": "string" },
-    "registered_at": { "type": "string" },
-    "source":        { "type": "string", "enum": ["manual_invite","beta_request_approved","free_invite"], "default": "manual_invite" }
+    "email": {
+      "type": "string"
+    },
+    "token": {
+      "type": "string"
+    },
+    "invited_by": {
+      "type": "string"
+    },
+    "note": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "clicked",
+        "registered"
+      ],
+      "default": "pending"
+    },
+    "expires_at": {
+      "type": "string"
+    },
+    "clicked_at": {
+      "type": "string"
+    },
+    "registered_at": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "manual_invite",
+        "beta_request_approved",
+        "free_invite"
+      ],
+      "default": "manual_invite"
+    }
   },
-  "required": []
+  "required": [],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
 }

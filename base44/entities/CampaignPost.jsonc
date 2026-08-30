@@ -2,24 +2,129 @@
   "name": "CampaignPost",
   "type": "object",
   "properties": {
-    "brand_id":          { "type": "string" },
-    "campaign_name":     { "type": "string" },
-    "step":              { "type": "string" },
-    "content_type":      { "type": "string" },
-    "ai_prompt":         { "type": "string" },
-    "ai_output":         { "type": "string" },
-    "reference_images":  { "type": "array", "items": { "type": "string" } },
-    "reference_consent": { "type": "boolean", "default": false },
-    "media_urls":        { "type": "array", "items": { "type": "string" } },
-    "media_type":        { "type": "string", "enum": ["image","video","reel","story","carousel"], "default": "image" },
-    "format":            { "type": "string" },
-    "platforms":         { "type": "array", "items": { "type": "string" } },
-    "caption":           { "type": "string" },
-    "hashtags":          { "type": "string" },
-    "scheduled_at":      { "type": "string", "format": "date-time" },
-    "status":            { "type": "string", "enum": ["draft","scheduled","posted","failed"], "default": "draft" },
-    "owner_id":          { "type": "string" },
-    "notes":             { "type": "string" }
+    "brand_id": {
+      "type": "string"
+    },
+    "campaign_name": {
+      "type": "string"
+    },
+    "step": {
+      "type": "string"
+    },
+    "content_type": {
+      "type": "string"
+    },
+    "ai_prompt": {
+      "type": "string"
+    },
+    "ai_output": {
+      "type": "string"
+    },
+    "reference_images": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "reference_consent": {
+      "type": "boolean",
+      "default": false
+    },
+    "media_urls": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "media_type": {
+      "type": "string",
+      "enum": [
+        "image",
+        "video",
+        "reel",
+        "story",
+        "carousel"
+      ],
+      "default": "image"
+    },
+    "format": {
+      "type": "string"
+    },
+    "platforms": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "caption": {
+      "type": "string"
+    },
+    "hashtags": {
+      "type": "string"
+    },
+    "scheduled_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "scheduled",
+        "posted",
+        "failed"
+      ],
+      "default": "draft"
+    },
+    "owner_id": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    }
   },
-  "required": ["brand_id"]
+  "required": [
+    "brand_id"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {
+      "created_by": "{{user.email}}"
+    },
+    "update": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
 }
