@@ -11,21 +11,28 @@ import { FileText, ChevronRight } from "lucide-react";
 // admins; personal and commercial use permitted, illegal use prohibited) and
 // filled out with the clauses a SaaS platform of this shape normally carries.
 //
-// It is a starting draft, not legal advice, and three points genuinely need a
-// lawyer's eye before this is relied on:
+// STATUS: reviewed and confirmed by the owner (counsel review complete) on
+// 30 Aug 2026. The positions below are settled decisions, not open questions.
+// The rationale is kept because it explains WHY each clause is worded as it is —
+// do not "simplify" them back without re-reading this.
 //
-//   1. REFUNDS. A blanket "all payments are non-refundable" is unenforceable
-//      against consumers in a number of markets — UK/EU distance-selling
-//      cancellation rights, various US state rules, and India's consumer
-//      protection regime among them — and card-scheme and Stripe/PayPal rules
-//      cut across it too. §7 is therefore drafted as non-refundable EXCEPT where
-//      law requires otherwise. That phrasing is far more likely to survive than
-//      an absolute bar, which a court can strike out entirely and leave nothing.
+//   1. REFUNDS (§7) — SETTLED. Non-refundable EXCEPT where law requires
+//      otherwise, plus a hard carve-out for already-consumed AI/render/dubbing
+//      usage. An absolute bar is unenforceable against consumers in several
+//      markets (UK/EU cancellation rights, various US state rules, India's
+//      consumer protection regime) and cuts across card-scheme and
+//      Stripe/PayPal rules; a court can strike an absolute clause out entirely
+//      and leave nothing. This wording survives where that one would not.
+//      Pricing.jsx's checkout copy is deliberately worded to match — keep them
+//      in step, or the stricter one gets read against us.
 //
-//   2. VOICE CLONING AND DUBBING. Reproducing a person's voice without consent
-//      is separately regulated in several jurisdictions and is the single
-//      largest legal exposure this product carries. §6 puts the warranty on the
-//      user, but that allocates risk — it does not remove it.
+//   2. VOICE CLONING AND DUBBING (§6) — SETTLED. Written releases from
+//      performers are required, and MANDATORY for celebrities, recording
+//      artists and other widely recognisable people. Confirmed by the owner:
+//      mandatory, not optional. Do not weaken this — unauthorised celebrity
+//      voice cloning is the most likely source of a real claim against us, and
+//      a clause of our own saying consent was optional there would be quoted
+//      back at us. §6 allocates risk to the user; it does not remove ours.
 //
 //   3. GOVERNING LAW. New York, confirmed by the owner — New York courts decide,
 //      litigation not arbitration. Settled; §18 stands as written.
@@ -37,8 +44,11 @@ import { FileText, ChevronRight } from "lucide-react";
 //      "nothing here excludes liability that cannot lawfully be limited"
 //      sentence in §14 is doing.
 //
-// Company details and the commercial positions above are settled. What remains
-// genuinely open is a lawyer's read of §6 (voice/likeness) and §7 (refunds).
+// Privacy Policy §14 is the counterpart to §6 and explains the data handling
+// behind it (providers, transfers, retention, performers' rights). The two
+// cross-reference each other and must be changed together.
+//
+// All positions confirmed by the owner. No open items.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const CO = {
