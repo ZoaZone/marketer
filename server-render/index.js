@@ -7,9 +7,11 @@
 // this is an async job API: POST /render, POST /lane1-video, POST /music,
 // POST /video, POST /dub-audio, or POST /dub-video enqueues and returns a
 // job id immediately, and the caller polls GET /jobs/:id for
-// status/progress/url(/captionsUrl). All job kinds share the same
-// in-memory job store and single-item queue (processQueue branches on
-// kind) — only one job, of any kind, runs at a time.
+// status/progress/url(/captionsUrl). All job kinds share the same job store
+// and single-item queue (processQueue branches on kind) — only one job, of any
+// kind, runs at a time. Job records live in jobstore.js: Redis-backed and
+// restart-durable when REDIS_URL is set, in-memory otherwise (the boot log
+// says which). The queue itself is still in-process.
 //
 // When PUBLIC_WORKER_URL is configured, dub-video's lip-sync step (the
 // slowest, most poll-flaky leg) is completed via a Replicate webhook
@@ -38,7 +40,15 @@ const REPLICATE_WEBHOOK_SIGNING_SECRET = process.env.REPLICATE_WEBHOOK_SIGNING_S
 // fetches to whatever imageUrl/voiceUrl/musicUrl it's given) — refuse to
 // start rather than come up wide open.
 if (!RENDER_SHARED_SECRET) {
-  console.error("RENDER_SHARED_SECRET is not configured — refusing to start.");
+  // This is the single most common cause of a "deployment crashed" on Railway:
+  // the variable is missing or was not attached to this service/environment, so
+  // the container exits 1 immediately on every boot. Named explicitly so the
+  // log says what to fix rather than just showing a non-zero exit.
+  console.error(
+    "RENDER_SHARED_SECRET is not configured — refusing to start. " +
+    "Set it in Railway → your worker service → Variables, and make sure it matches " +
+    "the RENDER_SHARED_SECRET secret set on the Base44 app.",
+  );
   process.exit(1);
 }
 
