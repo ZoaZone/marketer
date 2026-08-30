@@ -22,10 +22,34 @@ import { spawn } from "node:child_process";
 import { replicateFetch, isRetryableReplicateError, nextReplicateBackoffDelay, MAX_REPLICATE_RETRY_ATTEMPTS } from "./replicate.js";
 
 const POLL_INTERVAL_MS = 5000;
-// Dubbing a full-length video can take several minutes — this still runs on
-// the long-lived worker process, not inside a gated function call, so it can
-// afford the wait.
-const POLL_TIMEOUT_MS = 15 * 60 * 1000;
+// Dubbing runs on the long-lived worker process, not inside a gated function
+// call, so it can afford to wait.
+//
+// This was a flat 15 minutes, which is fine for a clip and wrong for the thing
+// the product actually sells: ElevenLabs Dubbing on a feature-length film runs
+// for hours, so the poll gave up long before the provider finished and a
+// perfectly healthy job surfaced to the user as a timeout. The provider job
+// kept running and kept billing — the result was simply abandoned.
+//
+// The ceiling now scales with the source duration when the caller knows it
+// (roughly 4x realtime plus generous headroom), and falls back to a flat
+// long-form window when it doesn't.
+const POLL_TIMEOUT_MS = 15 * 60 * 1000;              // short clips / unknown
+const LONG_FORM_POLL_TIMEOUT_MS = 6 * 60 * 60 * 1000; // hard ceiling, 6h
+const REALTIME_MULTIPLIER = 4;
+const POLL_HEADROOM_MS = 30 * 60 * 1000;
+
+/**
+ * Poll ceiling for one dubbing job.
+ * @param {number|undefined} sourceSeconds duration of the source media, when known.
+ */
+function pollTimeoutFor(sourceSeconds) {
+  if (!Number.isFinite(sourceSeconds) || sourceSeconds <= 0) {
+    return LONG_FORM_POLL_TIMEOUT_MS;
+  }
+  const estimated = sourceSeconds * 1000 * REALTIME_MULTIPLIER + POLL_HEADROOM_MS;
+  return Math.min(Math.max(estimated, POLL_TIMEOUT_MS), LONG_FORM_POLL_TIMEOUT_MS);
+}
 
 const DEFAULT_LIPSYNC_MODEL = "sync/lipsync-2";
 
@@ -88,7 +112,7 @@ async function createDubbingJob(spec, apiKey) {
   return data.dubbing_id;
 }
 
-async function pollDubbingJob(dubbingId, apiKey, onProgress, progressFloor, progressCeil) {
+async function pollDubbingJob(dubbingId, apiKey, onProgress, progressFloor, progressCeil, sourceSeconds) {
   const startedAt = Date.now();
   const deadline = startedAt + POLL_TIMEOUT_MS;
 
