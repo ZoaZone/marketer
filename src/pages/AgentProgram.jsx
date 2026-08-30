@@ -45,14 +45,17 @@ export default function AgentProgram() {
     setError("");
     setLoading(true);
     try {
-      await base44.entities.BetaRequest.create({
+      // Via submitBetaRequest (asServiceRole) — BetaRequest.create is admin-only
+      // under RLS now. See the matching call in AgencyEnquiry.jsx.
+      const res = await base44.functions.invoke("submitBetaRequest", {
         full_name: form.full_name,
         email: form.email,
         company: form.company || "",
         use_case: `AGENT APPLICATION | Phone: ${form.phone} | Audience: ${form.audience} | Experience: ${form.experience}`,
-        status: "pending",
         note: "Agent program application",
       });
+      const data = res?.data ?? res;
+      if (data?.error) throw new Error(data.error);
       setSubmitted(true);
     } catch (err) {
       setError(err.message || "Something went wrong. Please try again.");
