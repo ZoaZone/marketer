@@ -741,11 +741,21 @@ export default function PrivacyConsentPage() {
             <p className="text-gray-400 text-sm mt-4">
               We aim to respond to all inquiries within <strong className="text-white">5 business days</strong>. Data subject requests are handled within 30 days as required by applicable law.
             </p>
+            <div className="mt-4 bg-gray-900 border border-gray-800 rounded-xl p-5">
+              <p className="text-white font-semibold">{BRAND.companyName}</p>
+              <p className="text-gray-400 text-sm mt-1">{BRAND.companyAddress}</p>
+              <p className="text-gray-400 text-sm">Telephone: {BRAND.companyPhone}</p>
+              <p className="text-gray-400 text-sm mt-2">
+                See also our{" "}
+                <a href="/terms" className="text-indigo-400 underline">Terms of Service</a>, which
+                govern your use of {BRAND.name} — in particular §6 on AI content, voice and dubbing.
+              </p>
+            </div>
           </Section>
 
           {/* Footer signature */}
           <div className="border-t border-gray-800 pt-8 text-center text-gray-500 text-sm">
-            <p>{BRAND.companyName} · {BRAND.domain} · Effective {BRAND.effectiveDate}</p>
+            <p>{BRAND.companyName} · {BRAND.name} · {BRAND.domain} · Effective {BRAND.effectiveDate}</p>
             <p className="mt-1">
               Questions? <a href={`mailto:${BRAND.supportEmail}`} className="text-indigo-400 underline">{BRAND.supportEmail}</a>
             </p>
