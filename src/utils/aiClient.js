@@ -366,7 +366,49 @@ export async function getDubStatus(jobId) {
 }
 
 const DUB_POLL_MS = 5000;
-const DUB_TIMEOUT_MS = 900_000; // ~15 minutes — dubbing a full video can take a while
+
+// Client-side give-up window for a dubbing job. This was a flat 15 minutes,
+// which silently capped the product's headline feature: dubbing a
+// feature-length film runs for hours, so the browser stopped polling and
+// reported failure while the worker (and the ElevenLabs job it is paying for)
+// carried on to a successful result nobody ever collected.
+//
+// The budget now scales with the source duration, mirroring
+// server-render/dub.js's pollTimeoutFor so the two ends agree — the client
+// should never be the one to give up first, so it allows a little more than
+// the worker does.
+const DUB_TIMEOUT_MS = 900_000;                  // fallback: short clips / unknown duration
+const DUB_LONG_FORM_TIMEOUT_MS = 7 * 60 * 60 * 1000; // hard ceiling, 7h
+const DUB_REALTIME_MULTIPLIER = 4;
+const DUB_HEADROOM_MS = 45 * 60 * 1000;
+
+function dubTimeoutFor(sourceSeconds) {
+  if (!Number.isFinite(sourceSeconds) || sourceSeconds <= 0) return DUB_LONG_FORM_TIMEOUT_MS;
+  const estimated = sourceSeconds * 1000 * DUB_REALTIME_MULTIPLIER + DUB_HEADROOM_MS;
+  return Math.min(Math.max(estimated, DUB_TIMEOUT_MS), DUB_LONG_FORM_TIMEOUT_MS);
+}
+
+/**
+ * Reads a media file's duration in seconds from its URL, without downloading
+ * the whole file (metadata preload only). Returns undefined rather than
+ * throwing — an unknown duration just falls back to the long-form budget.
+ */
+export function probeMediaDuration(url, kind = "video") {
+  return new Promise((resolve) => {
+    if (!url || typeof document === "undefined") return resolve(undefined);
+    const el = document.createElement(kind === "audio" ? "audio" : "video");
+    el.preload = "metadata";
+    el.crossOrigin = "anonymous";
+    const done = (v) => { el.removeAttribute("src"); el.load?.(); resolve(v); };
+    const timer = setTimeout(() => done(undefined), 15000);
+    el.onloadedmetadata = () => {
+      clearTimeout(timer);
+      done(Number.isFinite(el.duration) && el.duration > 0 ? el.duration : undefined);
+    };
+    el.onerror = () => { clearTimeout(timer); done(undefined); };
+    el.src = url;
+  });
+}
 
 /**
  * Dub an audio file into another language via the async render-worker job
@@ -407,22 +449,45 @@ export async function dubAudioFile({ sourceUrl, targetLang, sourceLang, numSpeak
  *   including a timeout. Callers should treat this as non-fatal — a video
  *   that fails to dub just keeps its original audio/captions.
  */
-export async function dubVideoFile({ sourceUrl, targetLang, sourceLang, numSpeakers, dropBackgroundAudio, disableVoiceCloning, watermark, highestResolution, startTime, endTime, lipSync, burnCaptions, captionOverrides } = {}) {
+export async function dubVideoFile({ sourceUrl, targetLang, sourceLang, numSpeakers, dropBackgroundAudio, disableVoiceCloning, watermark, highestResolution, startTime, endTime, lipSync, burnCaptions, captionOverrides, sourceSeconds, onProgress } = {}) {
+  // Duration drives the timeout on BOTH ends: it is forwarded to the worker
+  // (submitDubVideo passes the spec through verbatim) so its poll budget
+  // matches, and used locally below. Probed from the media itself when the
+  // caller didn't supply it.
+  const durationSeconds = Number.isFinite(sourceSeconds) && sourceSeconds > 0
+    ? sourceSeconds
+    : await probeMediaDuration(sourceUrl, "video");
+
   const jobId = await submitDubVideo({
     sourceUrl, targetLang, sourceLang, numSpeakers, dropBackgroundAudio, disableVoiceCloning,
     watermark, highestResolution, startTime, endTime, lipSync, burnCaptions, captionOverrides,
+    sourceSeconds: durationSeconds,
   });
 
+  const budgetMs = dubTimeoutFor(durationSeconds);
   const startedAt = Date.now();
   for (;;) {
-    if (Date.now() - startedAt > DUB_TIMEOUT_MS) {
-      throw new Error("Dubbing timed out. Please try again.");
+    if (Date.now() - startedAt > budgetMs) {
+      throw new Error(
+        `Dubbing is still running after ${Math.round(budgetMs / 60000)} minutes and this page stopped waiting. ` +
+        "The job may still complete on the server — check your media library before re-running, since a re-run bills the source again.",
+      );
     }
     await new Promise((resolve) => setTimeout(resolve, DUB_POLL_MS));
     const job = await getDubStatus(jobId);
-    if (job?.status === "done") return { url: job.url, captionsUrl: job.captionsUrl || null };
+    if (job?.status === "done") return { url: job.url, captionsUrl: job.captionsUrl || null, jobId };
     if (job?.status === "error") throw new Error(job.error || "Dubbing failed.");
-    // else "queued" / "processing" — keep polling
+    // else "queued" / "processing" — keep polling. Surfacing progress matters
+    // far more on a two-hour job than on a clip: without it the UI looks hung.
+    if (typeof onProgress === "function") {
+      onProgress({
+        jobId,
+        status: job?.status || "processing",
+        progress: typeof job?.progress === "number" ? job.progress : null,
+        elapsedMs: Date.now() - startedAt,
+        budgetMs,
+      });
+    }
   }
 }
 
