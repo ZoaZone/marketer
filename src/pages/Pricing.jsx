@@ -202,7 +202,7 @@ export default function Pricing() {
         </div>
 
         {plan.contactSales ? (
-          <a href="mailto:sales@digitalstudios.app?subject=Movie%20Maker%20Pro%20Enterprise"
+          <a href="mailto:care@zoazoneservices.com?subject=Movie%20Maker%20Pro%20Enterprise"
             className="w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:opacity-90 shadow-lg">
             <Mail className="w-4 h-4" /> Contact Sales
           </a>

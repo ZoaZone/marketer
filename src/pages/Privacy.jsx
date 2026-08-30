@@ -501,7 +501,7 @@ export default function PrivacyConsentPage() {
             <SubHeading>7.1 Reporting a Security Issue</SubHeading>
             <p>
               If you discover a security vulnerability, please report it responsibly to{" "}
-              <a href="mailto:security@digitalstudios.app" className="text-indigo-400 underline">security@digitalstudios.app</a>. We commit to acknowledging your report within 48 hours and providing a remediation timeline within 7 business days. We do not pursue legal action against good-faith security researchers.
+              <a href="mailto:care@digitalstudios.app" className="text-indigo-400 underline">care@digitalstudios.app</a>. We commit to acknowledging your report within 48 hours and providing a remediation timeline within 7 business days. We do not pursue legal action against good-faith security researchers.
             </p>
           </Section>
 
@@ -654,7 +654,7 @@ export default function PrivacyConsentPage() {
               {[
                 { title: "General Privacy Inquiries", email: BRAND.supportEmail, icon: "📧" },
                 { title: "Data Protection Officer (EU/UK)", email: BRAND.dpoEmail, icon: "🏛️" },
-                { title: "Security Vulnerability Reports", email: "security@digitalstudios.app", icon: "🔒" },
+                { title: "Security Vulnerability Reports", email: "care@digitalstudios.app", icon: "🔒" },
                 { title: "CCPA / CPRA Requests", email: BRAND.supportEmail, icon: "📋" },
               ].map((c) => (
                 <div key={c.title} className="bg-gray-900 border border-gray-800 rounded-xl p-5">
