@@ -39,7 +39,8 @@ Deno.serve(async (req) => {
     // Create the record using service role (bypasses auth)
     const record = await base44.asServiceRole.entities.BetaRequest.create({
       full_name,
-      email,
+      email: String(email).trim().toLowerCase(),
+      note: note || '',
       company: company || '',
       use_case: use_case || '',
       status: 'pending',
