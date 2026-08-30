@@ -2,10 +2,10 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import {
-import { useSeo, SEO } from "@/lib/seo";
   Building2, CheckCircle2, ArrowRight, Loader2, Users,
   Sparkles, BarChart3, Shield, Headphones, Zap, Star
 } from "lucide-react";
+import { useSeo, SEO } from "@/lib/seo";
 
 const AGENCY_FEATURES = [
   { icon: Users, title: "Unlimited Client Seats", desc: "Manage all your clients from a single dashboard." },

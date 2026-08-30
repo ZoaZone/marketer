@@ -2,10 +2,10 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import {
-import { useSeo, SEO } from "@/lib/seo";
   Handshake, DollarSign, Users, TrendingUp, CheckCircle2,
   ArrowRight, Loader2, Sparkles, Star, Zap, Gift, ChevronRight
 } from "lucide-react";
+import { useSeo, SEO } from "@/lib/seo";
 
 const BENEFITS = [
   { icon: DollarSign, title: "Real Commission, Set When You're Approved", desc: "Your commission rate is agreed with our team when you're approved — no vague tiers, a real % of every sale you refer.", color: "from-emerald-500 to-teal-600" },
