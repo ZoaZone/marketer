@@ -3,9 +3,8 @@ import { useOutletContext, Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { mine } from "@/utils/scope";
 import {
-  Upload, Sparkles, Type, Music, Play, Download, Save, Lock,
-  ChevronLeft, ChevronRight, X, Image as ImageIcon, Video, Check,
-  Loader2, AlertCircle, RefreshCw, Wand2, Sliders, Film,
+  Upload, Sparkles, Type, Music, Download, Save, Lock, ChevronRight, X, Image as ImageIcon, Check,
+  Loader2, AlertCircle, Wand2, Film,
 } from "lucide-react";
 import { generateImage, uploadFile } from "@/utils/aiClient";
 import PageHeader from "@/components/ui/PageHeader";

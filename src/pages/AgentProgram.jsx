@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import {
   Handshake, DollarSign, Users, TrendingUp, CheckCircle2,
-  ArrowRight, Loader2, Sparkles, Star, Zap, Gift, ChevronRight
+  ArrowRight, Loader2, Sparkles, Gift, ChevronRight
 } from "lucide-react";
 import { useSeo, SEO } from "@/lib/seo";
 

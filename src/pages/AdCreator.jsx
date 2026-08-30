@@ -5,7 +5,7 @@ import { base44 } from "@/api/base44Client";
 import { mine } from "@/utils/scope";
 import { generateText } from "@/utils/aiClient";
 import { LLM_MODELS } from "@/utils/llmModels";
-import { PenTool, Wand2, Copy, CheckCircle2, Loader2, Download, Send, Check, AlertCircle, Share2, Info } from "lucide-react";
+import { PenTool, Wand2, Loader2, Download, Send, Check, AlertCircle, Share2, Info } from "lucide-react";
 
 const PLATFORMS=[{v:"instagram",l:"Instagram",formats:["Story","Reel","Feed Post","Carousel"]},{v:"facebook",l:"Facebook",formats:["News Feed","Story","Video Ad","Carousel"]},{v:"tiktok",l:"TikTok",formats:["Video Ad","TopView"]},{v:"linkedin",l:"LinkedIn",formats:["Sponsored Post","Message Ad","Banner"]},{v:"youtube",l:"YouTube",formats:["Pre-roll","Bumper","Display"]},{v:"google",l:"Google",formats:["Search Ad","Display","Responsive"]}];
 const OBJECTIVES=["Brand Awareness","Lead Generation","Sales/Conversion","App Install","Website Traffic","Engagement"];

@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Upload, User, MapPin, Briefcase, Globe, Tag, FileText, Lock, ArrowRight, Loader2, CheckCircle2, Sparkles, Image, Video, Mail, GitBranch, Share2, BarChart3, Zap, Play } from "lucide-react";
+import { ArrowLeft, Upload, User, Lock, ArrowRight, Loader2, CheckCircle2, Sparkles, Image, Video, Mail, GitBranch, Share2, BarChart3, Zap } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { useSeo, SEO } from "@/lib/seo";
 

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Mic, MicOff, Send, X, MessageSquare, Volume2, VolumeX, Bot, Loader2 } from "lucide-react";
+import { Mic, MicOff, Send, Volume2, VolumeX, Bot, Loader2 } from "lucide-react";
 
 const SRI_FN     = "https://sreeagent.base44.app/functions/sriChat";
 const TTS_FN     = "https://sreeagent.base44.app/functions/ttsStream";

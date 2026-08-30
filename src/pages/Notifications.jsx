@@ -1,6 +1,4 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
 import { Bell, CheckCheck, Megaphone, GitBranch, Share2, Sparkles, Info, AlertCircle, CheckCircle2, Trash2 } from "lucide-react";
 
 const TYPE_CONFIG = {

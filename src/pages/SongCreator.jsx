@@ -4,7 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { mine } from "@/utils/scope";
 import {
   Music, Sparkles, Lock, Loader2, Check, AlertCircle, X,
-  Save, Download, Play, Pause, Globe, Wand2, Mic2, RefreshCw,
+  Save, Download, Globe, Mic2, RefreshCw,
   Languages, ListMusic,
 } from "lucide-react";
 import { generateText, generateVoiceover, generateMusic, uploadFile } from "@/utils/aiClient";
