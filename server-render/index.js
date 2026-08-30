@@ -65,10 +65,30 @@ const jobs = new Map();
 const queue = [];
 let processing = false;
 
+// Job-record retention. This used to be a flat one hour, which quietly capped
+// how long a job could exist at all: dubbing a feature-length film runs well
+// past 60 minutes, so the record was deleted while the job was still running
+// and GET /jobs/:id began answering 404 for work still in flight — which the
+// client reads as a failed dub. Long-form kinds now get a retention window
+// sized to a realistic worst case; short kinds keep the original hour.
 const ONE_HOUR_MS = 60 * 60 * 1000;
-function scheduleCleanup(id) {
-  setTimeout(() => jobs.delete(id), ONE_HOUR_MS).unref();
+const LONG_FORM_RETENTION_MS = 8 * ONE_HOUR_MS;
+const LONG_FORM_KINDS = new Set(["dub-video", "dub-audio", "render"]);
+
+function retentionFor(id) {
+  const job = jobs.get(id);
+  return job && LONG_FORM_KINDS.has(job.kind) ? LONG_FORM_RETENTION_MS : ONE_HOUR_MS;
 }
+
+function scheduleCleanup(id) {
+  setTimeout(() => jobs.delete(id), retentionFor(id)).unref();
+}
+
+// KNOWN LIMITATION, left visible on purpose: `jobs` is still an in-memory Map,
+// so a worker restart or redeploy loses every in-flight job no matter what the
+// retention above says. For commercial dubbing runs measured in hours, moving
+// `jobs` to Railway Redis is the next step — the get/set API stays identical,
+// which is why the store was written this way in the first place.
 
 // jobToken -> { jobId, resolve, timeoutHandle }. Populated by
 // buildWebhookHooks() when a job hands its completion off to a Replicate
@@ -76,9 +96,17 @@ function scheduleCleanup(id) {
 // below. The token (not the jobId) is the unguessable part of the webhook
 // URL, so it doubles as that route's auth.
 const webhookPending = new Map();
+// Was a flat 15 minutes. Replicate lip-sync over a feature-length film runs
+// far past that, and the timer fired mid-job and marked healthy work "error".
+// Long-form kinds get a window sized to the job instead.
 const WEBHOOK_TIMEOUT_MS = 15 * 60 * 1000;
+const LONG_FORM_WEBHOOK_TIMEOUT_MS = 6 * ONE_HOUR_MS;
 
 function registerWebhookPending(token, jobId, resolve) {
+  const pendingJob = jobs.get(jobId);
+  const timeoutMs = pendingJob && LONG_FORM_KINDS.has(pendingJob.kind)
+    ? LONG_FORM_WEBHOOK_TIMEOUT_MS
+    : WEBHOOK_TIMEOUT_MS;
   const timeoutHandle = setTimeout(() => {
     if (!webhookPending.delete(token)) return; // already resolved by the webhook
     const job = jobs.get(jobId);
@@ -87,7 +115,7 @@ function registerWebhookPending(token, jobId, resolve) {
       job.error = "Timed out waiting for the Replicate webhook.";
     }
     scheduleCleanup(jobId);
-  }, WEBHOOK_TIMEOUT_MS);
+  }, timeoutMs);
   timeoutHandle.unref();
   webhookPending.set(token, { jobId, resolve, timeoutHandle });
 }
