@@ -34,9 +34,6 @@
       ]
     }
   ],
-  "env": {
-    "VITE_GOOGLE_CLIENT_ID": "342662050420-hjsrds4v122ggc6np9hlcgp0n2dt5rqd.apps.googleusercontent.com"
-  },
   "rewrites": [
     {
       "source": "/((?!api/).*)",
