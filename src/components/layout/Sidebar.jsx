@@ -121,42 +121,70 @@ export default function Sidebar({ userTier = 0, isAdmin = false, user = null }) 
 
   const navContent = (
     <div className="flex flex-col h-full">
-      {/* Logo */}
-      <div className="px-4 pt-5 pb-4 border-b border-sidebar-border">
-        <Link to="/studio" className="block" onClick={() => setMobileOpen(false)}>
-          {/* Dark bg wrapper — visible in light mode (white sidebar bg), transparent in dark mode */}
-          <div className="dark:bg-transparent bg-[#12121e] dark:p-0 p-2 rounded-xl transition-colors">
-                        <img src="/logo.png" alt={BRAND.name}
-              className="w-full max-h-24 object-contain object-left"
-              onError={(e) => e.target.style.display="none"} />
+      {/* Logo. /logo.png is a 1024×1024 square whose wordmark occupies only the
+          middle ~17% of the height, so `max-h-24 object-contain` fit the empty
+          square to 96px and left the actual mark rendering ~16px tall — the
+          "too small to read" problem. /brand/wordmark.png is the same artwork
+          cropped tight to its bounding box (956×189, 5.06:1), so the width it is
+          given is the width the mark actually fills. */}
+      <div className="px-4 pt-6 pb-5 border-b border-sidebar-border">
+        <Link
+          to="/studio"
+          onClick={() => setMobileOpen(false)}
+          aria-label={`${BRAND.name} — go to Studio`}
+          className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500/60"
+        >
+          {/* The mark is light-on-transparent, so it needs a dark plate in light
+              mode; in dark mode the sidebar already provides one. */}
+          <div className="dark:bg-transparent bg-[#12121e] dark:p-0 px-3 py-2.5 rounded-xl transition-colors">
+            <img
+              src="/brand/wordmark.png"
+              alt={BRAND.name}
+              width="956"
+              height="189"
+              className="w-full h-auto object-contain"
+              onError={(e) => e.target.style.display = "none"} />
           </div>
-          <p className="mt-1.5 px-1 text-xs font-bold tracking-wide text-sidebar-foreground/80">{BRAND.name}</p>
+          <p className="mt-2.5 px-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">
+            {BRAND.tagline}
+          </p>
         </Link>
       </div>
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
         {NAV_SECTIONS.map(section => (
-          <div key={section.label} className="mb-2">
+          <div key={section.label} className="mb-3">
+            {/* 9px uppercase was below the legible floor; 10.5px with wider
+                tracking and more contrast keeps the labels quiet but readable. */}
             <button onClick={() => toggle(section.label)}
-              className="flex items-center justify-between w-full px-3 py-1.5 text-[9px] font-bold tracking-widest text-muted-foreground/50 uppercase hover:text-muted-foreground transition-colors">
+              aria-expanded={!collapsed[section.label]}
+              className="flex items-center justify-between w-full px-3 py-2 text-[10.5px] font-bold tracking-[0.13em] text-muted-foreground/65 uppercase hover:text-muted-foreground transition-colors rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500/40">
               {section.label}
-              <ChevronDown className={`w-3 h-3 transition-transform ${collapsed[section.label] ? "-rotate-90" : ""}`} />
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${collapsed[section.label] ? "-rotate-90" : ""}`} />
             </button>
             {!collapsed[section.label] && (
-              <div className="mt-0.5 space-y-0.5">
+              <div className="mt-1 space-y-0.5">
                 {section.items.map(item => {
                   const isActive = location.pathname === item.to;
                   const isLocked = !isAdmin && item.minTier && userTier < item.minTier;
                   return (
                     <Link key={item.to} to={item.to} onClick={() => setMobileOpen(false)}
-                      className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all group ${
+                      aria-current={isActive ? "page" : undefined}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13.5px] font-medium transition-all group ${
                         isActive
                           ? "bg-fuchsia-500/10 text-fuchsia-400 border border-fuchsia-500/20"
                           : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-foreground"
                       }`}>
-                      <item.icon className={`w-4 h-4 flex-shrink-0 ${isActive ? "text-fuchsia-400" : ""}`} />
+                      <item.icon className={`w-[17px] h-[17px] flex-shrink-0 ${isActive ? "text-fuchsia-400" : "text-muted-foreground/80 group-hover:text-foreground"}`} />
                       <span className="flex-1 truncate">{item.label}</span>
+                      {item.badge && !isLocked && (
+                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wider ${
+                          item.badge === "ENT"
+                            ? "bg-amber-500/15 text-amber-400"
+                            : "bg-fuchsia-500/15 text-fuchsia-400"
+                        }`}>{item.badge}</span>
+                      )}
                       {isLocked && <Lock className="w-3 h-3 text-muted-foreground/30" />}
                     </Link>
                   );
