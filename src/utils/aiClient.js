@@ -421,19 +421,40 @@ export function probeMediaDuration(url, kind = "video") {
  *   including a timeout. Callers should treat this as non-fatal — audio
  *   that fails to dub just keeps its original language.
  */
-export async function dubAudioFile({ sourceUrl, targetLang, sourceLang, numSpeakers, dropBackgroundAudio, disableVoiceCloning } = {}) {
-  const jobId = await submitDubAudio({ sourceUrl, targetLang, sourceLang, numSpeakers, dropBackgroundAudio, disableVoiceCloning });
+export async function dubAudioFile({ sourceUrl, targetLang, sourceLang, numSpeakers, dropBackgroundAudio, disableVoiceCloning, sourceSeconds, onProgress } = {}) {
+  // Same duration-aware budget as dubVideoFile — an audiobook or a feature's
+  // full audio track is just as long as the film it came from.
+  const durationSeconds = Number.isFinite(sourceSeconds) && sourceSeconds > 0
+    ? sourceSeconds
+    : await probeMediaDuration(sourceUrl, "audio");
 
+  const jobId = await submitDubAudio({
+    sourceUrl, targetLang, sourceLang, numSpeakers, dropBackgroundAudio, disableVoiceCloning,
+    sourceSeconds: durationSeconds,
+  });
+
+  const budgetMs = dubTimeoutFor(durationSeconds);
   const startedAt = Date.now();
   for (;;) {
-    if (Date.now() - startedAt > DUB_TIMEOUT_MS) {
-      throw new Error("Dubbing timed out. Please try again.");
+    if (Date.now() - startedAt > budgetMs) {
+      throw new Error(
+        `Dubbing is still running after ${Math.round(budgetMs / 60000)} minutes and this page stopped waiting. ` +
+        "The job may still complete on the server — check before re-running, since a re-run bills the source again.",
+      );
     }
     await new Promise((resolve) => setTimeout(resolve, DUB_POLL_MS));
     const job = await getDubStatus(jobId);
     if (job?.status === "done") return job.url;
     if (job?.status === "error") throw new Error(job.error || "Dubbing failed.");
-    // else "queued" / "processing" — keep polling
+    if (typeof onProgress === "function") {
+      onProgress({
+        jobId,
+        status: job?.status || "processing",
+        progress: typeof job?.progress === "number" ? job.progress : null,
+        elapsedMs: Date.now() - startedAt,
+        budgetMs,
+      });
+    }
   }
 }
 
