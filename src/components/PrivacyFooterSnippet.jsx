@@ -1,7 +1,7 @@
 /**
  * PrivacyFooterSnippet.jsx
  * 
- * Drop this into the footer of ANY AEVOICE app.
+ * Drop this into the footer of ANY ZoaZone app.
  * Route /privacy must point to PrivacyConsentPage.jsx
  * 
  * Usage:
@@ -19,15 +19,15 @@ export default function PrivacyFooterSnippet({ variant = "dark" }) {
     <footer className={`border-t ${borderColor} mt-16 px-4 py-8`}>
       <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm">
         <p className={`${variant === "dark" ? "text-gray-600" : "text-gray-400"}`}>
-          © {new Date().getFullYear()} AEVOICE AI Inc. All rights reserved.
+          © {new Date().getFullYear()} ZoaZone Services LLC All rights reserved.
         </p>
         <div className="flex flex-wrap gap-4 items-center">
           <Link to="/privacy" className={`${textColor} transition`}>
             🔒 Privacy & Consent Policy
           </Link>
           <span className={variant === "dark" ? "text-gray-700" : "text-gray-300"}>·</span>
-          <a href="mailto:privacy@digitalstudios.app" className={`${textColor} transition`}>
-            privacy@digitalstudios.app
+          <a href="mailto:care@digitalstudios.app" className={`${textColor} transition`}>
+            care@digitalstudios.app
           </a>
           <span className={variant === "dark" ? "text-gray-700" : "text-gray-300"}>·</span>
           <span className={`${variant === "dark" ? "text-gray-600" : "text-gray-400"} text-xs`}>

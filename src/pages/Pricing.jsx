@@ -357,7 +357,7 @@ export default function Pricing() {
 
         {/* Legal note */}
         <p className="text-center text-xs text-white/25">
-          All prices shown exclude applicable taxes, calculated and applied at checkout. All sales are final. Subscriptions auto-renew. Cancel anytime before renewal to avoid charges. For billing questions: care@aevoice.ai
+          All prices shown exclude applicable taxes, calculated and applied at checkout. All sales are final. Subscriptions auto-renew. Cancel anytime before renewal to avoid charges. For billing questions: care@digitalstudios.app
         </p>
       </div>
     </div>

@@ -232,7 +232,7 @@ export default function AgentProgram() {
 
       {/* Footer */}
       <footer className="border-t border-white/8 py-8 px-6 text-center">
-        <p className="text-white/30 text-xs">© 2026 ZoaZone Services LLC · <a href="mailto:partners@digitalstudios.app" className="hover:text-white/50">partners@digitalstudios.app</a> · <Link to="/" className="hover:text-white/50">DigitalStudios.app</Link></p>
+        <p className="text-white/30 text-xs">© 2026 ZoaZone Services LLC · <a href="mailto:care@zoazoneservices.com" className="hover:text-white/50">care@zoazoneservices.com</a> · <Link to="/" className="hover:text-white/50">DigitalStudios.app</Link></p>
       </footer>
     </div>
   );

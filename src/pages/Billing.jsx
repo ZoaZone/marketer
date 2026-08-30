@@ -131,7 +131,7 @@ export default function Billing() {
     try {
       const res = await base44.functions.invoke("stripePortalMarketer", { return_url: window.location.href });
       if (res?.url) window.location.href = res.url;
-      else setError(res?.error || "Could not open billing portal. Contact care@aevoice.ai");
+      else setError(res?.error || "Could not open billing portal. Contact care@digitalstudios.app");
     } catch (e) { setError(e.message); }
     setLoadingPortal(false);
   };
@@ -346,7 +346,7 @@ export default function Billing() {
       </div>
 
       <p className="text-center text-xs text-muted-foreground">
-        Questions? <a href="mailto:care@aevoice.ai" className="text-fuchsia-400 hover:underline">care@aevoice.ai</a> · 14-day free trial on Growth plan
+        Questions? <a href="mailto:care@digitalstudios.app" className="text-fuchsia-400 hover:underline">care@digitalstudios.app</a> · 14-day free trial on Growth plan
       </p>
     </div>
   );

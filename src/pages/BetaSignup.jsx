@@ -56,7 +56,7 @@ export default function BetaSignup() {
           <div className="bg-card border border-border rounded-2xl p-6 space-y-5">
             <div>
               <h2 className="text-lg font-bold text-foreground">Request Free Beta Access</h2>
-              <p className="text-muted-foreground text-sm mt-1">Get full access to all AEVOICE features — free for early beta users. Our team will review and send your invite.</p>
+              <p className="text-muted-foreground text-sm mt-1">Get full access to all Digital Studio features — free for early beta users. Our team will review and send your invite.</p>
             </div>
 
             <div className="bg-gradient-to-r from-fuchsia-500/10 to-purple-500/10 border border-fuchsia-500/20 rounded-xl px-4 py-3 flex items-center gap-2">
@@ -96,7 +96,7 @@ export default function BetaSignup() {
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">How will you use AEVOICE? (optional)</label>
+                <label className="text-xs font-medium text-muted-foreground">How will you use Digital Studio? (optional)</label>
                 <textarea
                   value={form.use_case}
                   onChange={e => setForm(p => ({ ...p, use_case: e.target.value }))}

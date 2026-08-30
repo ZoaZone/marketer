@@ -91,7 +91,7 @@ export default function PostPaymentOnboarding() {
           }`}>
             {paypalStatus === "capturing" && <><Loader2 className="w-4 h-4 animate-spin" /> Confirming your PayPal payment…</>}
             {paypalStatus === "success" && <><CheckCircle2 className="w-4 h-4" /> Payment confirmed — your plan is now active.</>}
-            {paypalStatus === "error" && <><AlertCircle className="w-4 h-4" /> We couldn't confirm that PayPal payment. Contact care@aevoice.ai if you were charged.</>}
+            {paypalStatus === "error" && <><AlertCircle className="w-4 h-4" /> We couldn't confirm that PayPal payment. Contact care@digitalstudios.app if you were charged.</>}
           </div>
         )}
 

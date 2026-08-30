@@ -318,7 +318,7 @@ export default function BetaOnboarding() {
               <h1 className="text-2xl font-black text-white mb-2">
                 You're approved!<br />
                 <span className="bg-gradient-to-r from-fuchsia-400 to-purple-400 bg-clip-text text-transparent">
-                  Welcome to AEVOICE Beta
+                  Welcome to Digital Studio Beta
                 </span>
               </h1>
               <p className="text-white/50 text-sm mb-1">Invite reserved for</p>
@@ -387,7 +387,7 @@ export default function BetaOnboarding() {
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-white">Tell Us About You</h2>
-                  <p className="text-white/40 text-xs">Personalise your AEVOICE experience</p>
+                  <p className="text-white/40 text-xs">Personalise your Digital Studio experience</p>
                 </div>
               </div>
 
@@ -455,7 +455,7 @@ export default function BetaOnboarding() {
                 You're in{fullName ? ", " + fullName.split(" ")[0] : ""}! 🎉
               </h2>
               <p className="text-white/50 text-sm mb-6">
-                Full Agency-tier access activated. Welcome to AEVOICE beta — let's build something great.
+                Full Agency-tier access activated. Welcome to Digital Studio beta — let's build something great.
               </p>
               <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 mb-6 text-left space-y-2">
                 <p className="text-emerald-400 font-semibold text-sm">What's unlocked:</p>
@@ -479,7 +479,7 @@ export default function BetaOnboarding() {
         </div>
 
         <p className="text-center text-white/20 text-xs mt-6">
-          © 2026 AEVOICE · DigitalStudios.app · Questions? <a href="mailto:hello@aevoice.ai" className="hover:text-white/40 transition-colors">hello@aevoice.ai</a>
+          © 2026 ZoaZone Services LLC · DigitalStudios.app · Questions? <a href="mailto:care@digitalstudios.app" className="hover:text-white/40 transition-colors">care@digitalstudios.app</a>
         </p>
       </div>
     </div>

@@ -60,7 +60,7 @@ export default function FreeTrial() {
     // Save as a beta request / lead
     try {
       await base44.integrations.Core.SendEmail({
-        to: "care@aevoice.ai",
+        to: "care@digitalstudios.app",
         subject: `New Free Trial Profile: ${profile.business_name}`,
         body: `Business: ${profile.business_name}\nOwner: ${profile.owner_name}\nEmail: ${profile.email}\nPhone: ${profile.phone}\nIndustry: ${profile.industry}\nWebsite: ${profile.website}\nTagline: ${profile.tagline}\nDescription: ${profile.description}`,
       });

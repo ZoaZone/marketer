@@ -446,12 +446,12 @@ export default function Home() {
           <div className="flex items-center">
             <img src="/brand/wordmark.png" alt={BRAND.name} className="h-8 w-auto object-contain" onError={(e) => e.target.style.display = "none"} />
           </div>
-          {/* These pointed at care@aevoice.ai / aevoice.ai — a different
+          {/* These pointed at care@digitalstudios.app / aevoice.ai — a different
               company's contact details, on this company's marketing page.
               Privacy and Terms are linked here because Google's OAuth
               verification checks both are reachable from the site. */}
           <div className="flex flex-wrap gap-6 text-sm font-medium items-center justify-center">
-            <a href="mailto:support@digitalstudios.app" className="text-neutral-400 hover:text-white transition-colors">support@digitalstudios.app</a>
+            <a href="mailto:care@digitalstudios.app" className="text-neutral-400 hover:text-white transition-colors">care@digitalstudios.app</a>
             <Link to="/privacy" className="text-neutral-400 hover:text-white transition-colors">Privacy</Link>
             <Link to="/terms" className="text-neutral-400 hover:text-white transition-colors">Terms</Link>
             <Link to="/agent-program" className="text-fuchsia-400 hover:text-fuchsia-300 transition-colors">🤝 Agent Program</Link>

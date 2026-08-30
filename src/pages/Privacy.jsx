@@ -511,12 +511,12 @@ export default function PrivacyConsentPage() {
 
             <div className="grid sm:grid-cols-2 gap-4 mt-4">
               {[
-                { right: "Right to Access", desc: "Request a copy of all personal data we hold about you.", how: "Email privacy@digitalstudios.app or use Settings → Data Export" },
+                { right: "Right to Access", desc: "Request a copy of all personal data we hold about you.", how: "Email care@digitalstudios.app or use Settings → Data Export" },
                 { right: "Right to Correction", desc: "Request correction of inaccurate or incomplete data.", how: "Update directly in Settings, or email us" },
                 { right: "Right to Deletion", desc: "Request deletion of your data ('Right to be Forgotten').", how: "Settings → Delete Account, or email us" },
-                { right: "Right to Portability", desc: "Receive your data in a machine-readable format.", how: "Email privacy@digitalstudios.app with your request" },
+                { right: "Right to Portability", desc: "Receive your data in a machine-readable format.", how: "Email care@digitalstudios.app with your request" },
                 { right: "Right to Object", desc: "Object to processing of your data for marketing purposes.", how: "Unsubscribe links in messages or Settings → Notifications" },
-                { right: "Right to Restrict", desc: "Request limitation of how we use your data.", how: "Email privacy@digitalstudios.app with your request" },
+                { right: "Right to Restrict", desc: "Request limitation of how we use your data.", how: "Email care@digitalstudios.app with your request" },
                 { right: "Opt-Out of Sale (CCPA)", desc: "California residents: opt out of sale of personal information.", how: "We do not sell personal information. No action needed." },
                 { right: "Withdraw Consent", desc: "Withdraw any consent given at any time.", how: "Settings → Notifications, or reply STOP to messages" },
               ].map((r) => (

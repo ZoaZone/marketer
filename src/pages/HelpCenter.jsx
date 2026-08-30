@@ -224,7 +224,7 @@ export default function HelpCenter() {
           <div className="text-center py-12 text-muted-foreground">
             <HelpCircle className="w-8 h-8 mx-auto mb-2 opacity-20" />
             <p>No results for "{search}"</p>
-            <p className="text-sm mt-1">Try a different keyword or <a href="mailto:support@digitalstudios.app" className="text-fuchsia-400 hover:underline">contact support</a></p>
+            <p className="text-sm mt-1">Try a different keyword or <a href="mailto:care@digitalstudios.app" className="text-fuchsia-400 hover:underline">contact support</a></p>
           </div>
         )}
       </div>
