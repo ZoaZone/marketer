@@ -2,11 +2,11 @@ import { useState, useEffect } from "react";
 import { useSeo, SEO } from "@/lib/seo";
 
 const BRAND = {
-  name: "AEVOICE AI",
-  domain: "aevoice.ai",
-  supportEmail: "privacy@aevoice.ai",
-  dpoEmail: "dpo@aevoice.ai",
-  companyName: "AEVOICE AI Inc.",
+  name: "Digital Studio",
+  domain: "digitalstudios.app",
+  supportEmail: "privacy@digitalstudios.app",
+  dpoEmail: "privacy@digitalstudios.app",
+  companyName: "ZoaZone Services LLC",
   companyAddress: "United States",
   effectiveDate: "May 10, 2026",
   lastReviewed: "May 10, 2026",
@@ -42,7 +42,7 @@ export default function PrivacyConsentPage() {
   const [showConsentBanner, setShowConsentBanner] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem("aevoice_consent");
+    const stored = localStorage.getItem("digitalstudios_consent");
     if (!stored) setShowConsentBanner(true);
 
     const handleScroll = () => {
@@ -64,7 +64,7 @@ export default function PrivacyConsentPage() {
   };
 
   const saveConsent = () => {
-    localStorage.setItem("aevoice_consent", JSON.stringify({ ...consentGiven, timestamp: new Date().toISOString() }));
+    localStorage.setItem("digitalstudios_consent", JSON.stringify({ ...consentGiven, timestamp: new Date().toISOString() }));
     setShowConsentBanner(false);
   };
 
@@ -76,7 +76,7 @@ export default function PrivacyConsentPage() {
         <div className="fixed bottom-0 left-0 right-0 z-50 bg-gray-900 border-t border-indigo-700 shadow-2xl p-4 md:p-6">
           <div className="max-w-5xl mx-auto">
             <p className="text-sm text-gray-300 mb-3">
-              🔒 <strong className="text-white">AEVOICE AI</strong> uses your contact details to send account alerts,
+              🔒 <strong className="text-white">Digital Studio</strong> uses your contact details to send account alerts,
               OTPs, transaction receipts, and service updates. We require your explicit consent per{" "}
               <span className="text-indigo-400">TCPA / A2P 10DLC / GDPR / CCPA</span> rules.
             </p>
@@ -137,7 +137,7 @@ export default function PrivacyConsentPage() {
             Privacy, Security & Consent Policy
           </h1>
           <p className="text-gray-400 text-base max-w-2xl">
-            This policy governs how <strong className="text-white">{BRAND.companyName}</strong> collects, uses, stores, and communicates with you across all our platforms — including AEVOICE Voice Platform, Marketer, Sree OS, Aevathon, and HealthAI Companion.
+            This policy governs how <strong className="text-white">{BRAND.companyName}</strong> collects, uses, stores, and communicates with you across all our platforms — including Digital Studio, Marketer, Sree OS, Aevathon, and HealthAI Companion.
           </p>
           <p className="text-gray-500 text-sm mt-4">
             Effective Date: <span className="text-gray-300">{BRAND.effectiveDate}</span> &nbsp;|&nbsp;
@@ -176,14 +176,14 @@ export default function PrivacyConsentPage() {
           {/* 1. OVERVIEW */}
           <Section id="overview" title="1. Overview & Scope">
             <p>
-              <strong>{BRAND.companyName}</strong> ("AEVOICE", "we", "us", or "our") operates the following platforms under the <code className="text-indigo-400 bg-gray-900 px-1 rounded">{BRAND.domain}</code> umbrella:
+              <strong>{BRAND.companyName}</strong> ("Digital Studio", "we", "us", or "our") operates the following platforms under the <code className="text-indigo-400 bg-gray-900 px-1 rounded">{BRAND.domain}</code> umbrella:
             </p>
             <ul className="mt-3 space-y-2">
               {[
-                ["AEVOICE Voice Platform", "cream.aevoice.ai", "AI phone agents, CRM, call analytics"],
+                ["Digital Studio", "cream.digitalstudios.app", "AI phone agents, CRM, call analytics"],
                 ["Marketer", "digitalstudios.app", "AI-powered marketing, campaigns, social scheduling"],
-                ["Sree OS", "os.aevoice.ai", "Developer console, workflow engine"],
-                ["Aevathon", "aevathon.aevoice.ai", "AI tools and automation suite"],
+                ["Sree OS", "os.digitalstudios.app", "Developer console, workflow engine"],
+                ["Aevathon", "aevathon.digitalstudios.app", "AI tools and automation suite"],
                 ["HealthAI Companion", "health.workautomation.app", "Health AI platform — HIPAA-applicable"],
               ].map(([name, domain, desc]) => (
                 <li key={name} className="flex flex-col sm:flex-row sm:items-start gap-1 bg-gray-900/60 border border-gray-800 rounded-lg px-4 py-3">
@@ -194,10 +194,10 @@ export default function PrivacyConsentPage() {
               ))}
             </ul>
             <p className="mt-4">
-              This policy applies to all visitors, registered users, business account holders, and their end customers who interact with any AEVOICE platform. By creating an account or using any AEVOICE service, you agree to this policy.
+              This policy applies to all visitors, registered users, business account holders, and their end customers who interact with any Digital Studio platform. By creating an account or using any Digital Studio service, you agree to this policy.
             </p>
             <AlertBox type="info">
-              <strong>Platform Operators (Businesses):</strong> If you use AEVOICE to serve your own customers, you are the Data Controller for your customers' data. AEVOICE acts as a Data Processor on your behalf. You must maintain your own privacy disclosures and ensure your customers consent to AI-assisted calls.
+              <strong>Platform Operators (Businesses):</strong> If you use Digital Studio to serve your own customers, you are the Data Controller for your customers' data. Digital Studio acts as a Data Processor on your behalf. You must maintain your own privacy disclosures and ensure your customers consent to AI-assisted calls.
             </AlertBox>
           </Section>
 
@@ -317,7 +317,7 @@ export default function PrivacyConsentPage() {
           {/* 4. A2P & TCPA */}
           <Section id="a2p-compliance" title="4. A2P 10DLC & TCPA Compliance">
             <p>
-              AEVOICE sends application-to-person (A2P) SMS messages through registered US carriers in compliance with{" "}
+              Digital Studio sends application-to-person (A2P) SMS messages through registered US carriers in compliance with{" "}
               <strong className="text-white">A2P 10DLC (10-Digit Long Code)</strong> regulations enforced by The Campaign Registry (TCR) and US wireless carriers.
             </p>
 
@@ -325,7 +325,7 @@ export default function PrivacyConsentPage() {
             <ul className="space-y-2 text-gray-300">
               {[
                 "All SMS campaigns are registered with The Campaign Registry (TCR) with declared use cases.",
-                "We identify our brand name clearly in every message (e.g., 'AEVOICE:').",
+                "We identify our brand name clearly in every message (e.g., 'Digital Studio:').",
                 "Message content is pre-approved and consistent with the registered campaign use case.",
                 "We maintain a valid opt-out mechanism in EVERY message we send.",
                 "We do not send messages between 9:00 PM and 8:00 AM local recipient time.",
@@ -356,29 +356,29 @@ export default function PrivacyConsentPage() {
               ))}
             </ul>
 
-            <SubHeading>4.3 For Business Operators Using AEVOICE</SubHeading>
+            <SubHeading>4.3 For Business Operators Using Digital Studio</SubHeading>
             <AlertBox type="warning">
-              If you deploy AI phone agents through AEVOICE to contact your own customers, <strong>you are legally responsible</strong> for:
+              If you deploy AI phone agents through Digital Studio to contact your own customers, <strong>you are legally responsible</strong> for:
               <ul className="mt-2 space-y-1 list-disc list-inside text-sm">
                 <li>Obtaining valid consent from your customers before initiating AI-assisted calls.</li>
                 <li>Registering your own A2P campaigns if you send SMS through our platform.</li>
                 <li>Ensuring your agent scripts comply with applicable telemarketing and robocall laws.</li>
                 <li>Including disclosures that calls are AI-handled where required by state law (e.g., California AB 302).</li>
               </ul>
-              AEVOICE provides compliance tools (consent toggles, call disclosures) but is not liable for operator misuse.
+              Digital Studio provides compliance tools (consent toggles, call disclosures) but is not liable for operator misuse.
             </AlertBox>
           </Section>
 
           {/* 5. WHATSAPP */}
           <Section id="whatsapp-policy" title="5. WhatsApp Business Messaging Policy">
             <p>
-              AEVOICE sends WhatsApp messages through the official <strong className="text-white">WhatsApp Business API</strong> (Meta) and complies with WhatsApp's Business Messaging Policy and Commerce Policy.
+              Digital Studio sends WhatsApp messages through the official <strong className="text-white">WhatsApp Business API</strong> (Meta) and complies with WhatsApp's Business Messaging Policy and Commerce Policy.
             </p>
 
             <SubHeading>5.1 WhatsApp Consent Rules</SubHeading>
             <ul className="space-y-2 text-gray-300">
               {[
-                "You must explicitly opt in to receive WhatsApp messages from AEVOICE.",
+                "You must explicitly opt in to receive WhatsApp messages from Digital Studio.",
                 "Opt-in is collected through our registration form or account settings — never assumed.",
                 "We clearly state the types of messages you will receive at the time of opt-in.",
                 "We include our business name in every WhatsApp message.",
@@ -400,20 +400,20 @@ export default function PrivacyConsentPage() {
             ]} headers={["Category", "Examples", "Consent Required"]} />
 
             <p className="text-gray-400 text-sm mt-3">
-              AEVOICE does not use WhatsApp for spam, bulk cold outreach, or sharing user data with Meta beyond what is required for message delivery.
+              Digital Studio does not use WhatsApp for spam, bulk cold outreach, or sharing user data with Meta beyond what is required for message delivery.
             </p>
           </Section>
 
           {/* 6. EMAIL */}
           <Section id="email-policy" title="6. Email Communications Policy">
             <p>
-              All email communications from AEVOICE comply with <strong className="text-white">CAN-SPAM Act (US)</strong>, <strong className="text-white">CASL (Canada)</strong>, <strong className="text-white">GDPR (EU)</strong>, and applicable international email marketing laws.
+              All email communications from Digital Studio comply with <strong className="text-white">CAN-SPAM Act (US)</strong>, <strong className="text-white">CASL (Canada)</strong>, <strong className="text-white">GDPR (EU)</strong>, and applicable international email marketing laws.
             </p>
 
             <SubHeading>6.1 CAN-SPAM Compliance</SubHeading>
             <ul className="space-y-2 text-gray-300">
               {[
-                "Every email clearly identifies AEVOICE AI Inc. as the sender.",
+                "Every email clearly identifies ZoaZone Services LLC as the sender.",
                 "Subject lines are never deceptive or misleading.",
                 "Every marketing email includes a physical postal address.",
                 "Every marketing email includes a clear, working unsubscribe link.",
@@ -488,7 +488,7 @@ export default function PrivacyConsentPage() {
             <SubHeading>7.1 Reporting a Security Issue</SubHeading>
             <p>
               If you discover a security vulnerability, please report it responsibly to{" "}
-              <a href="mailto:security@aevoice.ai" className="text-indigo-400 underline">security@aevoice.ai</a>. We commit to acknowledging your report within 48 hours and providing a remediation timeline within 7 business days. We do not pursue legal action against good-faith security researchers.
+              <a href="mailto:security@digitalstudios.app" className="text-indigo-400 underline">security@digitalstudios.app</a>. We commit to acknowledging your report within 48 hours and providing a remediation timeline within 7 business days. We do not pursue legal action against good-faith security researchers.
             </p>
           </Section>
 
@@ -498,12 +498,12 @@ export default function PrivacyConsentPage() {
 
             <div className="grid sm:grid-cols-2 gap-4 mt-4">
               {[
-                { right: "Right to Access", desc: "Request a copy of all personal data we hold about you.", how: "Email privacy@aevoice.ai or use Settings → Data Export" },
+                { right: "Right to Access", desc: "Request a copy of all personal data we hold about you.", how: "Email privacy@digitalstudios.app or use Settings → Data Export" },
                 { right: "Right to Correction", desc: "Request correction of inaccurate or incomplete data.", how: "Update directly in Settings, or email us" },
                 { right: "Right to Deletion", desc: "Request deletion of your data ('Right to be Forgotten').", how: "Settings → Delete Account, or email us" },
-                { right: "Right to Portability", desc: "Receive your data in a machine-readable format.", how: "Email privacy@aevoice.ai with your request" },
+                { right: "Right to Portability", desc: "Receive your data in a machine-readable format.", how: "Email privacy@digitalstudios.app with your request" },
                 { right: "Right to Object", desc: "Object to processing of your data for marketing purposes.", how: "Unsubscribe links in messages or Settings → Notifications" },
-                { right: "Right to Restrict", desc: "Request limitation of how we use your data.", how: "Email privacy@aevoice.ai with your request" },
+                { right: "Right to Restrict", desc: "Request limitation of how we use your data.", how: "Email privacy@digitalstudios.app with your request" },
                 { right: "Opt-Out of Sale (CCPA)", desc: "California residents: opt out of sale of personal information.", how: "We do not sell personal information. No action needed." },
                 { right: "Withdraw Consent", desc: "Withdraw any consent given at any time.", how: "Settings → Notifications, or reply STOP to messages" },
               ].map((r) => (
@@ -557,12 +557,12 @@ export default function PrivacyConsentPage() {
           {/* 10. HIPAA */}
           <Section id="hipaa" title="10. HIPAA Compliance — HealthAI Companion">
             <AlertBox type="warning">
-              This section applies exclusively to the <strong>HealthAI Companion</strong> platform (<code className="text-yellow-300">health.workautomation.app</code>). Other AEVOICE platforms do not process Protected Health Information (PHI).
+              This section applies exclusively to the <strong>HealthAI Companion</strong> platform (<code className="text-yellow-300">health.workautomation.app</code>). Other Digital Studio platforms do not process Protected Health Information (PHI).
             </AlertBox>
 
             <ul className="space-y-2 text-gray-300 mt-4">
               {[
-                "AEVOICE enters into a Business Associate Agreement (BAA) with all covered entities using HealthAI Companion.",
+                "Digital Studio enters into a Business Associate Agreement (BAA) with all covered entities using HealthAI Companion.",
                 "PHI is encrypted at rest (AES-256) and in transit (TLS 1.3).",
                 "Access to PHI is strictly role-based and logged in immutable audit trails.",
                 "PHI is never used to train AI models without explicit authorization.",
@@ -583,7 +583,7 @@ export default function PrivacyConsentPage() {
           {/* 11. CHILDREN */}
           <Section id="children" title="11. Children's Privacy">
             <p>
-              AEVOICE services are intended for use by businesses and individuals aged <strong className="text-white">18 and older</strong>. We do not knowingly collect personal information from individuals under 18 years of age. If you believe a minor has provided us with personal information, please contact{" "}
+              Digital Studio services are intended for use by businesses and individuals aged <strong className="text-white">18 and older</strong>. We do not knowingly collect personal information from individuals under 18 years of age. If you believe a minor has provided us with personal information, please contact{" "}
               <a href={`mailto:${BRAND.supportEmail}`} className="text-indigo-400 underline">{BRAND.supportEmail}</a> and we will delete it promptly.
             </p>
           </Section>
@@ -631,7 +631,7 @@ export default function PrivacyConsentPage() {
               ))}
             </ul>
             <p className="mt-3">
-              You are solely responsible for reviewing, editing, fact-checking, and approving all AI-generated content — including campaigns, social posts, emails, SMS/WhatsApp messages, and chatbot replies — before it is sent to your contacts, published to your accounts, or used in any customer-facing or business decision. AEVOICE AI Inc. makes no warranty as to the accuracy, completeness, legality, or suitability of AI-generated output and is not liable for actions taken based on it.
+              You are solely responsible for reviewing, editing, fact-checking, and approving all AI-generated content — including campaigns, social posts, emails, SMS/WhatsApp messages, and chatbot replies — before it is sent to your contacts, published to your accounts, or used in any customer-facing or business decision. ZoaZone Services LLC makes no warranty as to the accuracy, completeness, legality, or suitability of AI-generated output and is not liable for actions taken based on it.
             </p>
           </Section>
 
@@ -641,7 +641,7 @@ export default function PrivacyConsentPage() {
               {[
                 { title: "General Privacy Inquiries", email: BRAND.supportEmail, icon: "📧" },
                 { title: "Data Protection Officer (EU/UK)", email: BRAND.dpoEmail, icon: "🏛️" },
-                { title: "Security Vulnerability Reports", email: "security@aevoice.ai", icon: "🔒" },
+                { title: "Security Vulnerability Reports", email: "security@digitalstudios.app", icon: "🔒" },
                 { title: "CCPA / CPRA Requests", email: BRAND.supportEmail, icon: "📋" },
               ].map((c) => (
                 <div key={c.title} className="bg-gray-900 border border-gray-800 rounded-xl p-5">
