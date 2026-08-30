@@ -54,6 +54,24 @@ function readAttempts(note: string): number {
   return m ? Number(m[1]) : 0;
 }
 
+// BetaRequest is shared between two unrelated things: genuine beta invites
+// (invite_token = a 30-day token from sendBetaInvite) and this handler's OTP
+// scratch space. Previously both wrote to records[0] of a filter-by-email, so
+// requesting a sign-in code overwrote a pending invite's token and silently
+// broke that person's invite link — and verify could read the wrong record.
+// These two helpers keep the roles apart on a shared entity. The real fix is a
+// dedicated OTP entity; until then, never write an OTP over a live invite.
+const isOtpRecord = (r: any) =>
+  String(r?.invite_token || '').startsWith('OTPH:') ||
+  String(r?.note || '').startsWith('otp_purpose:');
+
+const holdsLiveInvite = (r: any) => {
+  const t = String(r?.invite_token || '');
+  if (!t || isOtpRecord(r)) return false;
+  const exp = r?.invite_expires_at ? new Date(r.invite_expires_at).getTime() : 0;
+  return exp === 0 || exp > Date.now();
+};
+
 function buildEmailHtml(otp, purpose) {
   const title = purpose === 'signup' ? 'Verify your email' : purpose === 'reset' ? 'Reset your password' : 'Your sign-in code';
   const body = purpose === 'signup'
@@ -114,18 +132,25 @@ Deno.serve(async (req) => {
 
     // ── SEND OTP ──────────────────────────────────────────────────────────────
     if (action === 'send') {
-      const existing = await base44.asServiceRole.entities.BetaRequest.filter({ email });
+      const all = await base44.asServiceRole.entities.BetaRequest.filter({ email });
+      const records = Array.isArray(all) ? all : [];
+
+      // Target an existing OTP record if there is one; otherwise any record
+      // that is NOT holding a live invite; otherwise nothing (we create a
+      // dedicated OTP record below rather than clobber the invite).
+      const target =
+        records.find(isOtpRecord) ||
+        records.find((r) => !holdsLiveInvite(r)) ||
+        null;
 
       // Throttle resends. Without this, one unauthenticated caller can loop this
       // endpoint and mail-bomb any address from the app's sending domain (and
       // burn the email provider quota). issuedAt is derived from the stored
       // expiry, so no extra field is needed.
-      if (existing && existing.length > 0) {
-        const prev = existing[0];
-        const prevIsOTP = String(prev.invite_token || '').startsWith('OTPH:');
-        const prevExpiry = prev.invite_expires_at ? new Date(prev.invite_expires_at).getTime() : 0;
+      if (target && String(target.invite_token || '').startsWith('OTPH:')) {
+        const prevExpiry = target.invite_expires_at ? new Date(target.invite_expires_at).getTime() : 0;
         const issuedAt = prevExpiry - OTP_TTL_MS;
-        if (prevIsOTP && issuedAt > 0 && Date.now() - issuedAt < RESEND_COOLDOWN_MS) {
+        if (issuedAt > 0 && Date.now() - issuedAt < RESEND_COOLDOWN_MS) {
           return Response.json(
             { error: 'A code was just sent. Please wait a moment before requesting another.' },
             { status: 429, headers },
@@ -146,8 +171,8 @@ Deno.serve(async (req) => {
         note: buildNote(purpose, 0),
       };
 
-      if (existing && existing.length > 0) {
-        await base44.asServiceRole.entities.BetaRequest.update(existing[0].id, otpData);
+      if (target) {
+        await base44.asServiceRole.entities.BetaRequest.update(target.id, otpData);
       } else {
         await base44.asServiceRole.entities.BetaRequest.create({
           email,
@@ -240,12 +265,15 @@ Deno.serve(async (req) => {
         return Response.json({ error: 'otp is required' }, { status: 400, headers });
       }
 
-      const records = await base44.asServiceRole.entities.BetaRequest.filter({ email });
-      if (!records || records.length === 0) {
+      const all = await base44.asServiceRole.entities.BetaRequest.filter({ email });
+      const rows = Array.isArray(all) ? all : [];
+      // Select the OTP record specifically. Taking rows[0] could land on a beta
+      // invite record for the same address and reject a perfectly good code.
+      const record = rows.find((r) => String(r.invite_token || '').startsWith('OTPH:')) || null;
+      if (!record) {
         return Response.json({ error: 'No OTP found for this email. Please request a new code.' }, { status: 400, headers });
       }
 
-      const record = records[0];
       const storedToken = record.invite_token || '';
       // Legacy plaintext "OTP:" records are deliberately rejected rather than
       // accepted for compatibility — honouring them would keep the readable-code
