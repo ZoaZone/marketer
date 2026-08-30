@@ -212,7 +212,7 @@ export default function WidgetHost() {
 
       {/* Powered by */}
       <div style={{ textAlign:"center", padding:"8px", fontSize:10, color:"#334155" }}>
-        Powered by Sree AI · <a href="https://aevoice.ai" style={{color:"#334155"}} target="_blank">ZoaZone Services LLC</a>
+        Powered by Sree AI · <a href="https://zoazoneservices.com" style={{color:"#334155"}} target="_blank">ZoaZone Services LLC</a>
       </div>
     </div>
   );

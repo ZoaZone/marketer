@@ -16,7 +16,7 @@ export default function AuthCard({ children, title, subtitle }) {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl border border-white/10 bg-white/5 mb-4 shadow-xl overflow-hidden">
-            <img src={LOGO} alt="AEVOICE" className="w-12 h-12 object-cover rounded-xl"
+            <img src={LOGO} alt="Digital Studio" className="w-12 h-12 object-cover rounded-xl"
               onError={e => { e.target.style.display = "none"; }} />
           </div>
           <h1 className="text-xl font-black text-white tracking-tight">digitalstudios.app</h1>

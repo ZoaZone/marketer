@@ -189,7 +189,7 @@ export default function BetaOnboarding() {
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-fuchsia-500 to-purple-600 flex items-center justify-center shadow-lg shadow-fuchsia-500/30 mb-3">
             <span className="text-white font-black text-2xl">A</span>
           </div>
-          <h1 className="text-2xl font-black bg-gradient-to-r from-fuchsia-400 to-purple-400 bg-clip-text text-transparent">AEVOICE</h1>
+          <h1 className="text-2xl font-black bg-gradient-to-r from-fuchsia-400 to-purple-400 bg-clip-text text-transparent">Digital Studio</h1>
           <p className="text-white/40 text-xs mt-1">DigitalStudios.app</p>
         </div>
 
