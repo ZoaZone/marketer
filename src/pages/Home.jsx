@@ -298,11 +298,11 @@ export default function Home() {
               style={{ background: "radial-gradient(ellipse at center, rgba(217,70,239,0.28), transparent 70%)" }}
             />
             <img
-              src="/brand/wordmark.png"
+              src="/brand/lockup-h.png"
               alt={BRAND.name}
-              width="956"
-              height="189"
-              className="w-full max-w-[300px] sm:max-w-[420px] md:max-w-[520px] h-auto object-contain drop-shadow-[0_2px_24px_rgba(0,0,0,0.55)]"
+              width="600"
+              height="321"
+              className="w-full max-w-[320px] sm:max-w-[460px] md:max-w-[560px] h-auto object-contain"
               onError={(e) => { e.target.style.display = "none"; }}
             />
           </div>
