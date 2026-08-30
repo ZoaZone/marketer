@@ -13,10 +13,11 @@ const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
  * Uses Google Identity Services (GSI) One Tap + Button flow.
  * On success, exchanges the Google ID token with Base44 auth.
  *
- * NOT CURRENTLY MOUNTED: the only consumer is src/pages/Login.jsx, and App.jsx
- * redirects /login → /auth (src/pages/Auth.jsx), which signs in through
- * base44.auth.loginWithProvider("google") instead. Wiring this up requires both
- * a client id above AND a backend function that verifies the returned Google ID
+ * NOT CURRENTLY MOUNTED — kept as scaffolding. /login redirects to /auth
+ * (src/pages/Auth.jsx), which signs in through
+ * base44.auth.loginWithProvider("google"). Its former consumer, pages/Login.jsx,
+ * was unreachable dead code and has been deleted. Wiring this up requires both a
+ * client id above AND a backend function that verifies the returned Google ID
  * token and mints an app session — see handleCredential below.
  *
  * Props:
