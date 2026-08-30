@@ -29,14 +29,19 @@ export default function AgencyEnquiry() {
     setError("");
     setLoading(true);
     try {
-      await base44.entities.BetaRequest.create({
+      // Via submitBetaRequest (asServiceRole), not a direct entity create:
+      // BetaRequest.create is now admin-only under RLS, because leaving it
+      // client-writable let anyone forge or overwrite invite records. This is a
+      // public form, so the write has to happen server-side.
+      const res = await base44.functions.invoke("submitBetaRequest", {
         full_name: form.full_name,
         email: form.email,
         company: form.agency_name || "",
         use_case: `AGENCY ENQUIRY | Phone: ${form.phone} | Clients: ${form.client_count} | Tools: ${form.current_tools} | Requirements: ${form.requirements}`,
-        status: "pending",
         note: "Agency partnership enquiry",
       });
+      const data = res?.data ?? res;
+      if (data?.error) throw new Error(data.error);
       setSubmitted(true);
     } catch (err) {
       setError(err.message || "Something went wrong. Please try again.");
