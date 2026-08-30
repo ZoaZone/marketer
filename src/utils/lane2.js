@@ -20,7 +20,8 @@ import {
   proxyImageAsObjectUrl,
   generateVoiceover,
   shortenCaption,
-  splitScriptIntoScenes,
+  splitScriptIntoScenes,,
+  probeMediaDuration
 } from "./aiClient.js";
 
 import {
@@ -44,6 +45,7 @@ import {
   getDubStatus,
   dubAudioFile,
   dubVideoFile,
+  probeMediaDuration,
 } from "./aiClient.js";
 
 export {
