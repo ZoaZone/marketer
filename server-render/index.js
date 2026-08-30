@@ -57,11 +57,18 @@ function requireSecret(req, res, next) {
   next();
 }
 
-// In-memory job store + single-item queue. Fine at low volume since this
-// worker only ever runs one job at a time anyway; swap this Map + array for
-// Railway Redis when volume grows — the API (jobs.get/set, enqueue) stays
-// identical either way.
-const jobs = new Map();
+// Job records live in jobstore.js: an in-memory hot cache written through to
+// Redis when REDIS_URL is set, and plain in-memory otherwise. `jobs.get(id)`
+// stays synchronous so every internal call site below is unchanged; mutations
+// now go through jobs.update()/jobs.updateProgress() so they are actually
+// persisted, and the HTTP status route uses the async read so it can still
+// answer for a job that outlived the process that started it.
+//
+// The queue itself is still in-process: a job interrupted mid-ffmpeg is lost
+// work regardless. What survives is the *record* — and, for provider-backed
+// dubbing, the provider reference needed to reattach instead of re-paying.
+import * as jobs from "./jobstore.js";
+
 const queue = [];
 let processing = false;
 
@@ -81,14 +88,8 @@ function retentionFor(id) {
 }
 
 function scheduleCleanup(id) {
-  setTimeout(() => jobs.delete(id), retentionFor(id)).unref();
+  setTimeout(() => jobs.remove(id), retentionFor(id)).unref();
 }
-
-// KNOWN LIMITATION, left visible on purpose: `jobs` is still an in-memory Map,
-// so a worker restart or redeploy loses every in-flight job no matter what the
-// retention above says. For commercial dubbing runs measured in hours, moving
-// `jobs` to Railway Redis is the next step — the get/set API stays identical,
-// which is why the store was written this way in the first place.
 
 // jobToken -> { jobId, resolve, timeoutHandle }. Populated by
 // buildWebhookHooks() when a job hands its completion off to a Replicate
