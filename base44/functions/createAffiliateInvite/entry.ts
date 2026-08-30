@@ -46,6 +46,19 @@ Deno.serve(async (req) => {
     if (!email || !email.includes('@')) {
       return Response.json({ error: 'A valid email is required.' }, { status: 400, headers: CORS });
     }
+    // No self-invites. A tier-1 affiliate inviting their own address would
+    // create a second affiliate record under themselves and let them collect
+    // the parent override on their own referrals — a closed loop paying twice
+    // on one sale.
+    if (email === String(user.email || '').trim().toLowerCase()) {
+      return Response.json({ error: 'You cannot send an affiliate invite to your own account.' }, { status: 400, headers: CORS });
+    }
+    // Don't reissue to someone who is already an affiliate.
+    const alreadyAffiliate = await base44.asServiceRole.entities.Affiliate
+      .filter({ user_id: email }).catch(() => []);
+    if (alreadyAffiliate.length) {
+      return Response.json({ error: 'That account is already registered as an affiliate.' }, { status: 409, headers: CORS });
+    }
     if (proposedTier !== 1 && proposedTier !== 2) {
       return Response.json({ error: 'proposed_tier must be 1 or 2.' }, { status: 400, headers: CORS });
     }
