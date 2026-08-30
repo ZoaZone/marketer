@@ -458,6 +458,39 @@ app.get("/jobs/:id", requireSecret, async (req, res) => {
   res.json({ ...job, percent });
 });
 
+// Boot: connect the job store and reconcile anything mid-flight before the
+// first request lands, so a client polling across a redeploy sees continuity
+// rather than a 404.
+const store = await jobs.initJobStore();
+
+const orphans = jobs.orphanedJobs();
+if (orphans.length) {
+  // A job left "processing" by a restart has no compute behind it any more.
+  //  - with a providerRef (an ElevenLabs dubbing_id) the provider run is still
+  //    going and still billing, so keep the record intact for reattachment:
+  //    that beats paying for the same source twice.
+  //  - without one nothing is recoverable, so fail it honestly rather than
+  //    leave a client polling a job nobody is working on.
+  const resumable = jobs.resumableJobs();
+  const resumableIds = new Set(resumable.map((j) => j.id));
+
+  for (const job of orphans) {
+    if (resumableIds.has(job.id)) continue;
+    jobs.update(job.id, {
+      status: "error",
+      error: "The render worker restarted while this job was running. Please resubmit.",
+    });
+    scheduleCleanup(job.id);
+  }
+
+  console.log(
+    `[boot] ${orphans.length} mid-flight at shutdown: ` +
+    `${resumable.length} kept for reattachment, ` +
+    `${orphans.length - resumable.length} failed.`,
+  );
+}
+
 app.listen(PORT, () => {
-  console.log(`studio-render-worker listening on :${PORT}`);
+  const mode = store.durable ? "redis, durable" : "in-memory, NOT durable";
+  console.log(`studio-render-worker listening on :${PORT} (job store: ${mode})`);
 });
