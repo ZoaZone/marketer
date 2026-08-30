@@ -5,7 +5,7 @@ import {
   Search, GitBranch, UserPlus, MailCheck, Image, Globe,
   BarChart3, Settings, CreditCard, ChevronDown, LogOut, Menu, X,
   Lock, Bell, HelpCircle, ShieldCheck, Building2, Share,
-  Sun, Moon, Wand2, Monitor, Film, Music, Sliders, Plug,
+  Sun, Moon, Wand2, Monitor, Film, Music, Sliders, Plug, Languages,
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { BRAND } from "@/lib/brand";
@@ -64,6 +64,7 @@ const NAV_SECTIONS = [
     items: [
       { to: "/movie-maker",  icon: Film,    label: "Movie Maker", badge: "ENT", minTier: 4 },
       { to: "/song-creator", icon: Music,   label: "Song Creator", badge: "ENT", minTier: 4 },
+      { to: "/dubbing",      icon: Languages, label: "Dubbing Studio", badge: "ENT", minTier: 4 },
       { to: "/media-editor", icon: Sliders, label: "AI Media Editor", badge: "ENT", minTier: 4 },
       { to: "/demo-video",   icon: Monitor, label: "Create Demo Video", badge: "NEW" },
       { to: "/ad-creator",   icon: PenTool, label: "Ad Creator", minTier: 2 },
