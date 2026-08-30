@@ -533,8 +533,54 @@ export default function QuickCreate() {
             {step === 2 && (
               <div className="space-y-3">
                 <h3 className="font-semibold text-foreground">Storyboard/Images</h3>
+
+                {/* Motion mode. Until now this step always produced stills that
+                    were later panned by FFmpeg, so "Short Video" returned what
+                    reads as a slideshow. Both options are now explicit, and the
+                    cost difference is stated rather than hidden. */}
+                <div className="rounded-xl border border-border p-3 space-y-2">
+                  <label className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Output</label>
+                  <div className="grid sm:grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => canMotion && setMotionMode("motion")}
+                      disabled={!canMotion || generatingStoryboard}
+                      aria-pressed={useMotion}
+                      className={`text-left p-3 rounded-lg border transition-all disabled:opacity-50 disabled:cursor-not-allowed ${useMotion ? "bg-fuchsia-500/15 border-fuchsia-500/50" : "border-border hover:bg-muted/20"}`}>
+                      <span className={`flex items-center gap-1.5 text-sm font-bold ${useMotion ? "text-fuchsia-400" : "text-foreground"}`}>
+                        <Video className="w-3.5 h-3.5" /> Real AI video
+                ລ                     </span>
+                      <span className="block text-[11px] text-muted-foreground mt-1">
+                        Generates an actual moving clip per scene. Uses credits.
+                        {!canMotion && " Available on Agency and Movie Maker Pro plans."}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMotionMode("slideshow")}
+                      disabled={generatingStoryboard}
+                      aria-pressed={!useMotion}
+                      className={`text-left p-3 rounded-lg border transition-all ${!useMotion ? "bg-fuchsia-500/15 border-fuchsia-500/50" : "border-border hover:bg-muted/20"}`}>
+                      <span className={`flex items-center gap-1.5 text-sm font-bold ${!useMotion ? "text-fuchsia-400" : "text-foreground"}`}>
+                        <ImageIcon className="w-3.5 h-3.5" /> Cinematic slideshow
+                      </span>
+                      <span className="block text-[11px] text-muted-foreground mt-1">
+                        Still images with a slow pan and zoom. Fast, no credits.
+                      </span>
+                    </button>
+                  </div>
+                  {!canMotion && (
+                    <p className="text-[11px] text-muted-foreground">
+                      <Link to="/pricing" className="text-fuchsia-400 hover:underline font-semibold">Upgrade</Link>
+                      {" "}to generate real motion video instead of a slideshow.
+                    </p>
+                  )}
+                </div>
+
                 <div className="flex items-center gap-3">
-                  <label className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Scenes (~8s each)</label>
+                  <label className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
+                    Scenes ({useMotion ? `~${MOTION_CLIP_SECONDS}s clips` : "~8s each"})
+                  </label>
                   <div className="flex gap-2">
                     {[2, 3, 4].map(n => (
                       <button key={n} onClick={() => setSceneCount(n)} disabled={generatingStoryboard}
@@ -546,7 +592,15 @@ export default function QuickCreate() {
                 </div>
                 <button onClick={generateStoryboardStep} disabled={generatingStoryboard || !script.trim()}
                   className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-fuchsia-500/15 border border-fuchsia-500/50 text-fuchsia-400 text-sm font-semibold hover:bg-fuchsia-500/25 disabled:opacity-60">
-                  {generatingStoryboard ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating ({Math.round(storyboardProgress * 100)}%)…</> : <><ImageIcon className="w-4 h-4" /> {scenes.length ? "Regenerate Storyboard" : "Generate Storyboard"}</>}
+                  {generatingStoryboard
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> {
+                        storyboardProgress < 1
+                          ? `Generating images (${Math.round(storyboardProgress * 100)}%)…`
+                          : useMotion
+                            ? `Generating video clips (${Math.round(motionProgress * 100)}%)…`
+                            : "Finishing…"
+                      }</>
+                    : <><ImageIcon className="w-4 h-4" /> {scenes.length ? "Regenerate Storyboard" : "Generate Storyboard"}</>}
                 </button>
                 {scenes.length > 0 && (
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
