@@ -27,12 +27,18 @@ import { FileText, ChevronRight } from "lucide-react";
 //      largest legal exposure this product carries. §6 puts the warranty on the
 //      user, but that allocates risk — it does not remove it.
 //
-//   3. GOVERNING LAW. New York, per the owner. Confirm with counsel that New
-//      York is also where you want disputes heard, and whether you would rather
-//      arbitrate than litigate (§18 currently selects courts, not arbitration).
+//   3. GOVERNING LAW. New York, confirmed by the owner — New York courts decide,
+//      litigation not arbitration. Settled; §18 stands as written.
 //
-// Company details are final as supplied by the owner. What remains open is the
-// legal review of §6, §7, §15 and §18.
+//   4. LIABILITY CAP (§15). Confirmed by the owner: capped at fees actually paid
+//      in the preceding 12 months, never more than the plan's maximum annual
+//      value. Note the consequence — for a free-tier user that computes to zero.
+//      Some jurisdictions will not enforce a zero cap, which is what the
+//      "nothing here excludes liability that cannot lawfully be limited"
+//      sentence in §14 is doing.
+//
+// Company details and the commercial positions above are settled. What remains
+// genuinely open is a lawyer's read of §6 (voice/likeness) and §7 (refunds).
 // ─────────────────────────────────────────────────────────────────────────────
 
 const CO = {
@@ -397,9 +403,9 @@ export default function Terms() {
           </P>
           <P>
             To the maximum extent permitted by law, our total aggregate liability arising out of or
-            relating to the Service or these Terms will not exceed the greater of (a) the amounts you
-            paid us for the Service in the twelve months before the event giving rise to the claim, or
-            (b) one hundred United States dollars (US$100).
+            relating to the Service or these Terms will not exceed the total amounts you actually paid
+            us for the Service in the twelve (12) months immediately preceding the event giving rise
+            to the claim, and in no event more than the maximum annual value of your plan.
           </P>
           <P>
             These limits do not apply to liability that cannot lawfully be limited, and they apply
