@@ -27,20 +27,27 @@ import { FileText, ChevronRight } from "lucide-react";
 //      largest legal exposure this product carries. §6 puts the warranty on the
 //      user, but that allocates risk — it does not remove it.
 //
-//   3. GOVERNING LAW. [STATE] below is a placeholder. It must name the LLC's
-//      actual state of formation before publication.
+//   3. GOVERNING LAW. New York, per the owner. Confirm with counsel that New
+//      York is also where you want disputes heard, and whether you would rather
+//      arbitrate than litigate (§18 currently selects courts, not arbitration).
 //
-// Placeholders in [SQUARE BRACKETS] must be filled before this is published.
+// Company details are final as supplied by the owner. What remains open is the
+// legal review of §6, §7, §15 and §18.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const CO = {
   legalName: "ZoaZone Services LLC",
   product: "Digital Studio",
   domain: "digitalstudios.app",
-  supportEmail: "support@digitalstudios.app",
-  legalEmail: "legal@digitalstudios.app",
-  state: "[STATE]",
-  address: "[REGISTERED ADDRESS]",
+  // Both addresses are live customer-service mailboxes. Kept as two so the
+  // parent-company address works across every ZoaZone app while the
+  // product-specific one routes Digital Studio enquiries.
+  supportEmail: "care@digitalstudios.app",
+  parentEmail: "care@zoazoneservices.com",
+  legalEmail: "care@zoazoneservices.com",
+  phone: "+1 256 699 8899",
+  state: "New York",
+  address: "1770 Grand Concourse 12A, Bronx, NY 10457, United States",
   effective: "August 30, 2026",
 };
 
