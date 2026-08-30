@@ -189,15 +189,19 @@ export default function PrivacyConsentPage() {
           {/* 1. OVERVIEW */}
           <Section id="overview" title="1. Overview & Scope">
             <p>
-              <strong>{BRAND.companyName}</strong> ("Digital Studio", "we", "us", or "our") operates the following platforms under the <code className="text-indigo-400 bg-gray-900 px-1 rounded">{BRAND.domain}</code> umbrella:
+              <strong>{BRAND.companyName}</strong> ("we", "us", or "our") operates{" "}
+              <strong className="text-white">{BRAND.name}</strong> at{" "}
+              <code className="text-indigo-400 bg-gray-900 px-1 rounded">{BRAND.domain}</code>.
+              This policy covers {BRAND.name} only. {BRAND.companyName} publishes other products,
+              each with its own policy at its own domain.
             </p>
+            <p className="mt-3">{BRAND.name} provides:</p>
             <ul className="mt-3 space-y-2">
               {[
-                ["Digital Studio", "cream.digitalstudios.app", "AI phone agents, CRM, call analytics"],
-                ["Marketer", "digitalstudios.app", "AI-powered marketing, campaigns, social scheduling"],
-                ["Sree OS", "os.digitalstudios.app", "Developer console, workflow engine"],
-                ["Aevathon", "aevathon.digitalstudios.app", "AI tools and automation suite"],
-                ["HealthAI Companion", "health.workautomation.app", "Health AI platform — HIPAA-applicable"],
+                ["Creative studio", "Movie Maker, Song Creator, AI Media Editor", "AI video, music and image generation from your prompts and reference material"],
+                ["Dubbing Studio", "Voice, translation and lip-sync", "Dubs your uploaded film or audio into other languages, preserving speaker voice and background music"],
+                ["Marketing tools", "Campaigns, Social Hub, Funnels", "Scheduling and publishing to social accounts you connect, plus email/SMS/WhatsApp campaigns"],
+                ["CRM and analytics", "Contacts, Leads, Analytics", "Contact records you import or capture, and usage reporting"],
               ].map(([name, domain, desc]) => (
                 <li key={name} className="flex flex-col sm:flex-row sm:items-start gap-1 bg-gray-900/60 border border-gray-800 rounded-lg px-4 py-3">
                   <span className="font-semibold text-white w-48 flex-shrink-0">{name}</span>
