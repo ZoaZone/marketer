@@ -51,6 +51,7 @@ import Studio from './pages/Studio';
 import DubbingStudio from './pages/DubbingStudio';
 import OAuthConsent from './pages/OAuthConsent';
 import Privacy from './pages/Privacy';
+import Terms from './pages/Terms';
 
 
 const AuthenticatedApp = () => {
@@ -73,7 +74,7 @@ const AuthenticatedApp = () => {
     if (authError.type === 'user_not_registered') {
       return <UserNotRegisteredError />;
     } else if (authError.type === 'auth_required') {
-      const publicPaths = new Set(["/", "/Home", "/home", "/pricing", "/Pricing", "/WidgetHost", "/PromoSignup", "/login", "/auth", "/privacy"]);
+      const publicPaths = new Set(["/", "/Home", "/home", "/pricing", "/Pricing", "/WidgetHost", "/PromoSignup", "/login", "/auth", "/privacy", "/terms"]);
       if (!publicPaths.has(window.location.pathname)) { navigateToLogin(); }
       return null;
     }
@@ -95,6 +96,10 @@ const AuthenticatedApp = () => {
           Google's OAuth consent screen requires a reachable privacy policy URL
           before it will verify a custom client for digitalstudios.app. */}
       <Route path="/privacy" element={<Privacy />} />
+      {/* Google's OAuth verification requires BOTH a privacy policy and a terms
+          of service URL, each reachable without signing in, for an external
+          production app. */}
+      <Route path="/terms" element={<Terms />} />
       <Route path="/onboarding" element={<PostPaymentOnboarding />} />
       <Route path="/lead-capture" element={<LeadCapturePage />} />
       <Route path="/beta" element={<BetaSignup />} />
