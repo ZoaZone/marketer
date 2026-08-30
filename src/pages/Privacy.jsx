@@ -1,6 +1,18 @@
 import { useState, useEffect } from "react";
 import { useSeo, SEO } from "@/lib/seo";
 
+// NOTE: this policy was originally written for a different product (AEVOICE AI
+// Inc. / aevoice.ai) and was being served verbatim on digitalstudios.app — it
+// named the wrong legal entity throughout. Rebranded to ZoaZone Services LLC /
+// Digital Studio. Google's OAuth verification requires the privacy policy to be
+// hosted on the verified domain AND to describe this app, so the old text would
+// have failed review as well as being legally wrong.
+//
+// STILL TO REVIEW: the body covers SMS/WhatsApp/A2P/TCPA/HIPAA at length because
+// of where it came from. Digital Studio does have bulk messaging, so much of it
+// applies — but it should be read against what this app actually does before it
+// is relied on, and the AI-generated-content and voice-cloning disclosures in
+// the Terms have no counterpart here yet.
 const BRAND = {
   name: "Digital Studio",
   domain: "digitalstudios.app",
@@ -8,8 +20,8 @@ const BRAND = {
   dpoEmail: "privacy@digitalstudios.app",
   companyName: "ZoaZone Services LLC",
   companyAddress: "United States",
-  effectiveDate: "May 10, 2026",
-  lastReviewed: "May 10, 2026",
+  effectiveDate: "August 30, 2026",
+  lastReviewed: "August 30, 2026",
 };
 
 const SECTIONS = [
