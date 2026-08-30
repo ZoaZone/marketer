@@ -8,11 +8,14 @@ import { useSeo, SEO } from "@/lib/seo";
 // hosted on the verified domain AND to describe this app, so the old text would
 // have failed review as well as being legally wrong.
 //
+// §14 (AI Processing, Voice & Dubbing) is the counterpart to §6 of the Terms and
+// must be changed together with it — they cross-reference each other. The
+// no-model-training statement in §14 was confirmed by the owner against the
+// current ElevenLabs and Replicate plans; re-verify it if those plans change.
+//
 // STILL TO REVIEW: the body covers SMS/WhatsApp/A2P/TCPA/HIPAA at length because
 // of where it came from. Digital Studio does have bulk messaging, so much of it
-// applies — but it should be read against what this app actually does before it
-// is relied on, and the AI-generated-content and voice-cloning disclosures in
-// the Terms have no counterpart here yet.
+// applies — but it should be read against what this app actually does.
 const BRAND = {
   name: "Digital Studio",
   domain: "digitalstudios.app",
@@ -695,9 +698,9 @@ export default function PrivacyConsentPage() {
             </p>
             <p className="mt-3">
               <strong className="text-white">We do not use your uploads or generated output to train
-              our own models.</strong> Third-party providers&rsquo; use of data submitted to them is
-              governed by their own terms; we select providers on the basis that customer content is
-              not used for their model training, and will update this policy if that changes.
+              our own models, and the AI providers we use do not train their models on it either.</strong>{" "}
+              This is a condition of the plans we hold with them. If a provider&rsquo;s terms change, we
+              will update this policy and tell you before the change takes effect.
             </p>
 
             <h4 className="text-white font-semibold mt-5 mb-2">Retention, and the rights of people in your media</h4>
