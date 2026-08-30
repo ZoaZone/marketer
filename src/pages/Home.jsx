@@ -277,19 +277,33 @@ export default function Home() {
         
         <div className="relative max-w-5xl mx-auto text-center z-10 animate-in fade-in slide-in-from-bottom-8 duration-1000">
 
-          {/* Brand banner — full-width, blends with background.
-              Mask is on the container so edges stay fixed while the
-              image animates inside — no hard cut when it scales/shifts. */}
-          <div className="absolute left-1/2 -translate-x-1/2 top-0 z-0 h-[45vh] w-screen overflow-hidden pointer-events-none mask-fade-edges">
+          {/* Brand lockup. Previously this was the opaque logo-wordmark JPEG
+              blown up to 45vh full-bleed behind the copy, wrapped in
+              .mask-fade-edges. That mask tops out at rgba(0,0,0,0.7), so
+              combined with opacity-90 the logo never rendered above ~63%
+              opacity, and its top and bottom dissolved completely — which read
+              as the logo sitting *under* an overlay. animate-kenburns then
+              scaled it 1.05→1.15, cropping the wordmark against the container.
+              Now it uses /brand/wordmark.png (real alpha channel, cropped tight
+              to the mark) at full opacity in normal flow, with the glow behind
+              it rather than over it. */}
+          <div className="relative flex justify-center mb-10">
+            <div
+              aria-hidden="true"
+              className="absolute inset-0 -z-10 mx-auto w-[130%] max-w-[820px] blur-[70px] opacity-60 pointer-events-none"
+              style={{ background: "radial-gradient(ellipse at center, rgba(217,70,239,0.28), transparent 70%)" }}
+            />
             <img
-              src="/brand/logo-wordmark.jpg"
+              src="/brand/wordmark.png"
               alt={BRAND.name}
-              className="w-full h-full object-contain opacity-90 animate-kenburns"
+              width="956"
+              height="189"
+              className="w-full max-w-[300px] sm:max-w-[420px] md:max-w-[520px] h-auto object-contain drop-shadow-[0_2px_24px_rgba(0,0,0,0.55)]"
               onError={(e) => { e.target.style.display = "none"; }}
             />
           </div>
 
-          <div className="mt-[40vh] inline-flex items-center gap-2 px-4 py-2 rounded-full border border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-300 text-xs font-bold mb-8 uppercase tracking-widest">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-300 text-xs font-bold mb-8 uppercase tracking-widest">
             <Sparkles className="w-3.5 h-3.5" /> The AI Creative Platform
           </div>
 
@@ -426,7 +440,7 @@ export default function Home() {
       <footer className="border-t border-white/10 py-12 px-6 bg-neutral-950">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center">
-            <img src="/brand/logo-wordmark.jpg" alt={BRAND.name} className="h-11 object-contain" onError={(e) => e.target.style.display = "none"} />
+            <img src="/brand/wordmark.png" alt={BRAND.name} className="h-8 w-auto object-contain" onError={(e) => e.target.style.display = "none"} />
           </div>
           <div className="flex flex-wrap gap-6 text-sm font-medium items-center justify-center">
             <a href="mailto:care@aevoice.ai" className="text-neutral-400 hover:text-white transition-colors">care@aevoice.ai</a>
