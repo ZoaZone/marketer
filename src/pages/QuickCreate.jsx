@@ -549,7 +549,7 @@ export default function QuickCreate() {
                       className={`text-left p-3 rounded-lg border transition-all disabled:opacity-50 disabled:cursor-not-allowed ${useMotion ? "bg-fuchsia-500/15 border-fuchsia-500/50" : "border-border hover:bg-muted/20"}`}>
                       <span className={`flex items-center gap-1.5 text-sm font-bold ${useMotion ? "text-fuchsia-400" : "text-foreground"}`}>
                         <Video className="w-3.5 h-3.5" /> Real AI video
-                ລ                     </span>
+                      </span>
                       <span className="block text-[11px] text-muted-foreground mt-1">
                         Generates an actual moving clip per scene. Uses credits.
                         {!canMotion && " Available on Agency and Movie Maker Pro plans."}
