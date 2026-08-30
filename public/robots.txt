@@ -1,4 +1,4 @@
-> # digitalstudios.app
+# digitalstudios.app
 User-agent: *
 Allow: /
 
