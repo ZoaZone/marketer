@@ -45,7 +45,6 @@ import {
   getDubStatus,
   dubAudioFile,
   dubVideoFile,
-  probeMediaDuration,
 } from "./aiClient.js";
 
 export {
@@ -71,4 +70,5 @@ export {
   getDubStatus,
   dubAudioFile,
   dubVideoFile,
+  probeMediaDuration,
 };
