@@ -26,8 +26,8 @@ export default function PrivacyFooterSnippet({ variant = "dark" }) {
             🔒 Privacy & Consent Policy
           </Link>
           <span className={variant === "dark" ? "text-gray-700" : "text-gray-300"}>·</span>
-          <a href="mailto:privacy@aevoice.ai" className={`${textColor} transition`}>
-            privacy@aevoice.ai
+          <a href="mailto:privacy@digitalstudios.app" className={`${textColor} transition`}>
+            privacy@digitalstudios.app
           </a>
           <span className={variant === "dark" ? "text-gray-700" : "text-gray-300"}>·</span>
           <span className={`${variant === "dark" ? "text-gray-600" : "text-gray-400"} text-xs`}>
