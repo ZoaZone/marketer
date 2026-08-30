@@ -114,11 +114,15 @@ async function createDubbingJob(spec, apiKey) {
 
 async function pollDubbingJob(dubbingId, apiKey, onProgress, progressFloor, progressCeil, sourceSeconds) {
   const startedAt = Date.now();
-  const deadline = startedAt + POLL_TIMEOUT_MS;
+  const budgetMs = pollTimeoutFor(sourceSeconds);
+  const deadline = startedAt + budgetMs;
 
   for (;;) {
     if (Date.now() > deadline) {
-      throw new Error("Timed out waiting for ElevenLabs dubbing to finish.");
+      throw new Error(
+        `Timed out waiting for ElevenLabs dubbing to finish after ${Math.round(budgetMs / 60000)} minutes. ` +
+        "The provider job may still be running — check before re-submitting, since a re-run bills the source again.",
+      );
     }
     await sleep(POLL_INTERVAL_MS);
 
@@ -137,7 +141,10 @@ async function pollDubbingJob(dubbingId, apiKey, onProgress, progressFloor, prog
 
     // ElevenLabs doesn't expose a real completion percentage — approximate
     // with elapsed-time-over-budget, same technique as video.js's polling.
-    const elapsedFrac = Math.min(1, (Date.now() - startedAt) / POLL_TIMEOUT_MS);
+    // Uses the same duration-aware budget as the deadline above, so the bar on
+    // a two-hour film advances realistically instead of pinning at 100% after
+    // fifteen minutes and sitting there.
+    const elapsedFrac = Math.min(1, (Date.now() - startedAt) / budgetMs);
     onProgress(progressFloor + elapsedFrac * (progressCeil - progressFloor));
   }
 }
@@ -355,7 +362,7 @@ export async function dubAudio(spec, onProgress = () => {}) {
   }, apiKey);
   onProgress(0.05);
 
-  await pollDubbingJob(dubbingId, apiKey, onProgress, 0.05, 0.9);
+  await pollDubbingJob(dubbingId, apiKey, onProgress, 0.05, 0.9, spec?.sourceSeconds);
 
   const workDir = await fs.mkdtemp(path.join(os.tmpdir(), "dub-audio-"));
   try {
@@ -421,7 +428,7 @@ export async function dubVideo(spec, onProgress = () => {}, webhookHooks = {}) {
   // plain dub (no options) still reaches 1 without stalling on unused
   // stages.
   const dubCeil = lipSync ? 0.55 : (burnCaptions ? 0.7 : 0.9);
-  await pollDubbingJob(dubbingId, apiKey, onProgress, 0.05, dubCeil);
+  await pollDubbingJob(dubbingId, apiKey, onProgress, 0.05, dubCeil, spec?.sourceSeconds);
 
   const workDir = await fs.mkdtemp(path.join(os.tmpdir(), "dub-video-"));
   // Set to false right before handing the job off to a webhook — from that
