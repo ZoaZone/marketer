@@ -16,7 +16,10 @@
     },
     "role": {
       "type": "string",
-      "enum": ["direct", "override"],
+      "enum": [
+        "direct",
+        "override"
+      ],
       "description": "direct = the affiliate whose link/code drove the sale. override = the tier-1 parent's cut of a tier-2 sub-affiliate's sale."
     },
     "pct_applied": {
@@ -32,12 +35,43 @@
     },
     "status": {
       "type": "string",
-      "enum": ["pending", "approved", "clawed_back", "paid"],
+      "enum": [
+        "pending",
+        "approved",
+        "clawed_back",
+        "paid"
+      ],
       "default": "pending"
     },
     "payout_batch_id": {
       "type": "string"
     }
   },
-  "required": ["affiliate_id", "role", "amount"]
+  "required": [
+    "affiliate_id",
+    "role",
+    "amount"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
 }

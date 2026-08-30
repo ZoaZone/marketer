@@ -2,20 +2,111 @@
   "name": "SocialAccount",
   "type": "object",
   "properties": {
-    "brand_id":          { "type": "string", "description": "Link to Brand" },
+    "brand_id": {
+      "type": "string",
+      "description": "Link to Brand"
+    },
     "platform": {
       "type": "string",
-      "enum": ["instagram","facebook","tiktok","linkedin","youtube","twitter_x","pinterest","whatsapp","email"]
+      "enum": [
+        "instagram",
+        "facebook",
+        "tiktok",
+        "linkedin",
+        "youtube",
+        "twitter_x",
+        "pinterest",
+        "whatsapp",
+        "email"
+      ]
     },
-    "account_name":      { "type": "string" },
-    "username":          { "type": "string" },
-    "access_token":      { "type": "string" },
-    "refresh_token":     { "type": "string" },
-    "page_id":           { "type": "string" },
-    "connection_method": { "type": "string", "enum": ["credentials","api","webhook"], "default": "api", "description": "\"credentials\" (raw username/password) is kept only for reading pre-existing records — none of these platforms' posting APIs accept it, so it's no longer offered when creating a new account." },
-    "status":            { "type": "string", "enum": ["active","connected","disconnected","expired"], "default": "active" },
-    "connected_at":      { "type": "string", "format": "date-time" },
-    "description":       { "type": "string", "maxLength": 1000 }
+    "account_name": {
+      "type": "string"
+    },
+    "username": {
+      "type": "string"
+    },
+    "access_token": {
+      "type": "string"
+    },
+    "refresh_token": {
+      "type": "string"
+    },
+    "page_id": {
+      "type": "string"
+    },
+    "connection_method": {
+      "type": "string",
+      "enum": [
+        "credentials",
+        "api",
+        "webhook"
+      ],
+      "default": "api",
+      "description": "\"credentials\" (raw username/password) is kept only for reading pre-existing records \u2014 none of these platforms' posting APIs accept it, so it's no longer offered when creating a new account."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "connected",
+        "disconnected",
+        "expired"
+      ],
+      "default": "active"
+    },
+    "connected_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000
+    }
   },
-  "required": ["platform","account_name"]
+  "required": [
+    "platform",
+    "account_name"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {
+      "created_by": "{{user.email}}"
+    },
+    "update": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
 }

@@ -137,28 +137,21 @@ export default function BetaOnboarding() {
     setError("");
     setSavingProfile(true);
     try {
-      // Activate Agency-tier subscription
-      await base44.asServiceRole?.entities?.Subscription?.create?.({
-        owner_email: invite.email,
-        plan_name: "Beta Pro",
-        plan_tier: "agency",
-        status: "active",
-        current_period_end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-      }) ?? await base44.entities.Subscription.create({
-        owner_email: invite.email,
-        plan_name: "Beta Pro",
-        plan_tier: "agency",
-        status: "active",
-        current_period_end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-      });
-
-      // Mark invite as registered
-      await base44.entities.BetaRequest.update(invite.id, {
-        status: "registered",
+      // Activation (mark invite registered + create the Agency subscription)
+      // now runs server-side via activateBetaInvite. BetaRequest is admin-only
+      // writable under its RLS, so the old client-side update would be
+      // rejected; routing the Subscription creation through asServiceRole here
+      // also avoids a case mismatch between the invite email and the logged-in
+      // user's email.
+      const res = await base44.functions.invoke("activateBetaInvite", {
+        invite_id: invite.id,
+        token: invite.invite_token || "",
         full_name: fullName,
         company: company || invite.company || "",
         use_case: useCase || invite.use_case || "",
       });
+      const data = res?.data ?? res;
+      if (!data?.success) throw new Error(data?.error || "Could not activate your access. Please try again.");
 
       setSavingProfile(false);
       setStep(4);

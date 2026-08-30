@@ -4,7 +4,7 @@
   "properties": {
     "user_id": {
       "type": "string",
-      "description": "Owning user's email — this app's user identity key (same convention as Subscription.owner_email)."
+      "description": "Owning user's email \u2014 this app's user identity key (same convention as Subscription.owner_email)."
     },
     "code": {
       "type": "string",
@@ -12,12 +12,19 @@
     },
     "status": {
       "type": "string",
-      "enum": ["invited", "active", "suspended"],
+      "enum": [
+        "invited",
+        "active",
+        "suspended"
+      ],
       "default": "invited"
     },
     "tier": {
       "type": "number",
-      "enum": [1, 2],
+      "enum": [
+        1,
+        2
+      ],
       "description": "1 = admin-recruited affiliate. 2 = sub-affiliate recruited by a tier-1 affiliate. No deeper tiers exist."
     },
     "parent_affiliate_id": {
@@ -30,11 +37,14 @@
     },
     "effective_pool_pct": {
       "type": "number",
-      "description": "% of sale amount this affiliate personally earns. Tier-1 = commission_pct. Tier-2 = parent.commission_pct × commission_pct / 100. Computed on accept/update, never edited directly."
+      "description": "% of sale amount this affiliate personally earns. Tier-1 = commission_pct. Tier-2 = parent.commission_pct \u00d7 commission_pct / 100. Computed on accept/update, never edited directly."
     },
     "payout_method": {
       "type": "string",
-      "enum": ["stripe_connect", "paypal"]
+      "enum": [
+        "stripe_connect",
+        "paypal"
+      ]
     },
     "payout_account_ref": {
       "type": "string",
@@ -53,5 +63,38 @@
       "default": 0
     }
   },
-  "required": ["user_id", "code", "tier"]
+  "required": [
+    "user_id",
+    "code",
+    "tier"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "data.user_id": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
 }
