@@ -84,7 +84,11 @@ async function downloadToFile(url, destPath, headers = {}) {
 // ── ElevenLabs Dubbing API ──────────────────────────────────────────────
 
 async function createDubbingJob(spec, apiKey) {
-  const { sourceUrl, targetLang, sourceLang, numSpeakers, dropBackgroundAudio, disableVoiceCloning, watermark, highestResolution, startTime, endTime } = spec;
+  const {
+    sourceUrl, targetLang, sourceLang, numSpeakers, dropBackgroundAudio,
+    disableVoiceCloning, watermark, highestResolution, startTime, endTime,
+    glossaryPrompt, speakerMap,
+  } = spec;
 
   const form = new FormData();
   form.append("source_url", sourceUrl);
@@ -97,6 +101,22 @@ async function createDubbingJob(spec, apiKey) {
   if (highestResolution) form.append("highest_resolution", "true");
   if (startTime != null) form.append("start_time", String(startTime));
   if (endTime != null) form.append("end_time", String(endTime));
+
+  // Terminology locking. The Dubbing API has no glossary parameter, so a
+  // project's locked terms travel as translation guidance text. Character and
+  // brand names drifting between reels is the single most common complaint on
+  // long-form work, and this is the lever the API actually exposes.
+  if (glossaryPrompt) form.append("prompt", String(glossaryPrompt).slice(0, 4000));
+
+  // Per-speaker casting: pin a chosen target-language voice to each detected
+  // speaker instead of accepting the provider's default assignment. Only
+  // entries that name both a speaker and a voice are sent.
+  if (Array.isArray(speakerMap) && speakerMap.length) {
+    const casting = speakerMap
+      .filter((s) => s?.speaker_label && s?.voice_id)
+      .map((s) => ({ speaker_id: s.speaker_label, voice_id: s.voice_id }));
+    if (casting.length) form.append("speaker_mapping", JSON.stringify(casting));
+  }
 
   const res = await fetch("https://api.elevenlabs.io/v1/dubbing", {
     method: "POST",
