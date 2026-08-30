@@ -140,23 +140,40 @@ async function processQueue() {
   if (!next) return;
 
   processing = true;
-  const job = jobs.get(next.id);
-  job.status = "processing";
+  jobs.update(next.id, { status: "processing" });
 
   try {
     // Most job kinds report progress as a bare 0-1 fraction; renderProject
     // additionally reports which scene is currently rendering (see
     // render.js), so this accepts either shape without changing behavior
     // for music/video/dub/lane1 jobs.
+    // updateProgress keeps the in-memory value fresh on every tick (that is
+    // what the status route reads) but throttles the Redis write — an
+    // hours-long dub ticks every few seconds and none of that is worth
+    // persisting at full rate.
     const onProgress = (update) => {
       if (typeof update === "number") {
-        job.progress = update;
+        jobs.updateProgress(next.id, { progress: update });
         return;
       }
       if (update && typeof update === "object") {
-        if (typeof update.fraction === "number") job.progress = update.fraction;
-        if (typeof update.sceneIndex === "number") job.sceneIndex = update.sceneIndex;
-        if (typeof update.sceneTotal === "number") job.sceneTotal = update.sceneTotal;
+        const changes = {};
+        if (typeof update.fraction === "number") changes.progress = update.fraction;
+        if (typeof update.sceneIndex === "number") changes.sceneIndex = update.sceneIndex;
+        if (typeof update.sceneTotal === "number") changes.sceneTotal = update.sceneTotal;
+        // A provider reference (e.g. the ElevenLabs dubbing_id) is the one
+        // progress-channel field worth writing immediately: it is what lets a
+        // restarted worker reattach to a run already in flight instead of
+        // re-submitting and paying for the same source twice.
+        if (update.providerRef) {
+          jobs.update(next.id, {
+            ...changes,
+            providerRef: update.providerRef,
+            providerKind: update.providerKind || next.kind,
+          });
+          return;
+        }
+        if (Object.keys(changes).length) jobs.updateProgress(next.id, changes);
       }
     };
     let result;
@@ -180,21 +197,20 @@ async function processQueue() {
       // skip cleanup scheduling; the webhook handler (or its safety
       // timeout) does both once the job actually finishes.
     } else {
-      job.status = "done";
-      job.progress = 1;
       // Most job kinds resolve to a plain URL string; dubVideo resolves to
       // { url, captionsUrl } since it may also produce a captions sidecar.
+      const done = { status: "done", progress: 1 };
       if (result && typeof result === "object") {
-        job.url = result.url;
-        job.captionsUrl = result.captionsUrl ?? null;
+        done.url = result.url;
+        done.captionsUrl = result.captionsUrl ?? null;
       } else {
-        job.url = result;
+        done.url = result;
       }
+      jobs.update(next.id, done);
       scheduleCleanup(next.id);
     }
   } catch (e) {
-    job.status = "error";
-    job.error = String(e?.message || e);
+    jobs.update(next.id, { status: "error", error: String(e?.message || e) });
     scheduleCleanup(next.id);
   } finally {
     processing = false;
