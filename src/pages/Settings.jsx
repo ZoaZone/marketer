@@ -70,7 +70,12 @@ function SocialAccountsTab() {
     if (!form.account_name.trim()) { alert("Account / display name is required"); return; }
     setSaving(true);
     try {
-      const created = await base44.entities.SocialAccount.create({
+      // Routed through saveSocialAccount rather than writing the entity
+      // directly: that function encrypts the token (AES-256-GCM) before it is
+      // stored, so a live posting credential never sits in plaintext on a
+      // client-readable record. The token is sent once, on this request, and
+      // is never read back to the browser afterwards.
+      const res = await base44.functions.invoke("saveSocialAccount", {
         platform: form.platform,
         account_name: form.account_name,
         username: form.username || "",
@@ -78,8 +83,9 @@ function SocialAccountsTab() {
         refresh_token: form.refresh_token || "",
         page_id: form.page_id || "",
         connection_method: "api",
-        status: "disconnected",
       });
+      const created = res?.data?.account ?? res?.account;
+      if (!created?.id) throw new Error(res?.data?.error || res?.error || "Could not save the account.");
       try {
         await base44.functions.invoke("testSocialConnection", { account_id: created.id });
       } catch (_e) { /* verification is best-effort */ }
