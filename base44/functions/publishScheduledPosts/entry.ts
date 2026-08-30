@@ -1,6 +1,44 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
 
 /**
+ * Platform tokens are stored AES-256-GCM encrypted in access_token_enc (written
+ * only by saveSocialAccount), matching how saveApiKey handles BYOK provider
+ * keys. resolveAccountToken decrypts that, and falls back to the deprecated
+ * plaintext access_token column so accounts created before the migration keep
+ * publishing until they are next saved. Delete the fallback once no plaintext
+ * records remain.
+ */
+async function decryptSecret(blob: string, keyB64: string): Promise<string> {
+  const stored = JSON.parse(blob);
+  const keyBytes = Uint8Array.from(atob(keyB64), (c) => c.charCodeAt(0));
+  const cryptoKey = await crypto.subtle.importKey('raw', keyBytes, 'AES-GCM', false, ['decrypt']);
+  const iv = Uint8Array.from(atob(stored.iv), (c) => c.charCodeAt(0));
+  const ciphertext = Uint8Array.from(atob(stored.ciphertext), (c) => c.charCodeAt(0));
+  const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, cryptoKey, ciphertext);
+  return new TextDecoder().decode(plainBuf);
+}
+
+async function resolveAccountToken(account: any): Promise<string> {
+  if (!account) return '';
+  if (account.access_token_enc) {
+    const key = Deno.env.get('BYOK_ENCRYPTION_KEY');
+    if (!key) {
+      console.error('BYOK_ENCRYPTION_KEY missing — cannot decrypt social token.');
+      return '';
+    }
+    try {
+      return await decryptSecret(account.access_token_enc, key);
+    } catch (e) {
+      // A rotated or corrupt key must fail this one account loudly in the
+      // result rows, not throw and abort the whole publish run.
+      console.error(`Failed to decrypt token for account ${account.id}: ${(e as Error).message}`);
+      return '';
+    }
+  }
+  return account.access_token || '';
+}
+
+/**
  * publishScheduledPosts — On-demand trigger (called from SocialHub UI)
  *
  * Flow:
@@ -62,7 +100,7 @@ Deno.serve(async (req) => {
     for (const post of postsToPublish) {
       // Resolve social account — must belong to this user
       const account = post.social_account_id ? accountMap[post.social_account_id] : null;
-      const token = account?.access_token;
+      const token = await resolveAccountToken(account);
 
       let postUrl = '';
       let status = 'posted';
