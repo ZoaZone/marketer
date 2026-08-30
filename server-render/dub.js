@@ -360,7 +360,12 @@ export async function dubAudio(spec, onProgress = () => {}) {
     dropBackgroundAudio: !!spec?.dropBackgroundAudio,
     disableVoiceCloning: !!spec?.disableVoiceCloning,
   }, apiKey);
-  onProgress(0.05);
+
+  // Report the provider's own job id up the progress channel BEFORE polling.
+  // index.js persists this immediately, so if the worker restarts during a
+  // multi-hour dub the record still points at the ElevenLabs run that is
+  // already in flight (and already being billed) instead of stranding it.
+  onProgress({ fraction: 0.05, providerRef: dubbingId, providerKind: "elevenlabs-dubbing" });
 
   await pollDubbingJob(dubbingId, apiKey, onProgress, 0.05, 0.9, spec?.sourceSeconds);
 
@@ -428,6 +433,8 @@ export async function dubVideo(spec, onProgress = () => {}, webhookHooks = {}) {
   // plain dub (no options) still reaches 1 without stalling on unused
   // stages.
   const dubCeil = lipSync ? 0.55 : (burnCaptions ? 0.7 : 0.9);
+  // See dubAudio above — persist the provider reference before the long wait.
+  onProgress({ fraction: 0.05, providerRef: dubbingId, providerKind: "elevenlabs-dubbing" });
   await pollDubbingJob(dubbingId, apiKey, onProgress, 0.05, dubCeil, spec?.sourceSeconds);
 
   const workDir = await fs.mkdtemp(path.join(os.tmpdir(), "dub-video-"));
