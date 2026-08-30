@@ -95,6 +95,22 @@ function toBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
+// COST GATE. ElevenLabs TTS bills per character against the platform key. Every paid plan lists voiceover, so this allows any active subscription and blocks only tier-less/free accounts.
+// Added because this endpoint authenticated the caller but never checked what
+// their plan actually included — any signed-in user could bill the platform.
+const VOICEOVER_ENTITLED_TIERS = ["creator","starter","growth","agency","indie","studio","dubbing_house","enterprise","byok"];
+async function assertEntitled(base44: any, user: any): Promise<Response | null> {
+  if (user.role === 'admin') return null;
+  const subs = await base44.asServiceRole.entities.Subscription.filter({ owner_email: user.email }).catch(() => []);
+  const sub = subs?.[0];
+  const ok = !!sub && ['active', 'trialing'].includes(sub.status) && VOICEOVER_ENTITLED_TIERS.includes(sub.plan_tier);
+  if (ok) return null;
+  return Response.json(
+    { error: 'Your plan does not include AI voiceover.', code: 'upgrade_required', required_tiers: VOICEOVER_ENTITLED_TIERS },
+    { status: 403, headers: CORS },
+  );
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
 
@@ -102,6 +118,9 @@ Deno.serve(async (req) => {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401, headers: CORS });
+
+    const denied = await assertEntitled(base44, user);
+    if (denied) return denied;
 
     const apiKey = Deno.env.get('ELEVENLABS_API_KEY');
     if (!apiKey?.trim()) {
