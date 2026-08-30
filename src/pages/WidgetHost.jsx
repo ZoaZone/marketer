@@ -3,7 +3,7 @@ import { Mic, MicOff, Send, X, MessageSquare, Volume2, VolumeX, Bot, Loader2 } f
 
 const SRI_FN     = "https://sreeagent.base44.app/functions/sriChat";
 const TTS_FN     = "https://sreeagent.base44.app/functions/ttsStream";
-const LOGO_URL   = "https://media.base44.com/images/public/69c3c2f5acaefc3a7afad5fd/aa408b540_IMG_8880.jpeg";
+const LOGO_URL   = "/brand/logo-mark.jpeg";
 const SITE_COLOR = "#d946ef";
 const SITE_NAME  = "MARKETER";
 const SITE_URL   = "https://digitalstudios.app";

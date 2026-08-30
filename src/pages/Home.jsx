@@ -282,7 +282,7 @@ export default function Home() {
               image animates inside — no hard cut when it scales/shifts. */}
           <div className="absolute left-1/2 -translate-x-1/2 top-0 z-0 h-[45vh] w-screen overflow-hidden pointer-events-none mask-fade-edges">
             <img
-              src="https://media.base44.com/images/public/69c3c2f5acaefc3a7afad5fd/db61ca772_IMG_8881.jpg"
+              src="/brand/logo-wordmark.jpg"
               alt={BRAND.name}
               className="w-full h-full object-contain opacity-90 animate-kenburns"
               onError={(e) => { e.target.style.display = "none"; }}
@@ -426,7 +426,7 @@ export default function Home() {
       <footer className="border-t border-white/10 py-12 px-6 bg-neutral-950">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center">
-            <img src="https://media.base44.com/images/public/69c3c2f5acaefc3a7afad5fd/db61ca772_IMG_8881.jpg" alt={BRAND.name} className="h-11 object-contain" onError={(e) => e.target.style.display = "none"} />
+            <img src="/brand/logo-wordmark.jpg" alt={BRAND.name} className="h-11 object-contain" onError={(e) => e.target.style.display = "none"} />
           </div>
           <div className="flex flex-wrap gap-6 text-sm font-medium items-center justify-center">
             <a href="mailto:care@aevoice.ai" className="text-neutral-400 hover:text-white transition-colors">care@aevoice.ai</a>
