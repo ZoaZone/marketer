@@ -236,7 +236,7 @@ export default function Pricing() {
         {/* Header */}
         <div className="text-center mb-14">
           <div className="flex items-center justify-center mb-4">
-            <img src="/brand/logo-wordmark.jpg" alt={BRAND.name} className="h-12 object-contain" onError={(e) => e.target.style.display="none"} />
+            <img src="/brand/wordmark.png" alt={BRAND.name} className="h-12 object-contain" onError={(e) => e.target.style.display="none"} />
           </div>
           <h1 className="text-4xl md:text-5xl font-black mb-4">Choose your plan</h1>
           <p className="text-white/50 text-lg mb-6">Two lanes, priced for what they actually cost: Business runs on pooled platform credits, Movie Maker Pro meters real external render costs.</p>

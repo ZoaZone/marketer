@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Loader2, Eye, EyeOff, Mail, Lock, ShieldCheck } from "lucide-react";
 
-const LOGO = "/brand/logo-mark.jpeg";
+const LOGO = "/brand/icon.png";
 const BRAND = "Marketer OS";
 const ADMIN_REDIRECT = "/admin-dashboard";
 

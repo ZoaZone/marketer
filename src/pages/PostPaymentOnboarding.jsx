@@ -5,7 +5,7 @@ import { CheckCircle2, Globe, Megaphone, Share2, ArrowRight, Loader2, Sparkles, 
 import { BRAND } from "@/lib/brand";
 import { recordCommissionFor } from "@/utils/affiliate";
 
-const M_LOGO="/brand/logo-mark.jpeg";
+const M_LOGO="/brand/icon.png";
 const STEPS=[
   {id:1,Icon:Globe,title:"Scan Your Website",desc:"Let AI learn about your business — auto-generates content concepts",color:"from-fuchsia-500 to-purple-600"},
   {id:2,Icon:Share2,title:"Connect Social Accounts",desc:"Link Instagram, TikTok, LinkedIn and more to start scheduling",color:"from-pink-500 to-rose-600"},

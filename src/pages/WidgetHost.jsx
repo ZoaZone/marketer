@@ -3,7 +3,7 @@ import { Mic, MicOff, Send, Volume2, VolumeX, Bot, Loader2 } from "lucide-react"
 
 const SRI_FN     = "https://sreeagent.base44.app/functions/sriChat";
 const TTS_FN     = "https://sreeagent.base44.app/functions/ttsStream";
-const LOGO_URL   = "/brand/logo-mark.jpeg";
+const LOGO_URL   = "/brand/icon.png";
 const SITE_COLOR = "#d946ef";
 const SITE_NAME  = "MARKETER";
 const SITE_URL   = "https://digitalstudios.app";

@@ -5,7 +5,7 @@ import { mine } from "@/utils/scope";
 import { Users, Megaphone, Share2, GitBranch, MessageSquare, Clock, TrendingUp, Sparkles, Zap, Plus } from "lucide-react";
 import { Link } from "react-router-dom";
 
-const M_LOGO = "/brand/logo-mark.jpeg";
+const M_LOGO = "/brand/icon.png";
 
 export default function Dashboard() {
   const { user } = useOutletContext() || {};

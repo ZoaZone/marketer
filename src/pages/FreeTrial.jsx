@@ -4,7 +4,7 @@ import { ArrowLeft, Upload, User, Lock, ArrowRight, Loader2, CheckCircle2, Spark
 import { base44 } from "@/api/base44Client";
 import { useSeo, SEO } from "@/lib/seo";
 
-const M_LOGO = "/brand/logo-mark.jpeg";
+const M_LOGO = "/brand/icon.png";
 
 const LOCKED_FEATURES = [
   { Icon: Image,    label: "AI Image Generation",     desc: "Create stunning visuals in seconds with AI." },
