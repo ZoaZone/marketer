@@ -27,10 +27,29 @@
       "type": "string"
     },
     "access_token": {
-      "type": "string"
+      "type": "string",
+      "description": "DEPRECATED legacy plaintext token, read-only. Never write this again \u2014 saveSocialAccount writes access_token_enc. Consumers (publishScheduledPosts, testSocialConnection) read it only as a fallback for records created before encryption existed, and it is blanked when such a record is next saved."
     },
     "refresh_token": {
-      "type": "string"
+      "type": "string",
+      "description": "DEPRECATED legacy plaintext token, read-only. See access_token."
+    },
+    "access_token_enc": {
+      "type": "string",
+      "description": "AES-256-GCM ciphertext of the platform access token, stored as JSON {ciphertext, iv} and encrypted with BYOK_ENCRYPTION_KEY \u2014 the same scheme saveApiKey uses for BYOK provider keys. Written ONLY by the saveSocialAccount backend function; never set from the client and never returned to it."
+    },
+    "refresh_token_enc": {
+      "type": "string",
+      "description": "AES-256-GCM ciphertext of the refresh token as JSON {ciphertext, iv}. See access_token_enc."
+    },
+    "token_hint": {
+      "type": "string",
+      "description": "Last 4 characters of the access token, so the UI can show which credential is stored without ever handling the secret."
+    },
+    "token_updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the stored credential was last written \u2014 lets the UI flag stale tokens for platforms that expire them."
     },
     "page_id": {
       "type": "string"
