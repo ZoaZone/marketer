@@ -499,8 +499,18 @@ export default function Auth() {
               <button onClick={() => resetFlow("login")} className="text-violet-400 hover:text-violet-300 font-medium transition-colors">Sign in</button>
             </p>
           )}
+          {/* Legal links on the auth screen itself. Google's OAuth review looks
+              for the privacy policy and terms to be reachable from the sign-in
+              flow, and a consent line at the point of account creation is the
+              normal way to evidence acceptance. */}
+          <p className="text-xs text-slate-600">
+            By continuing you agree to our{" "}
+            <a href="/terms" className="text-slate-400 hover:text-slate-200 underline underline-offset-2">Terms of Service</a>
+            {" "}and{" "}
+            <a href="/privacy" className="text-slate-400 hover:text-slate-200 underline underline-offset-2">Privacy Policy</a>.
+          </p>
           <p className="text-xs text-slate-700">
-                          © 2026 {BRAND} · AI creative studio
+            © 2026 ZoaZone Services LLC · {BRAND}
           </p>
         </div>
       </div>
