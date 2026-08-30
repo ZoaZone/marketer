@@ -9,7 +9,6 @@ import {
 import { BRAND } from "@/lib/brand";
 import { useSeo, SEO, injectStructuredData } from "@/lib/seo";
 
-const M_LOGO = "/favicon.png";
 
 // Direct video file (mp4/webm) for the "Watch Demo" modal. Leave empty to show
 // the in-app feature tour instead of a broken/placeholder embed.

@@ -46,7 +46,6 @@ function DarkToggle() {
 }
 
 
-const M_LOGO = "/favicon.png";
 
 // The creative experience is primary: CREATE and LIBRARY come first.
 // Marketing/CRM tools are still fully available, just de-emphasized into a
