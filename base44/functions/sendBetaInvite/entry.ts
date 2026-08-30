@@ -98,8 +98,23 @@ Deno.serve(async (req) => {
 
   try {
     const base44 = createClientFromRequest(req);
+
+    // SECURITY: every write below runs through asServiceRole, so an
+    // unauthenticated caller could mint a valid 30-day invite token for any
+    // address, overwrite an existing BetaRequest, and send mail from the app's
+    // domain. The only call site is AdminDashboard, which is already gated on
+    // user.role === 'admin' in the browser — that gate has to be enforced here
+    // too, since a client-side check protects nothing.
+    const caller = await base44.auth.me();
+    if (!caller) {
+      return Response.json({ error: 'Unauthorized' }, { status: 401, headers: CORS });
+    }
+    if (caller.role !== 'admin') {
+      return Response.json({ error: 'Forbidden — admin only' }, { status: 403, headers: CORS });
+    }
+
     const payload = await req.json().catch(() => ({}));
-    const { email, note = '', invited_by = 'admin', source = 'manual_invite', full_name = '' } = payload;
+    const { email, note = '', invited_by = caller.email || 'admin', source = 'manual_invite', full_name = '' } = payload;
 
     if (!email) {
       return Response.json({ error: 'email is required' }, { status: 400, headers: CORS });
