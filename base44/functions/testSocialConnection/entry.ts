@@ -1,6 +1,36 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
 
 /**
+ * Tokens are AES-256-GCM encrypted in access_token_enc (written only by
+ * saveSocialAccount). Falls back to the deprecated plaintext access_token so
+ * pre-migration accounts can still be tested; remove the fallback once none
+ * remain. Mirrors publishScheduledPosts' helper of the same name.
+ */
+async function decryptSecret(blob: string, keyB64: string): Promise<string> {
+  const stored = JSON.parse(blob);
+  const keyBytes = Uint8Array.from(atob(keyB64), (c) => c.charCodeAt(0));
+  const cryptoKey = await crypto.subtle.importKey('raw', keyBytes, 'AES-GCM', false, ['decrypt']);
+  const iv = Uint8Array.from(atob(stored.iv), (c) => c.charCodeAt(0));
+  const ciphertext = Uint8Array.from(atob(stored.ciphertext), (c) => c.charCodeAt(0));
+  const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, cryptoKey, ciphertext);
+  return new TextDecoder().decode(plainBuf);
+}
+
+async function resolveAccountToken(account: any): Promise<string> {
+  if (!account) return '';
+  if (account.access_token_enc) {
+    const key = Deno.env.get('BYOK_ENCRYPTION_KEY');
+    if (!key) return '';
+    try {
+      return await decryptSecret(account.access_token_enc, key);
+    } catch {
+      return '';
+    }
+  }
+  return account.access_token || '';
+}
+
+/**
  * testSocialConnection — "Test Connection" action for Social Hub / Settings.
  *
  * Social accounts previously always showed as "active" the moment they were
@@ -87,13 +117,22 @@ Deno.serve(async (req) => {
       message = account.platform === 'email'
         ? 'This entry is a sender label only. Email sending uses the SendGrid API key configured in Settings → API Keys.'
         : 'This entry is a sender label only. WhatsApp sending uses the WhatsApp Business (Twilio/BSP) credentials configured in Settings → API Keys.';
-    } else if (account.connection_method === 'credentials' || !account.access_token) {
+    } else if (account.connection_method === 'credentials' || !(account.access_token_enc || account.access_token)) {
       status = 'disconnected';
       message = account.connection_method === 'credentials'
         ? `${account.platform} accounts saved with a username/password can't be used to publish via the API. Reconnect with an API access token in Settings → Social Accounts.`
         : `No access token is set for this account. Reconnect it in Settings → Social Accounts.`;
     } else {
-      const result = await checkToken(account.platform, account.access_token);
+      const resolved = await resolveAccountToken(account);
+      if (!resolved) {
+        // A stored-but-undecryptable token is a distinct failure from no token
+        // at all, and says something different about what to do next.
+        return Response.json({
+          status: 'expired',
+          message: 'The stored credential for this account could not be decrypted — the encryption key may have been rotated. Reconnect the account to store it again.',
+        }, { headers: corsHeaders });
+      }
+      const result = await checkToken(account.platform, resolved);
       status = result.ok ? 'active' : 'expired';
       message = result.message;
     }
