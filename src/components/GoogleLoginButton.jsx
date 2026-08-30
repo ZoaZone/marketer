@@ -1,11 +1,23 @@
 import { useEffect, useRef } from "react";
 
-const GOOGLE_CLIENT_ID = "342662050420-hjsrds4v122ggc6np9hlcgp0n2dt5rqd.apps.googleusercontent.com";
+// Read from the environment — never hardcoded. The value that used to sit here
+// (342662050420-hjsrds4v…) was Base44's own platform OAuth client, not this
+// app's: its redirect_uri is https://app.base44.com/api/apps/auth/callback and
+// we cannot administer it, so no Google Cloud branding change would ever have
+// taken effect through it. Set VITE_GOOGLE_CLIENT_ID to a client id from a
+// Google Cloud project we control to enable this button.
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
 
 /**
  * GoogleLoginButton — ZoaZone Shared Component
  * Uses Google Identity Services (GSI) One Tap + Button flow.
  * On success, exchanges the Google ID token with Base44 auth.
+ *
+ * NOT CURRENTLY MOUNTED: the only consumer is src/pages/Login.jsx, and App.jsx
+ * redirects /login → /auth (src/pages/Auth.jsx), which signs in through
+ * base44.auth.loginWithProvider("google") instead. Wiring this up requires both
+ * a client id above AND a backend function that verifies the returned Google ID
+ * token and mints an app session — see handleCredential below.
  *
  * Props:
  *   onSuccess(credential) — called with the Base44 session after login
@@ -23,6 +35,13 @@ export default function GoogleLoginButton({
   const btnRef = useRef(null);
 
   useEffect(() => {
+    // No client id configured — render nothing rather than initialising GSI with
+    // an empty client_id, which fails with an opaque console error.
+    if (!GOOGLE_CLIENT_ID) {
+      console.warn("[GoogleLogin] VITE_GOOGLE_CLIENT_ID is not set — button disabled.");
+      return;
+    }
+
     // Load GSI script if not already loaded
     if (!window.google?.accounts) {
       const script = document.createElement("script");
@@ -78,17 +97,17 @@ export default function GoogleLoginButton({
         } else if (base44?.auth?.googleLogin) {
           session = await base44.auth.googleLogin({ credential });
         } else {
-          // Direct API fallback
-          const res = await fetch("https://base44.app/api/auth/google", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ credential, client_id: GOOGLE_CLIENT_ID }),
-          });
-          if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            throw new Error(err.message || err.error || `Auth failed: ${res.status}`);
-          }
-          session = await res.json();
+          // No SDK method to exchange a Google ID token for an app session.
+          // The previous fallback here POSTed to https://base44.app/api/auth/google
+          // — a hardcoded base44.app endpoint that is not part of the public API
+          // and returns nothing usable, so this path silently failed while
+          // looking like it worked. Fail loudly instead: exchanging the token
+          // needs a backend function of ours that verifies the JWT against
+          // https://www.googleapis.com/oauth2/v3/certs, checks aud/iss/exp, and
+          // then issues the session.
+          throw new Error(
+            "Google sign-in is not wired up: no token-exchange backend is configured.",
+          );
         }
 
         // Persist token
@@ -110,6 +129,8 @@ export default function GoogleLoginButton({
       window.google?.accounts?.id?.cancel?.();
     };
   }, []);
+
+  if (!GOOGLE_CLIENT_ID) return null;
 
   return (
     <div className="w-full">
