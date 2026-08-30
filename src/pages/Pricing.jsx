@@ -355,9 +355,18 @@ export default function Pricing() {
           </div>
         </div>
 
-        {/* Legal note */}
+        {/* Legal note. This previously read "All sales are final", which
+            contradicted the Terms — §7 makes fees non-refundable EXCEPT where
+            law requires otherwise, because an absolute bar is unenforceable
+            against consumers in several markets and a court can strike the whole
+            clause. Checkout copy and the Terms have to say the same thing, or
+            the stricter-sounding one gets read against us. */}
         <p className="text-center text-xs text-white/25">
-          All prices shown exclude applicable taxes, calculated and applied at checkout. All sales are final. Subscriptions auto-renew. Cancel anytime before renewal to avoid charges. For billing questions: care@digitalstudios.app
+          All prices shown exclude applicable taxes, calculated and applied at checkout.
+          Subscriptions auto-renew; cancel anytime before renewal to avoid charges.
+          Fees are non-refundable except where required by law — see our{" "}
+          <Link to="/terms" className="underline hover:text-white/40">Terms of Service</Link>.
+          For billing questions: care@digitalstudios.app
         </p>
       </div>
     </div>
