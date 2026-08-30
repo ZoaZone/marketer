@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, Megaphone, Share2, Sparkles, PenTool,
   Search, GitBranch, UserPlus, MailCheck, Image, Globe,
   BarChart3, Settings, CreditCard, ChevronDown, LogOut, Menu, X,
-  Lock, Bell, HelpCircle, ShieldCheck, Zap, Building2, Share,
+  Lock, Bell, HelpCircle, ShieldCheck, Building2, Share,
   Sun, Moon, Wand2, Monitor, Film, Music, Sliders, Plug,
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
