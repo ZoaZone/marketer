@@ -49,14 +49,13 @@ export default function Login() {
         await base44.auth.loginViaEmailPassword(form.email, form.password);
         navigate(SIGNUP_REDIRECT, { replace: true });
       } else {
-        // Password reset — try multiple SDK method names for compatibility
+        // Password reset — try both SDK method names for compatibility. The
+        // third fallback that used to live here POSTed to a hardcoded
+        // https://base44.app/... URL; it is gone, both because it pinned the
+        // platform domain into a page users see and because it swallowed real
+        // failures into a "reset link sent" message that was not true.
         try { await base44.auth.resetPasswordRequest(form.email); }
-        catch { try { await base44.auth.sendPasswordResetEmail({ email: form.email }); }
-        catch { await fetch("https://base44.app/api/auth/forgot-password", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: form.email }),
-        }); }}
+        catch { await base44.auth.sendPasswordResetEmail({ email: form.email }); }
         setMsg("Reset link sent — check your inbox.");
       }
     } catch (err) {
