@@ -210,10 +210,48 @@ export default function QuickCreate() {
       for (let i = 0; i < sceneScripts.length; i++) {
         setStoryboardProgress(i / sceneScripts.length);
         const imgUrl = await generateImage({ prompt: sceneScripts[i].imagePrompt || sceneScripts[i].text || prompt, referenceImageUrls });
-        built.push({ imageUrl: imgUrl, text: sceneScripts[i].text, seconds: 8 });
+        built.push({
+          imageUrl: imgUrl,
+          text: sceneScripts[i].text,
+          seconds: useMotion ? MOTION_CLIP_SECONDS : 8,
+        });
         setScenes([...built]);
       }
       setStoryboardProgress(1);
+
+      // Real video: each still becomes the start frame for a generated clip,
+      // which is what keeps the look consistent across scenes. Sequential, not
+      // parallel — the worker fans these out to Replicate and firing them all
+      // at once risks tripping rate limits across the whole batch (same reason
+      // MovieMaker paces its own scene loop).
+      if (useMotion) {
+        setMotionProgress(0);
+        for (let i = 0; i < built.length; i++) {
+          try {
+            const clipUrl = await generateSceneVideo({
+              prompt: built[i].text || prompt,
+              imageUrl: built[i].imageUrl,
+              durationSeconds: MOTION_CLIP_SECONDS,
+            });
+            if (clipUrl) {
+              built[i] = { ...built[i], videoUrl: clipUrl };
+              setScenes([...built]);
+            }
+          } catch (clipError) {
+            // A failed clip is not fatal — the scene keeps its still image and
+            // the assembler pans it instead, so the render still completes.
+            const msg = /403|plan|upgrade/i.test(clipError?.message || "")
+              ? "Your plan does not include AI video generation — finishing as a cinematic slideshow instead."
+              : `Scene ${i + 1}: ${clipError?.message || "video clip generation failed"} — using the still image for this scene.`;
+            setWarnings(prev => prev.includes(msg) ? prev : [...prev, msg]);
+            if (/403|plan|upgrade/i.test(clipError?.message || "")) {
+              setMotionMode("slideshow");
+              break;
+            }
+          }
+          setMotionProgress((i + 1) / built.length);
+        }
+      }
     } catch (e) {
       setError(e?.message || "Storyboard generation failed.");
     }
@@ -260,12 +298,38 @@ export default function QuickCreate() {
       if (audioMode === "voiceover" && !voiceoverUrl) setWarnings(prev => [...prev, "No voiceover was generated — shipping silent instead."]);
       if (audioMode === "music" && !musicUrl) setWarnings(prev => [...prev, "No music track uploaded — shipping silent. Use Movie Maker Pro for AI-composed music."]);
 
-      const url = await assembleLane1Video({
-        scenes, ratio: videoRatio, resolution,
-        audioMode: effectiveAudioMode,
-        voiceoverUrl: voiceoverUrl || undefined,
-        musicUrl: musicUrl || undefined,
-      }, { onProgress: setMuxProgress });
+      // Two assemblers, picked by what the scenes actually contain. The Lane 2
+      // render worker understands scene.videoUrl and stitches real clips;
+      // assembleLane1Video only knows how to Ken Burns a still. Routing on the
+      // scenes rather than on the toggle means a partial failure above (some
+      // clips generated, some not) still assembles correctly — render.js
+      // already falls back to the still for any scene lacking a videoUrl.
+      const hasClips = scenes.some(s => s.videoUrl);
+      let url;
+
+      if (hasClips) {
+        const jobId = await submitRender({
+          scenes, ratio: videoRatio, resolution,
+          audioMode: effectiveAudioMode,
+          voiceoverUrl: voiceoverUrl || undefined,
+          musicUrl: musicUrl || undefined,
+        });
+        for (;;) {
+          await new Promise(r => setTimeout(r, 4000));
+          const job = await getRenderStatus(jobId);
+          if (typeof job?.progress === "number") setMuxProgress(job.progress);
+          if (job?.status === "done") { url = job.url; break; }
+          if (job?.status === "error") throw new Error(job.error || "Video assembly failed.");
+        }
+      } else {
+        url = await assembleLane1Video({
+          scenes, ratio: videoRatio, resolution,
+          audioMode: effectiveAudioMode,
+          voiceoverUrl: voiceoverUrl || undefined,
+          musicUrl: musicUrl || undefined,
+        }, { onProgress: setMuxProgress });
+      }
+
       setVideoResult(url);
       setStep(6); // advance straight to Publish/Export once assembled
     } catch (e) {
