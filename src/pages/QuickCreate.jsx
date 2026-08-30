@@ -1,8 +1,13 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { Link, useOutletContext } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { generateText, generateImage, generateVoiceover, uploadFile, splitScriptIntoScenes, assembleLane1Video } from "@/utils/lane1";
+// Tier-gated Lane 2 access — see the amended lane guard in eslint.config.js.
+// Entitlement is enforced server-side in base44/functions/submitVideo (403);
+// the client check below is UX, so an unentitled user gets an upgrade prompt
+// instead of a failed request.
+import { generateSceneVideo, submitRender, getRenderStatus } from "@/utils/lane2";
 import { VIDEO_RATIOS } from "@/utils/videoAssembler";
 import {
   Wand2, Image as ImageIcon, Video, Loader2, Download, Save, CheckCircle2,
@@ -46,8 +51,31 @@ const AUDIO_MODES = [
 // Pixel-dimension hints passed to the image generator per aspect ratio.
 const RATIO_DIMENSIONS = { "1:1": "1024x1024", "16:9": "1792x1024", "9:16": "1024x1792", "4:5": "1024x1280" };
 
+// Tier at which real generative video unlocks. Mirrors AppLayout's TIER_MAP
+// (3 = agency, 4 = any Lane 2 tier or BYOK) and must stay in step with
+// GENERATION_ENTITLED_TIERS in base44/functions/submitVideo/entry.ts, which is
+// the check that actually enforces it.
+const MOTION_MIN_TIER = 3;
+
+// Per-scene clip length for real video. Kling bills per clip, so Quick Create
+// generates exactly one short clip per scene — Movie Maker is where multi-shot
+// scenes and longer durations live.
+const MOTION_CLIP_SECONDS = 5;
+
 export default function QuickCreate() {
   const qc = useQueryClient();
+  // AppLayout supplies this via <Outlet context>. Defaults keep the page
+  // usable if it is ever rendered outside that shell.
+  const { userTier = 0, isAdmin = false } = useOutletContext() || {};
+  const canMotion = isAdmin || userTier >= MOTION_MIN_TIER;
+
+  // "motion" = real generative video (Kling, one clip per scene).
+  // "slideshow" = the original FFmpeg Ken Burns pan over stills.
+  // Entitled users default to motion, because that is what "Short Video"
+  // is understood to mean; everyone else gets the slideshow, labelled.
+  const [motionMode, setMotionMode] = useState(canMotion ? "motion" : "slideshow");
+  const useMotion = canMotion && motionMode === "motion";
+  const [motionProgress, setMotionProgress] = useState(0);
   const [prompt, setPrompt] = useState("");
   const [outputType, setOutputType] = useState("image"); // "image" | "video"
   const [attachments, setAttachments] = useState([]); // [{ url, name }]
