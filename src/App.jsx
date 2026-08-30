@@ -50,6 +50,7 @@ import MovieMaker from './pages/MovieMaker';
 import SongCreator from './pages/SongCreator';
 import Studio from './pages/Studio';
 import OAuthConsent from './pages/OAuthConsent';
+import Privacy from './pages/Privacy';
 
 
 const AuthenticatedApp = () => {
@@ -72,7 +73,7 @@ const AuthenticatedApp = () => {
     if (authError.type === 'user_not_registered') {
       return <UserNotRegisteredError />;
     } else if (authError.type === 'auth_required') {
-      const publicPaths = new Set(["/", "/Home", "/home", "/pricing", "/Pricing", "/WidgetHost", "/PromoSignup", "/login", "/auth"]);
+      const publicPaths = new Set(["/", "/Home", "/home", "/pricing", "/Pricing", "/WidgetHost", "/PromoSignup", "/login", "/auth", "/privacy"]);
       if (!publicPaths.has(window.location.pathname)) { navigateToLogin(); }
       return null;
     }
@@ -89,6 +90,11 @@ const AuthenticatedApp = () => {
         <Route path="/login" element={<Navigate to="/auth" replace />} />
       <Route path="/auth" element={<Auth />} />
       <Route path="/oauth/consent" element={<OAuthConsent />} />
+      {/* src/pages/Privacy.jsx existed but was never routed, so the "Privacy
+          Policy" link in the login footer 404'd. It has to resolve publicly:
+          Google's OAuth consent screen requires a reachable privacy policy URL
+          before it will verify a custom client for digitalstudios.app. */}
+      <Route path="/privacy" element={<Privacy />} />
       <Route path="/onboarding" element={<PostPaymentOnboarding />} />
       <Route path="/lead-capture" element={<LeadCapturePage />} />
       <Route path="/beta" element={<BetaSignup />} />
