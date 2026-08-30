@@ -9,7 +9,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageSquare, X, Send, Mic, MicOff, Bot, User, Loader2, Minimize2, Zap } from 'lucide-react';
+import { X, Send, Mic, MicOff, User, Minimize2 } from 'lucide-react';
 
 const SREE_ENGINE = "https://sreeagent.base44.app/functions/sreeAgenticEngine";
 

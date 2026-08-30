@@ -1,5 +1,5 @@
 import React from "react";
-import { Outlet, useOutletContext } from "react-router-dom";
+import { Outlet } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import Sidebar from "./Sidebar";
