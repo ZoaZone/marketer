@@ -47,14 +47,19 @@ export default function AddAccountModal({ open, onClose, platforms, onSaved }) {
     if (!isDecorative && !form.access_token.trim()) { setError("An access token is required for an API connection."); return; }
     setSaving(true);
     try {
-      const created = await base44.entities.SocialAccount.create({
+      // Via saveSocialAccount so the token is encrypted before storage — the
+      // same path Settings.jsx and BrandManager.jsx use. Creating the entity
+      // directly here would put a live posting credential in plaintext on a
+      // client-readable record.
+      const res = await base44.functions.invoke("saveSocialAccount", {
         platform: form.platform,
         account_name: form.account_name.trim(),
         username: form.username || "",
         access_token: form.access_token || "",
         connection_method: isDecorative ? "webhook" : "api",
-        status: "disconnected",
       });
+      const created = res?.data?.account ?? res?.account;
+      if (!created?.id) throw new Error(res?.data?.error || res?.error || "Could not save the account.");
       try {
         await base44.functions.invoke("testSocialConnection", { account_id: created.id });
       } catch (_e) {
