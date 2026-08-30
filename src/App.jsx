@@ -49,6 +49,7 @@ import MediaEditor from './pages/MediaEditor';
 import MovieMaker from './pages/MovieMaker';
 import SongCreator from './pages/SongCreator';
 import Studio from './pages/Studio';
+import OAuthConsent from './pages/OAuthConsent';
 
 
 const AuthenticatedApp = () => {
@@ -87,6 +88,7 @@ const AuthenticatedApp = () => {
       <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/login" element={<Navigate to="/auth" replace />} />
       <Route path="/auth" element={<Auth />} />
+      <Route path="/oauth/consent" element={<OAuthConsent />} />
       <Route path="/onboarding" element={<PostPaymentOnboarding />} />
       <Route path="/lead-capture" element={<LeadCapturePage />} />
       <Route path="/beta" element={<BetaSignup />} />
