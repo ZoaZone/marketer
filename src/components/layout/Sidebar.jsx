@@ -122,12 +122,14 @@ export default function Sidebar({ userTier = 0, isAdmin = false, user = null }) 
 
   const navContent = (
     <div className="flex flex-col h-full">
-      {/* Logo. /logo.png is a 1024×1024 square whose wordmark occupies only the
-          middle ~17% of the height, so `max-h-24 object-contain` fit the empty
-          square to 96px and left the actual mark rendering ~16px tall — the
-          "too small to read" problem. /brand/wordmark.png is the same artwork
-          cropped tight to its bounding box (956×189, 5.06:1), so the width it is
-          given is the width the mark actually fills. */}
+      {/* Logo. Uses the horizontal lockup (icon + wordmark, ~1.87:1), which is
+          the shape a 224px-wide sidebar header actually wants.
+          History worth keeping: the original /logo.png was a 1024×1024 square
+          whose mark filled only the middle ~17% of the height, so
+          `max-h-24 object-contain` fitted the empty square to 96px and rendered
+          the actual mark about 16px tall — the "too small to read" bug. Any
+          replacement asset must be cropped tight to its artwork for the same
+          reason: the box you give it is the size the mark should fill. */}
       <div className="px-4 pt-6 pb-5 border-b border-sidebar-border">
         <Link
           to="/studio"
@@ -139,10 +141,10 @@ export default function Sidebar({ userTier = 0, isAdmin = false, user = null }) 
               mode; in dark mode the sidebar already provides one. */}
           <div className="dark:bg-transparent bg-[#12121e] dark:p-0 px-3 py-2.5 rounded-xl transition-colors">
             <img
-              src="/brand/wordmark.png"
+              src="/brand/lockup-h.png"
               alt={BRAND.name}
-              width="956"
-              height="189"
+              width="600"
+              height="321"
               className="w-full h-auto object-contain"
               onError={(e) => e.target.style.display = "none"} />
           </div>
