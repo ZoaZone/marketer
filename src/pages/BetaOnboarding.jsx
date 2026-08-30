@@ -51,19 +51,25 @@ export default function BetaOnboarding() {
     setLoading(true);
     setError("");
     try {
-      const results = await base44.entities.BetaRequest.filter({ invite_token: tok });
-      if (!results || results.length === 0) {
+      // Resolved server-side via lookupBetaInvite. This used to read
+      // BetaRequest directly from the browser, which required the entity to be
+      // world-readable — and that exposed every row's invite_token, i.e. live
+      // redeemable invites, to anyone who cared to list them.
+      const res = await base44.functions.invoke("lookupBetaInvite", { token: tok });
+      const data = res?.data ?? res;
+      if (data?.error) throw new Error(data.error);
+      if (!data?.found) {
         setError("This invite link is invalid or has already been used.");
         setLoading(false);
         return;
       }
-      const inv = results[0];
+      const inv = data.invite;
       if (inv.status === "registered") {
         setError("This invite has already been used. Please log in instead.");
         setLoading(false);
         return;
       }
-      if (inv.invite_expires_at && new Date(inv.invite_expires_at) < new Date()) {
+      if (data.expired) {
         setError("This invite link has expired. Please contact the team for a new one.");
         setLoading(false);
         return;
@@ -85,12 +91,16 @@ export default function BetaOnboarding() {
     setLookingUp(true);
     setError("");
     try {
-      // Code is first 6 chars of token uppercased
-      const results = await base44.entities.BetaRequest.filter({ email: manualEmail.trim().toLowerCase() });
-      const match = results?.find(r =>
-        r.invite_token &&
-        r.invite_token.slice(0, 6).toUpperCase() === manualCode.trim().toUpperCase()
-      );
+      // The code is the first 6 characters of the token, but that comparison
+      // now happens server-side in lookupBetaInvite — the token never reaches
+      // the browser, so this fallback can't be used to harvest one.
+      const res = await base44.functions.invoke("lookupBetaInvite", {
+        email: manualEmail.trim().toLowerCase(),
+        code: manualCode.trim(),
+      });
+      const data = res?.data ?? res;
+      if (data?.error) throw new Error(data.error);
+      const match = data?.found ? data.invite : null;
       if (!match) {
         setError("Code not found for this email. Please check and try again.");
         setLookingUp(false);
