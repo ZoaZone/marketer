@@ -64,10 +64,24 @@ export default [
   // + FFmpeg assembly — Quick Create/Campaign Studio/Demo Video Maker)
   // must never reach a paid Replicate/ElevenLabs generation endpoint —
   // that's Lane 2 (Movie Maker Pro) only. See lane1.js's header comment.
+  //
+  // AMENDED: QuickCreate.jsx is deliberately no longer in this list.
+  //
+  // Quick Create's "Short Video" step produced an FFmpeg Ken Burns slideshow
+  // over still images — which is what this guard was protecting, and which
+  // users reasonably read as the video feature being broken. It may now reach
+  // Lane 2's generateSceneVideo, gated on subscription tier, and falls back to
+  // the slideshow (clearly labelled as such) for everyone else.
+  //
+  // The guard's real purpose — don't let free users burn paid credits — is
+  // now enforced where it actually binds: base44/functions/submitVideo,
+  // submitMusic, submitDubVideo and submitDubAudio each return 403 for an
+  // unentitled subscription. That check is what matters; this lint rule only
+  // ever governed which files could *import* the call, and a lint rule cannot
+  // stop a direct HTTP request. CampaignStudio and lane1.js stay guarded.
   {
     files: [
       "src/utils/lane1.js",
-      "src/pages/QuickCreate.jsx",
       "src/pages/CampaignStudio.jsx",
     ],
     rules: {
