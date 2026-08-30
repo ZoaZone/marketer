@@ -242,13 +242,18 @@ export default function Terms() {
             <Strong>Written releases from performers.</Strong> Before you dub or clone the voice of a
             performer &mdash; an actor, narrator, singer or other voice artist &mdash; you must obtain a
             signed release from that performer, or from the party that lawfully controls those rights
-            under their engagement, covering the specific project and each target language.{" "}
+            under their engagement, covering the specific project and each target language.
+          </P>
+          <P>
             <Strong>
               Where the voice belongs to a celebrity, recording artist, public figure or any other
-              widely recognisable person, a documented written agreement is mandatory
+              widely recognisable person, a documented written agreement is mandatory in every case.
             </Strong>{" "}
-            and must be in place before you begin. Obtain these releases through your own production
-            or workplace process and retain them for as long as the dubbed work is distributed.
+            There is no exception to this requirement, and it must be signed and in your possession
+            <em> before</em> you begin the dub — not obtained afterwards. Obtain these releases through
+            your own production or workplace process and retain them for as long as the dubbed work is
+            distributed anywhere. Using these features on such a voice without that agreement is a
+            material breach of these Terms and grounds for immediate termination under §13.
           </P>
           <P>
             <Strong>Copyright and neighbouring rights.</Strong> You must comply with all copyright,
