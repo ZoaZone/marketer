@@ -15,7 +15,11 @@ Deno.serve(async (req) => {
 
   try {
     const base44 = createClientFromRequest(req);
-    const { full_name, email, company, use_case } = await req.json();
+    // `note` added so the public Agency Enquiry and Agent Program forms can
+    // route through here instead of creating BetaRequest from the browser.
+    // Client-side creation stopped being possible once BetaRequest.create was
+    // locked to admin — those two forms silently broke until they were moved.
+    const { full_name, email, company, use_case, note } = await req.json();
 
     if (!full_name || !email) {
       return Response.json({ error: 'full_name and email are required' }, {
@@ -25,7 +29,7 @@ Deno.serve(async (req) => {
     }
 
     // Check for duplicate email (service role — no auth needed for public form)
-    const existing = await base44.asServiceRole.entities.BetaRequest.filter({ email });
+    const existing = await base44.asServiceRole.entities.BetaRequest.filter({ email: String(email).trim().toLowerCase() });
     if (existing && existing.length > 0) {
       return Response.json({ success: true, message: 'Already registered' }, {
         headers: { 'Access-Control-Allow-Origin': '*' },
