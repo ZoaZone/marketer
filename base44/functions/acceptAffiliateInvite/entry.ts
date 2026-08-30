@@ -61,6 +61,36 @@ Deno.serve(async (req) => {
     const invites = await base44.asServiceRole.entities.AffiliateInvite.filter({ token });
     const invite = invites[0];
     if (!invite) return Response.json({ error: 'Invite not found.' }, { status: 404, headers: CORS });
+
+    // SECURITY: the invite must belong to the person redeeming it.
+    //
+    // Without this check, possession of a token was the ONLY requirement, and
+    // the Affiliate below is created with user_id = the CALLER's email. Any
+    // signed-in user who obtained a token — a forwarded link, or (until the
+    // matching RLS was added) simply listing AffiliateInvite from the browser —
+    // could redeem an invite issued to someone else and become an affiliate at
+    // a commission rate an admin had authorised for a different person. That is
+    // direct financial fraud, so it is checked before anything else is touched.
+    const inviteEmail = String(invite.email || '').trim().toLowerCase();
+    const callerEmail = String(user.email || '').trim().toLowerCase();
+    if (!inviteEmail || inviteEmail !== callerEmail) {
+      return Response.json(
+        { error: 'This invite was issued to a different email address. Sign in with the invited account to accept it.' },
+        { status: 403, headers: CORS },
+      );
+    }
+
+    // One affiliate record per person. Otherwise a user holding two invites
+    // could stack accounts and pick whichever pays better per referral.
+    const existingForUser = await base44.asServiceRole.entities.Affiliate
+      .filter({ user_id: user.email }).catch(() => []);
+    if (existingForUser.length) {
+      return Response.json(
+        { error: 'This account is already registered as an affiliate.', code: 'already_affiliate' },
+        { status: 409, headers: CORS },
+      );
+    }
+
     if (invite.status === 'accepted') return Response.json({ error: 'This invite has already been accepted.' }, { status: 400, headers: CORS });
     if (invite.status === 'expired' || (invite.expires_at && new Date(invite.expires_at).getTime() < Date.now())) {
       return Response.json({ error: 'This invite has expired.' }, { status: 400, headers: CORS });
@@ -68,7 +98,19 @@ Deno.serve(async (req) => {
 
     // Recompute effective_pool_pct server-side — never trust a stored
     // client value for the number that determines real payouts.
-    let effectivePoolPct = invite.proposed_share_pct;
+    // Clamp the stored share before it is used for money. createAffiliateInvite
+    // validates this on the way in, but a record written before that validation
+    // existed — or edited by any other path — must not be able to mint an
+    // out-of-range rate here.
+    const storedSharePct = Number(invite.proposed_share_pct);
+    if (!Number.isFinite(storedSharePct) || storedSharePct <= 0 || storedSharePct > 100) {
+      return Response.json(
+        { error: 'This invite has an invalid commission share and cannot be accepted. Ask an admin to reissue it.' },
+        { status: 400, headers: CORS },
+      );
+    }
+
+    let effectivePoolPct = storedSharePct;
     if (invite.proposed_tier === 2) {
       if (!invite.parent_affiliate_id) {
         return Response.json({ error: 'This sub-affiliate invite is missing its parent affiliate.' }, { status: 400, headers: CORS });
@@ -78,7 +120,7 @@ Deno.serve(async (req) => {
       if (!parent || parent.status !== 'active') {
         return Response.json({ error: 'The inviting affiliate is no longer active.' }, { status: 400, headers: CORS });
       }
-      effectivePoolPct = (parent.commission_pct * invite.proposed_share_pct) / 100;
+      effectivePoolPct = (parent.commission_pct * storedSharePct) / 100;
     }
 
     const code = await generateUniqueCode(base44, user.email);
@@ -89,7 +131,7 @@ Deno.serve(async (req) => {
       status: 'active',
       tier: invite.proposed_tier,
       parent_affiliate_id: invite.parent_affiliate_id || '',
-      commission_pct: invite.proposed_share_pct,
+      commission_pct: storedSharePct,
       effective_pool_pct: effectivePoolPct,
       payout_method: 'stripe_connect',
       payout_account_ref: '',
