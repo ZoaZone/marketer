@@ -39,6 +39,7 @@ const SECTIONS = [
   { id: "children", label: "Children's Privacy" },
   { id: "changes", label: "Policy Changes" },
   { id: "ai-disclaimer", label: "AI Disclaimer" },
+  { id: "ai-voice", label: "AI Processing & Voice" },
   { id: "contact", label: "Contact Us" },
 ];
 
@@ -150,7 +151,7 @@ export default function PrivacyConsentPage() {
             Privacy, Security & Consent Policy
           </h1>
           <p className="text-gray-400 text-base max-w-2xl">
-            This policy governs how <strong className="text-white">{BRAND.companyName}</strong> collects, uses, stores, and communicates with you across all our platforms — including Digital Studio, Marketer, Sree OS, Aevathon, and HealthAI Companion.
+            This policy governs how <strong className="text-white">{BRAND.companyName}</strong> collects, uses, stores, and communicates with you through <strong className="text-white">{BRAND.name}</strong> at {BRAND.domain} — including the media you upload for AI generation and dubbing.
           </p>
           <p className="text-gray-500 text-sm mt-4">
             Effective Date: <span className="text-gray-300">{BRAND.effectiveDate}</span> &nbsp;|&nbsp;
@@ -633,7 +634,7 @@ export default function PrivacyConsentPage() {
               <strong>AI can make mistakes.</strong> Always review and verify the accuracy of any AI-generated content before publishing, sending, or relying on it.
             </AlertBox>
             <p>
-              Marketer (digitalstudios.app) uses generative AI to produce images, videos, voiceovers, captions, ad copy, scripts, website-scan summaries, and chatbot responses (including the "Sree" assistant). AI-generated output is created automatically based on your prompts and may be:
+              {BRAND.name} ({BRAND.domain}) uses generative AI to produce images, video, music, voiceovers, translated dubs, subtitles, captions, ad copy, scripts, website-scan summaries and chatbot responses. AI output is created automatically from your prompts and uploaded material, and may be:
             </p>
             <ul className="space-y-2 mt-2 text-gray-300">
               {[
