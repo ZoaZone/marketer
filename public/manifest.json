@@ -1,11 +1,16 @@
 {
-  "name": "digitalstudios.app — AI Marketing OS",
-  "short_name": "digitalstudios.app",
-  "description": "AI-powered marketing OS: content studio, social scheduling, funnels, bulk messaging and analytics.",
+  "name": "Digital Studio — AI Movie, Music & Dubbing Studio",
+  "short_name": "Digital Studio",
+  "description": "Create feature-length AI movies with scenes, music, subtitles and dubbing. Generate images and songs, and dub any video into any language.",
+  "id": "/",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#0f0f0f",
   "theme_color": "#0f0f0f",
+  "categories": ["productivity", "photo", "video", "business"],
+  "lang": "en",
+  "dir": "ltr",
   "icons": [
     {
       "src": "/favicon.png",
@@ -15,7 +20,14 @@
     {
       "src": "/favicon.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
