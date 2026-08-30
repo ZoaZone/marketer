@@ -57,6 +57,24 @@ async function buildByok(apiKeys: any, fields: Array<'replicate' | 'elevenlabs'>
   return byok;
 }
 
+// COST GATE. isByokEntitled below only decides WHOSE api key pays; it never
+// gated access, so before this any authenticated user — free tier included —
+// could call this endpoint directly and bill the platform. ElevenLabs Dubbing bills per minute of source media; commercial dubbing is a Studio/Dubbing House/Enterprise capability.
+// The eslint lane guard stops Lane 1 *code* importing Lane 2, but a lint rule
+// is not an access control: it does nothing about a direct HTTP call.
+const DUBBING_ENTITLED_TIERS = ["byok","studio","dubbing_house","enterprise"];
+async function assertEntitled(base44: any, user: any): Promise<Response | null> {
+  if (user.role === 'admin') return null;
+  const subs = await base44.asServiceRole.entities.Subscription.filter({ owner_email: user.email }).catch(() => []);
+  const sub = subs?.[0];
+  const ok = !!sub && ['active', 'trialing'].includes(sub.status) && DUBBING_ENTITLED_TIERS.includes(sub.plan_tier);
+  if (ok) return null;
+  return Response.json(
+    { error: 'Your plan does not include video dubbing.', code: 'upgrade_required', required_tiers: DUBBING_ENTITLED_TIERS },
+    { status: 403, headers: CORS },
+  );
+}
+
 // A saved BYOK key is only honored for a user whose subscription actually
 // covers it — the dedicated BYOK add-on, or any Lane-2 (Movie Maker Pro)
 // tier. A Lane-1-only (or free) user's stored key, if any, is ignored and
@@ -76,6 +94,9 @@ Deno.serve(async (req) => {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401, headers: CORS });
+
+    const denied = await assertEntitled(base44, user);
+    if (denied) return denied;
 
     const workerUrl = Deno.env.get('RENDER_WORKER_URL')?.trim();
     const sharedSecret = Deno.env.get('RENDER_SHARED_SECRET')?.trim();
