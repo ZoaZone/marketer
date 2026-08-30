@@ -4,7 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { ArrowLeft, Eye, EyeOff, Mail, Lock, User, Loader2, CheckCircle2, RefreshCw, Shield } from "lucide-react";
 import { useSeo, SEO } from "@/lib/seo";
 
-const LOGO = "/brand/logo-wordmark.jpg";
+const LOGO = "/brand/wordmark.png";
 const BRAND = "Digital Studio";
 const TAGLINE = "The all-in-one AI creative studio";
 const DASHBOARD = "/studio"; // post-login default landing — the creative hub
