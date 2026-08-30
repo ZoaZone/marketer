@@ -219,8 +219,36 @@ export default function Terms() {
             territories where you will distribute the result, and that the use complies with all laws
             governing voice, likeness, publicity and synthetic media in those territories. You are
             solely responsible for obtaining and retaining evidence of that consent, and you must
-            provide it to us on request. We may refuse or remove any dub where we reasonably believe
-            consent is absent.
+            provide it to us on request. We may refuse, suspend or remove any dub where we reasonably
+            believe consent is absent.
+          </P>
+          <P>
+            <Strong>Written releases from performers.</Strong> Before you dub or clone the voice of a
+            performer &mdash; an actor, narrator, singer or other voice artist &mdash; you must obtain a
+            signed release from that performer, or from the party that lawfully controls those rights
+            under their engagement, covering the specific project and each target language.{" "}
+            <Strong>
+              Where the voice belongs to a celebrity, recording artist, public figure or any other
+              widely recognisable person, a documented written agreement is mandatory
+            </Strong>{" "}
+            and must be in place before you begin. Obtain these releases through your own production
+            or workplace process and retain them for as long as the dubbed work is distributed.
+          </P>
+          <P>
+            <Strong>Copyright and neighbouring rights.</Strong> You must comply with all copyright,
+            performers&rsquo; and moral-rights rules that apply to the source work and to the dubbed
+            versions you create, in every territory where you distribute them. Clearing the underlying
+            film, script, score and performances is your responsibility, not ours.
+          </P>
+          <P>
+            <Strong>Consequences and enforcement.</Strong> You accept full responsibility for any
+            unlawful, infringing or non-consensual use of these features, and for all resulting
+            claims, penalties, damages and losses. Where such a use causes a claim against us, our
+            affiliates or our providers, {CO.legalName} reserves the right to pursue its remedies
+            against you and, to the extent permitted by law, against any client, agency or other party
+            on whose instructions or behalf you acted &mdash; jointly or separately &mdash; in addition
+            to the indemnity in §16. We may also disclose relevant account and job records where
+            legally required or where reasonably necessary to defend such a claim.
           </P>
 
           <H id="billing" n="7">Plans, billing and refunds</H>
