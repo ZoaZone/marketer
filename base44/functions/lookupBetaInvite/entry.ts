@@ -15,11 +15,12 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
  * resolves the token server-side and returns ONLY what the onboarding screen
  * needs to render — never the token, never the OTP digest, never another row.
  *
- * Body: { token }  or  { email }
+ * Body: { token }  or  { email, code }
  *   - token: the normal path, from /invite/:token
- *   - email: the manual fallback for someone who lost their link. Deliberately
- *     returns nothing beyond whether an approved invite exists, so this cannot
- *     be used to enumerate who has been invited.
+ *   - email + code: the manual fallback for someone who lost their link. The
+ *     code is the first 6 characters of the token, and the comparison happens
+ *     HERE — the token itself is never returned, so the fallback cannot be used
+ *     to harvest a redeemable token or to enumerate who has been invited.
  */
 
 const CORS = {
@@ -52,9 +53,10 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const token = String(body?.token || '').trim();
     const email = String(body?.email || '').trim().toLowerCase();
+    const code = String(body?.code || '').trim().toUpperCase();
 
-    if (!token && !email) {
-      return Response.json({ error: 'token or email is required.' }, { status: 400, headers: CORS });
+    if (!token && !(email && code)) {
+      return Response.json({ error: 'Provide either a token, or an email and code.' }, { status: 400, headers: CORS });
     }
 
     let record: any = null;
@@ -69,11 +71,13 @@ Deno.serve(async (req) => {
       if (record && !isRealInviteToken(String(record.invite_token || ''))) record = null;
     } else {
       const rows = await base44.asServiceRole.entities.BetaRequest.filter({ email });
-      // Email fallback resolves ONLY an already-approved invite. Anything else
-      // would let a caller confirm whether an arbitrary address had applied.
-      record = (rows || []).find(
-        (r: any) => r.status === 'approved' && isRealInviteToken(String(r.invite_token || '')),
-      ) || null;
+      // The code must match the token's first 6 characters. Matching here rather
+      // than in the browser is the whole point: the client never sees the token,
+      // so knowing an email alone reveals nothing.
+      record = (rows || []).find((r: any) => {
+        const t = String(r.invite_token || '');
+        return isRealInviteToken(t) && t.slice(0, 6).toUpperCase() === code;
+      }) || null;
     }
 
     if (!record) return Response.json({ found: false }, { headers: CORS });
