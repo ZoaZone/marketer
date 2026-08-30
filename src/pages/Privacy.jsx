@@ -16,10 +16,11 @@ import { useSeo, SEO } from "@/lib/seo";
 const BRAND = {
   name: "Digital Studio",
   domain: "digitalstudios.app",
-  supportEmail: "privacy@digitalstudios.app",
-  dpoEmail: "privacy@digitalstudios.app",
+  supportEmail: "care@digitalstudios.app",
+  dpoEmail: "care@zoazoneservices.com",
   companyName: "ZoaZone Services LLC",
-  companyAddress: "United States",
+  companyAddress: "1770 Grand Concourse 12A, Bronx, NY 10457, United States",
+  companyPhone: "+1 256 699 8899",
   effectiveDate: "August 30, 2026",
   lastReviewed: "August 30, 2026",
 };
