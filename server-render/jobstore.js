@@ -35,6 +35,9 @@ const KEY_PREFIX = "renderjob:";
 // Redis is never the thing that removes a record first; the worker's own
 // scheduleCleanup stays in charge of lifetime.
 const REDIS_TTL_SECONDS = 24 * 60 * 60;
+// Boot must not block on an unavailable Redis — see initJobStore.
+const CONNECT_TIMEOUT_MS = 5000;
+const MAX_RECONNECT_ATTEMPTS = 10;
 
 const cache = new Map();
 
@@ -52,7 +55,18 @@ export async function initJobStore() {
   }
 
   try {
-    redis = createClient({ url: REDIS_URL });
+    redis = createClient({
+      url: REDIS_URL,
+      socket: {
+        // Without these, an unreachable Redis makes connect() retry forever and
+        // the worker never reaches app.listen() — it silently serves nothing.
+        // A render worker that is up without Redis is strictly better than a
+        // render worker that is down, so give up quickly and degrade.
+        connectTimeout: CONNECT_TIMEOUT_MS,
+        reconnectStrategy: (retries) =>
+          retries > MAX_RECONNECT_ATTEMPTS ? false : Math.min(retries * 200, 2000),
+      },
+    });
     // An 'error' listener is mandatory: without one, node-redis emits an
     // unhandled 'error' event and crashes the process on a transient blip.
     redis.on("error", (err) => {
@@ -60,7 +74,14 @@ export async function initJobStore() {
       redisReady = false;
     });
     redis.on("ready", () => { redisReady = true; });
-    await redis.connect();
+    // Belt and braces: connectTimeout governs the socket, this bounds the whole
+    // handshake (auth, TLS) so boot can never hang on it.
+    await Promise.race([
+      redis.connect(),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("redis connect timed out")), CONNECT_TIMEOUT_MS + 1000),
+      ),
+    ]);
     redisReady = true;
 
     const recovered = await hydrate();
@@ -68,8 +89,12 @@ export async function initJobStore() {
     return { durable: true, recovered };
   } catch (e) {
     console.error(
-      `[jobstore] redis connect failed (${e?.message || e}) — continuing in memory-only mode.`,
+      `[jobstore] redis connect failed (${e?.message || e}) — continuing in memory-only mode. ` +
+      "Jobs will NOT survive a restart until Redis is reachable.",
     );
+    // Detach so a late reconnect can't half-enable persistence behind our back,
+    // and so the dangling client doesn't keep the event loop alive.
+    try { await redis?.disconnect(); } catch { /* already gone */ }
     redis = null;
     redisReady = false;
     return { durable: false, recovered: 0 };
