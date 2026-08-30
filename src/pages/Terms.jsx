@@ -256,6 +256,14 @@ export default function Terms() {
             to the indemnity in §16. We may also disclose relevant account and job records where
             legally required or where reasonably necessary to defend such a claim.
           </P>
+          <P>
+            How we actually handle the media, speech and voice data behind these features — which
+            providers receive it, where it is processed, how long it is kept, and how a performer can
+            ask about or object to material someone has uploaded — is set out in{" "}
+            <Link to="/privacy" className="text-fuchsia-400 hover:underline">
+              §14 of our Privacy Policy
+            </Link>.
+          </P>
 
           <H id="billing" n="7">Plans, billing and refunds</H>
           <UL>
