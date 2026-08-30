@@ -8,9 +8,50 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
  */
 
 const OTP_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const RESEND_COOLDOWN_MS = 45 * 1000; // minimum gap between codes for one email
+const MAX_VERIFY_ATTEMPTS = 5;        // wrong guesses before the code is burned
 
 function generateOTP() {
-  return String(Math.floor(100000 + Math.random() * 900000));
+  // crypto.getRandomValues, not Math.random: Math.random is not a CSPRNG, and
+  // this value is a login credential. 100000-999999 keeps the 6-digit shape.
+  const buf = new Uint32Array(1);
+  crypto.getRandomValues(buf);
+  return String(100000 + (buf[0] % 900000));
+}
+
+// SECURITY: the OTP is stored on BetaRequest.invite_token, and BetaOnboarding
+// reads BetaRequest from the browser BEFORE login (it looks an invite up by
+// token and by email). Anything written there must be assumed readable by an
+// unauthenticated visitor — so the code is never stored in the clear. We keep
+// a salted SHA-256 digest instead: useless to a reader, still verifiable here.
+async function hashOTP(salt: string, otp: string): Promise<string> {
+  const data = new TextEncoder().encode(`${salt}:${otp}`);
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+function newSalt(): string {
+  const buf = new Uint8Array(16);
+  crypto.getRandomValues(buf);
+  return Array.from(buf).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Length-independent comparison so a timing signal can't leak the digest.
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+// note field doubles as the OTP's metadata store: "otp_purpose:login|attempts:2"
+function buildNote(purpose: string, attempts: number): string {
+  return `otp_purpose:${purpose}|attempts:${attempts}`;
+}
+
+function readAttempts(note: string): number {
+  const m = /attempts:(\d+)/.exec(note || '');
+  return m ? Number(m[1]) : 0;
 }
 
 function buildEmailHtml(otp, purpose) {
@@ -73,13 +114,37 @@ Deno.serve(async (req) => {
 
     // ── SEND OTP ──────────────────────────────────────────────────────────────
     if (action === 'send') {
+      const existing = await base44.asServiceRole.entities.BetaRequest.filter({ email });
+
+      // Throttle resends. Without this, one unauthenticated caller can loop this
+      // endpoint and mail-bomb any address from the app's sending domain (and
+      // burn the email provider quota). issuedAt is derived from the stored
+      // expiry, so no extra field is needed.
+      if (existing && existing.length > 0) {
+        const prev = existing[0];
+        const prevIsOTP = String(prev.invite_token || '').startsWith('OTPH:');
+        const prevExpiry = prev.invite_expires_at ? new Date(prev.invite_expires_at).getTime() : 0;
+        const issuedAt = prevExpiry - OTP_TTL_MS;
+        if (prevIsOTP && issuedAt > 0 && Date.now() - issuedAt < RESEND_COOLDOWN_MS) {
+          return Response.json(
+            { error: 'A code was just sent. Please wait a moment before requesting another.' },
+            { status: 429, headers },
+          );
+        }
+      }
+
       const otp = generateOTP();
       const expiresAt = new Date(Date.now() + OTP_TTL_MS).toISOString();
 
-      // Store OTP in BetaRequest entity temporarily (reuse as scratch pad)
-      // We use a dedicated OTP record keyed by email+purpose
-      const existing = await base44.asServiceRole.entities.BetaRequest.filter({ email });
-      const otpData = { invite_token: `OTP:${otp}`, invite_expires_at: expiresAt, note: `otp_purpose:${purpose}` };
+      // Store only a salted digest of the code — see hashOTP above for why the
+      // plaintext must never land in this field.
+      const salt = newSalt();
+      const digest = await hashOTP(salt, otp);
+      const otpData = {
+        invite_token: `OTPH:${salt}:${digest}`,
+        invite_expires_at: expiresAt,
+        note: buildNote(purpose, 0),
+      };
 
       if (existing && existing.length > 0) {
         await base44.asServiceRole.entities.BetaRequest.update(existing[0].id, otpData);
@@ -182,18 +247,37 @@ Deno.serve(async (req) => {
 
       const record = records[0];
       const storedToken = record.invite_token || '';
-      if (!storedToken.startsWith('OTP:')) {
+      // Legacy plaintext "OTP:" records are deliberately rejected rather than
+      // accepted for compatibility — honouring them would keep the readable-code
+      // path alive. Codes live 10 minutes, so the worst case is one resend.
+      if (!storedToken.startsWith('OTPH:')) {
         return Response.json({ error: 'No active OTP found. Please request a new code.' }, { status: 400, headers });
       }
 
-      const storedOTP = storedToken.replace('OTP:', '');
       const expiresAt = record.invite_expires_at ? new Date(record.invite_expires_at) : null;
-
       if (expiresAt && Date.now() > expiresAt.getTime()) {
         return Response.json({ error: 'Code has expired. Please request a new one.' }, { status: 400, headers });
       }
 
-      if (storedOTP !== submittedOTP.trim()) {
+      // A 6-digit code with unlimited guesses is brute-forceable inside its own
+      // 10-minute window. Burn the code after a handful of wrong answers so the
+      // attacker has to request a new one (which the resend cooldown throttles).
+      const attempts = readAttempts(record.note);
+      if (attempts >= MAX_VERIFY_ATTEMPTS) {
+        await base44.asServiceRole.entities.BetaRequest.update(record.id, { invite_token: '' });
+        return Response.json(
+          { error: 'Too many incorrect attempts. Please request a new code.' },
+          { status: 429, headers },
+        );
+      }
+
+      const [, salt, storedDigest] = storedToken.split(':');
+      const submittedDigest = await hashOTP(salt || '', String(submittedOTP).trim());
+
+      if (!timingSafeEqual(storedDigest || '', submittedDigest)) {
+        await base44.asServiceRole.entities.BetaRequest.update(record.id, {
+          note: buildNote(purpose, attempts + 1),
+        });
         return Response.json({ error: 'Incorrect code. Please try again.' }, { status: 400, headers });
       }
 
