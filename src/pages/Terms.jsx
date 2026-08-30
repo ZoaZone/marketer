@@ -415,6 +415,11 @@ export default function Terms() {
             lacked rights or consent in source material, a voice or a likeness); or your violation of
             any law or third-party right.
           </P>
+          <P>
+            This obligation applies whether you acted on your own account or on the instructions of a
+            client or other third party, and it survives termination. We will notify you of any claim
+            we seek indemnity for and may, at our option, take control of its defence.
+          </P>
 
           <H id="changes" n="17">Changes to these terms</H>
           <P>
@@ -455,10 +460,11 @@ export default function Terms() {
 
           <H id="contact" n="20">Contact</H>
           <P>
-            {CO.legalName}<br />
+            <Strong>{CO.legalName}</Strong><br />
             {CO.address}<br />
-            General support: {CO.supportEmail}<br />
-            Legal notices: {CO.legalEmail}
+            Telephone: {CO.phone}<br />
+            {CO.product} support: {CO.supportEmail}<br />
+            Company / legal notices: {CO.legalEmail}
           </P>
 
           <p className="text-xs text-muted-foreground mt-10 pt-6 border-t border-border">
