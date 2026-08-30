@@ -27,7 +27,13 @@
 // in flight instead of paying to start it over — see resumableJobs() and its
 // use in index.js.
 
-import { createClient } from "redis";
+// NOTE: `redis` is imported dynamically inside initJobStore(), never statically.
+// A static `import { createClient } from "redis"` is evaluated before any code
+// runs, so if the package is missing from the deployed image — a cached Docker
+// layer, a build that didn't pick up the new dependency — the whole worker dies
+// at import time with ERR_MODULE_NOT_FOUND and every render fails, not just
+// persistence. Loading it lazily means a missing package degrades to
+// memory-only exactly like a missing REDIS_URL does.
 
 const REDIS_URL = process.env.REDIS_URL || process.env.REDIS_PRIVATE_URL || "";
 const KEY_PREFIX = "renderjob:";
@@ -50,6 +56,18 @@ export async function initJobStore() {
     console.warn(
       "[jobstore] REDIS_URL not set — using in-memory job records only. " +
       "Jobs will NOT survive a restart; long dubbing runs are at risk.",
+    );
+    return { durable: false, recovered: 0 };
+  }
+
+  let createClient;
+  try {
+    ({ createClient } = await import("redis"));
+  } catch (e) {
+    console.error(
+      `[jobstore] the 'redis' package is not installed (${e?.message || e}) — ` +
+      "running in memory-only mode. Rebuild the worker image so package.json's " +
+      "dependencies are installed, then redeploy to enable durability.",
     );
     return { durable: false, recovered: 0 };
   }
