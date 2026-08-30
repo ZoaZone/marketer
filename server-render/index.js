@@ -112,8 +112,12 @@ function registerWebhookPending(token, jobId, resolve) {
     if (!webhookPending.delete(token)) return; // already resolved by the webhook
     const job = jobs.get(jobId);
     if (job && job.status === "processing") {
-      job.status = "error";
-      job.error = "Timed out waiting for the Replicate webhook.";
+      // via jobs.update, not in-place: an in-place mutation is invisible to the
+      // durable store, so a restart would resurrect this as still "processing".
+      jobs.update(jobId, {
+        status: "error",
+        error: "Timed out waiting for the Replicate webhook.",
+      });
     }
     scheduleCleanup(jobId);
   }, timeoutMs);
