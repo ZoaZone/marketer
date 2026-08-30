@@ -48,6 +48,7 @@ import MediaEditor from './pages/MediaEditor';
 import MovieMaker from './pages/MovieMaker';
 import SongCreator from './pages/SongCreator';
 import Studio from './pages/Studio';
+import DubbingStudio from './pages/DubbingStudio';
 import OAuthConsent from './pages/OAuthConsent';
 import Privacy from './pages/Privacy';
 
@@ -120,6 +121,7 @@ const AuthenticatedApp = () => {
         <Route path="/media-editor" element={<MediaEditor />} />
         <Route path="/movie-maker" element={<MovieMaker />} />
         <Route path="/song-creator" element={<SongCreator />} />
+        <Route path="/dubbing" element={<DubbingStudio />} />
         <Route path="/website-scanner" element={<WebsiteScanner />} />
         <Route path="/funnel-builder" element={<FunnelBuilder />} />
         <Route path="/follow-up" element={<FollowUp />} />
