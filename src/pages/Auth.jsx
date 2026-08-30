@@ -4,7 +4,8 @@ import { base44 } from "@/api/base44Client";
 import { ArrowLeft, Eye, EyeOff, Mail, Lock, User, Loader2, CheckCircle2, RefreshCw, Shield } from "lucide-react";
 import { useSeo, SEO } from "@/lib/seo";
 
-const LOGO = "/brand/wordmark.png";
+// Vertical lockup (icon over wordmark) — the right shape for a centred auth card.
+const LOGO = "/brand/lockup-v.png";
 const BRAND = "Digital Studio";
 const TAGLINE = "The all-in-one AI creative studio";
 const DASHBOARD = "/studio"; // post-login default landing — the creative hub
@@ -259,7 +260,7 @@ export default function Auth() {
         {/* Logo + Brand */}
         <div className="text-center space-y-3">
           <div className="inline-flex items-center justify-center">
-            <img src={LOGO} alt={BRAND} className="h-12 w-auto rounded-xl" onError={e => { e.target.style.display="none"; }} />
+            <img src={LOGO} alt={BRAND} className="h-24 w-auto object-contain" onError={e => { e.target.style.display="none"; }} />
           </div>
           <div>
             <p className="text-white font-black text-xl tracking-tight">{BRAND}</p>
