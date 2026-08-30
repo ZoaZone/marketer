@@ -426,20 +426,16 @@ app.post("/replicate-webhook/:jobToken", (req, res) => {
   res.status(200).json({ ok: true });
 
   (async () => {
-    const job = jobs.get(pending.jobId);
     try {
       const result = await pending.resolve(body);
-      if (job) {
-        job.status = "done";
-        job.progress = 1;
-        job.url = result.url;
-        job.captionsUrl = result.captionsUrl ?? null;
-      }
+      jobs.update(pending.jobId, {
+        status: "done",
+        progress: 1,
+        url: result.url,
+        captionsUrl: result.captionsUrl ?? null,
+      });
     } catch (e) {
-      if (job) {
-        job.status = "error";
-        job.error = String(e?.message || e);
-      }
+      jobs.update(pending.jobId, { status: "error", error: String(e?.message || e) });
     } finally {
       scheduleCleanup(pending.jobId);
     }
@@ -448,8 +444,11 @@ app.post("/replicate-webhook/:jobToken", (req, res) => {
 
 // Shared across all job kinds — the job record shape is identical either
 // way ({ id, status, progress, url, captionsUrl, error, createdAt }).
-app.get("/jobs/:id", requireSecret, (req, res) => {
-  const job = jobs.get(req.params.id);
+app.get("/jobs/:id", requireSecret, async (req, res) => {
+  // Async read: after a redeploy the in-memory cache is cold but Redis still
+  // holds the record. Answering 404 there is what made a surviving job look
+  // like a failed one to the client.
+  const job = await jobs.getAsync(req.params.id);
   if (!job) return res.status(404).json({ error: "Job not found" });
   // percent is derived from progress, not stored separately, so it can
   // never drift out of sync. sceneIndex/sceneTotal stay absent on the job
