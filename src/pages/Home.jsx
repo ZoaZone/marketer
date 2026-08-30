@@ -7,6 +7,7 @@ import {
   Film, Music, Sliders, PenTool, Briefcase, Clapperboard } from
 "lucide-react";
 import { BRAND } from "@/lib/brand";
+import { useSeo, SEO, injectStructuredData } from "@/lib/seo";
 
 const M_LOGO = "/favicon.png";
 
@@ -219,6 +220,9 @@ function SreeFloatBot({ accentColor }) {
 }
 
 export default function Home() {
+  useSeo(SEO.home);
+  useEffect(() => { injectStructuredData(); }, []);
+
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);

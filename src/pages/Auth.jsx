@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { ArrowLeft, Eye, EyeOff, Mail, Lock, User, Loader2, CheckCircle2, RefreshCw, Shield } from "lucide-react";
+import { useSeo, SEO } from "@/lib/seo";
 
 const LOGO = "/brand/logo-wordmark.jpg";
 const BRAND = "Digital Studio";
@@ -75,6 +76,8 @@ function PasswordStrength({ password }) {
 
 // ─── Main Auth Page ─────────────────────────────────────────────────────────
 export default function Auth() {
+  useSeo(SEO.auth);
+
   const navigate = useNavigate();
   const location = useLocation();
   const from = location.state?.from?.pathname || DASHBOARD;

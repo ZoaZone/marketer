@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { useSeo, SEO } from "@/lib/seo";
 
 const BRAND = {
   name: "AEVOICE AI",
@@ -30,6 +31,8 @@ const SECTIONS = [
 ];
 
 export default function PrivacyConsentPage() {
+  useSeo(SEO.privacy);
+
   const [activeSection, setActiveSection] = useState("overview");
   const [consentGiven, setConsentGiven] = useState({
     email: false,

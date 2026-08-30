@@ -2,8 +2,11 @@ import { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { Sparkles, Send, CheckCircle2, Loader2 } from "lucide-react";
 import { BRAND } from "@/lib/brand";
+import { useSeo, SEO } from "@/lib/seo";
 
 export default function BetaSignup() {
+  useSeo(SEO.beta);
+
   const [form, setForm] = useState({ full_name: "", email: "", company: "", use_case: "" });
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);

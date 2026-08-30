@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import {
+import { useSeo, SEO } from "@/lib/seo";
   Handshake, DollarSign, Users, TrendingUp, CheckCircle2,
   ArrowRight, Loader2, Sparkles, Star, Zap, Gift, ChevronRight
 } from "lucide-react";
@@ -31,6 +32,8 @@ const PLANS = [
 ];
 
 export default function AgentProgram() {
+  useSeo(SEO.agentProgram);
+
   const [form, setForm] = useState({ full_name: "", email: "", phone: "", company: "", audience: "", experience: "" });
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);

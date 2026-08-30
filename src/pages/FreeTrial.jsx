@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Upload, User, MapPin, Briefcase, Globe, Tag, FileText, Lock, ArrowRight, Loader2, CheckCircle2, Sparkles, Image, Video, Mail, GitBranch, Share2, BarChart3, Zap, Play } from "lucide-react";
 import { base44 } from "@/api/base44Client";
+import { useSeo, SEO } from "@/lib/seo";
 
 const M_LOGO = "/brand/logo-mark.jpeg";
 
@@ -19,6 +20,8 @@ const LOCKED_FEATURES = [
 const INDUSTRIES = ["E-commerce", "Real Estate", "Healthcare", "Education", "Restaurant & Food", "Fashion & Apparel", "Fitness & Wellness", "Technology", "Finance", "Travel & Hospitality", "Agency", "Other"];
 
 export default function FreeTrial() {
+  useSeo(SEO.freeTrial);
+
   const fileRef = useRef(null);
   const [step, setStep] = useState("form"); // "form" | "saving" | "done"
   const [uploading, setUploading] = useState(false);

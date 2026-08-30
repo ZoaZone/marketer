@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import {
+import { useSeo, SEO } from "@/lib/seo";
   Building2, CheckCircle2, ArrowRight, Loader2, Users,
   Sparkles, BarChart3, Shield, Headphones, Zap, Star
 } from "lucide-react";
@@ -15,6 +16,8 @@ const AGENCY_FEATURES = [
 ];
 
 export default function AgencyEnquiry() {
+  useSeo(SEO.agencyEnquiry);
+
   const [form, setForm] = useState({ full_name: "", email: "", phone: "", agency_name: "", client_count: "", current_tools: "", requirements: "" });
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);

@@ -5,6 +5,7 @@ import { base44 } from "@/api/base44Client";
 import PayPalButton from "@/components/PayPalButton";
 import { Check, ArrowRight, ArrowLeft, Loader2, Star, Sparkles, Gift, Mail, Phone, MessageSquare, Film, Clapperboard, KeyRound, Briefcase } from "lucide-react";
 import { BRAND } from "@/lib/brand";
+import { useSeo, SEO } from "@/lib/seo";
 
 const PRICE_PER_CREDIT = 0.06;
 const FREE_TRIAL_LIMIT = 25;
@@ -134,6 +135,8 @@ const BYOK_PLAN = {
 };
 
 export default function Pricing() {
+  useSeo(SEO.pricing);
+
   const [billing, setBilling] = useState("monthly");
   const isIndia = typeof Intl !== "undefined" && Intl.DateTimeFormat().resolvedOptions().timeZone.startsWith("Asia/");
   const [loadingPlan, setLoadingPlan] = useState(null);
