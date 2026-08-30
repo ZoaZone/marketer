@@ -1,0 +1,47 @@
+> # digitalstudios.app
+User-agent: *
+Allow: /
+
+# Authenticated app surface — no search value, and these URLs carry
+# per-user state (session ids, invite tokens, return URLs).
+Disallow: /auth
+Disallow: /login
+Disallow: /admin
+Disallow: /admin/login
+Disallow: /oauth/consent
+Disallow: /onboarding
+Disallow: /invite
+Disallow: /dashboard
+Disallow: /studio
+Disallow: /billing
+Disallow: /settings
+Disallow: /integrations
+Disallow: /notifications
+Disallow: /analytics
+Disallow: /contacts
+Disallow: /campaigns
+Disallow: /social-hub
+Disallow: /brands
+Disallow: /media-library
+Disallow: /media-editor
+Disallow: /movie-maker
+Disallow: /song-creator
+Disallow: /quick-create
+Disallow: /demo-video
+Disallow: /campaign-studio
+Disallow: /ad-creator
+Disallow: /website-scanner
+Disallow: /funnel-builder
+Disallow: /follow-up
+Disallow: /lead-capture
+Disallow: /web-projects
+Disallow: /affiliate
+Disallow: /agency
+Disallow: /help
+
+# Query-string variants of public pages duplicate content.
+Disallow: /*?session_id=
+Disallow: /*?ref=
+Disallow: /*?utm_
+
+Sitemap: https://digitalstudios.app/sitemap.xml
