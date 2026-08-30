@@ -20,8 +20,8 @@ import {
   proxyImageAsObjectUrl,
   generateVoiceover,
   shortenCaption,
-  splitScriptIntoScenes,,
-  probeMediaDuration
+  splitScriptIntoScenes,
+  probeMediaDuration,
 } from "./aiClient.js";
 
 import {
