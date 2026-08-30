@@ -159,7 +159,12 @@ export default function BrandManager() {
     if (!newAccount.account_name.trim()) { alert("Account name is required"); return; }
     setSavingAccount(true);
     try {
-      const created = await base44.entities.SocialAccount.create({ ...newAccount, brand_id: brandId, status: "disconnected" });
+      // Via saveSocialAccount so the platform token is encrypted at rest — see
+      // the matching call in Settings.jsx. Writing the entity directly from the
+      // browser would store the credential in plaintext.
+      const res = await base44.functions.invoke("saveSocialAccount", { ...newAccount, brand_id: brandId });
+      const created = res?.data?.account ?? res?.account;
+      if (!created?.id) throw new Error(res?.data?.error || res?.error || "Could not save the account.");
       try {
         await base44.functions.invoke("testSocialConnection", { account_id: created.id });
       } catch (_e) { /* verification is best-effort */ }
