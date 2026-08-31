@@ -407,7 +407,7 @@ export default function AdminDashboard() {
             <UserPlus className="w-5 h-5 text-emerald-400 mt-0.5 shrink-0"/>
             <div>
               <p className="text-sm font-bold text-foreground">Free Trial Invites — Standard Free Account</p>
-              <p className="text-xs text-muted-foreground mt-1">Invite users to try DigitalStudios.app with a no-credit-card free trial: 25 free AI generations (≈5 images or 3 short videos), full platform access, and an in-app prompt to subscribe once their trial limit is reached.</p>
+              <p className="text-xs text-muted-foreground mt-1">Invite users to try DigitalStudios.app with a no-credit-card free trial: 25 free AI generations (1 = one AI image or one voiceover up to 1,500 characters), full platform access apart from the paid Studio & Dubbing features, and an in-app prompt to subscribe once the trial limit is reached.</p>
             </div>
           </div>
 

@@ -108,6 +108,16 @@ console.log("\ninlined metering blocks");
     else if (+m[2] !== plan.allowance.render_minutes) bad(`${plan.key} render_minutes: block ${m[2]} vs catalog ${plan.allowance.render_minutes}`);
   }
 
+  // The free-trial number is quoted on the home page, /pricing and the Help
+  // Center; the block enforces it. They must agree.
+  {
+    const m = canon.match(/const FREE_TRIAL_UNITS = (\d+);/);
+    if (!m) bad("metering block has no FREE_TRIAL_UNITS — the free trial is unbounded");
+    else if (+m[1] !== catalog.FREE_TRIAL_GENERATIONS) {
+      bad(`free trial: block ${m[1]} vs catalog ${catalog.FREE_TRIAL_GENERATIONS}`);
+    }
+  }
+
   // Public weights must equal the block's Render-Minute weights.
   for (const [kind, weight] of Object.entries(RENDER_MINUTE_WEIGHTS)) {
     const m = canon.match(new RegExp(`${kind}:\\s*\\{\\s*rm:\\s*([\\d.]+)`));

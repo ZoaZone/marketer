@@ -181,7 +181,7 @@ export default function Pricing() {
           <p className="text-white/50 text-lg mb-6">Two lanes, priced for what they actually cost: Business runs on pooled AI credits, Studio &amp; Dubbing meters real external render work in Render Minutes.</p>
 
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-fuchsia-500/10 border border-fuchsia-500/20 text-fuchsia-300 text-sm font-medium mb-8">
-            <Gift className="w-4 h-4" /> Start free — {FREE_TRIAL_LIMIT} AI generations (~5 images or 3 short videos), no credit card required
+            <Gift className="w-4 h-4" /> Start free — {FREE_TRIAL_LIMIT} AI generations, images and voiceover included, no credit card required
           </div>
 
           <div className="inline-flex items-center bg-white/5 border border-white/10 rounded-xl p-1">

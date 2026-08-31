@@ -7,7 +7,7 @@ const FAQS = [
     icon: Zap,
     color: "text-fuchsia-400 bg-fuchsia-500/10",
     items: [
-      { q: "What do I get when I sign up?", a: "Every new account starts with a free trial of 25 AI generations (about 5 images or 3 short videos) — no credit card required. Once that's used up you can subscribe to a plan or buy pay-as-you-go credits." },
+      { q: "What do I get when I sign up?", a: "Every new account starts with a free trial of 25 AI generations — no credit card required. A generation is one AI image, or one voiceover of up to 1,500 characters, so it covers a few complete short videos. Per-scene AI video, music and dubbing need a paid plan, because those bill real per-minute costs to external providers. Once the trial is used up you can subscribe or buy pay-as-you-go credits." },
       { q: "How do I add my first brand?", a: "Go to Brand Manager and click 'Add Brand'. Fill in the name, industry, voice/tone and colors — Studio, Quick Create and Ad Creator all use this to keep AI content on-brand." },
       { q: "How do I connect a social media account?", a: "Navigate to Social Hub → click 'Connect Account'. We support Instagram, Facebook, TikTok, LinkedIn, YouTube and Pinterest. You'll be prompted to authorize via OAuth." },
       { q: "Where do I create AI content?", a: "Use Studio for full campaigns (brand → accounts → content → media → preview → schedule → launch), or Quick Create for a one-off image/video with no setup." },
@@ -40,7 +40,7 @@ const FAQS = [
     icon: Sparkles,
     color: "text-purple-400 bg-purple-500/10",
     items: [
-      { q: "How many free AI generations do I get?", a: "25 total — roughly 5 images or 3 short (multi-scene) videos — with no credit card required. Check your usage on the Billing page." },
+      { q: "How many free AI generations do I get?", a: "25 total, with no credit card required. One generation is one AI image, or one voiceover of up to 1,500 characters — so a short multi-scene video with narration typically uses about 5 to 7. Check your usage on the Billing page." },
       { q: "What happens after I use my free generations?", a: "You'll see a 'Subscribe to continue' prompt. Subscribe to a plan for a monthly AI allowance, or buy pay-as-you-go credits from Billing to keep creating without a subscription." },
       { q: "How do AI generation credits work and what do they cost?", a: "1 credit = 1 image or video-scene generation = $0.06. Minimum purchase is $10 (≈166 credits); any amount $10 or above thereafter. Credits never expire and stack on top of your plan's monthly allowance." },
       { q: "How many AI generations does each plan include per month?", a: "Starter: 500/mo · Growth: 2,500/mo · Agency: 10,000/mo. Each image or video-scene generation counts as one." },

@@ -103,7 +103,16 @@ async function assertEntitled(base44: any, user: any): Promise<Response | null> 
   if (user.role === 'admin') return null;
   const subs = await base44.asServiceRole.entities.Subscription.filter({ owner_email: user.email }).catch(() => []);
   const sub = subs?.[0];
-  const ok = !!sub && ['active', 'trialing'].includes(sub.status) && VOICEOVER_ENTITLED_TIERS.includes(sub.plan_tier);
+  // A user with no subscription at all is a free-trial user, and the signup
+  // offer ("25 AI generations, no credit card") covers narration — without
+  // this, Quick Create and the Demo Video maker both died with a 403 at the
+  // voiceover step and a trial user could never finish a single video.
+  // meterUsage below enforces and counts the trial; this gate only has to
+  // stop stopping them. A user WITH a subscription still needs an entitled
+  // tier, so a lapsed or unentitled plan is still refused here.
+  const hasAnySub = !!sub && ['active', 'trialing'].includes(sub.status);
+  if (!hasAnySub) return null;
+  const ok = VOICEOVER_ENTITLED_TIERS.includes(sub.plan_tier);
   if (ok) return null;
   return Response.json(
     { error: 'Your plan does not include AI voiceover.', code: 'upgrade_required', required_tiers: VOICEOVER_ENTITLED_TIERS },

@@ -187,7 +187,7 @@ export default function Billing() {
             <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
               <div className="h-full bg-gradient-to-r from-fuchsia-500 to-purple-600 transition-all" style={{ width: `${Math.min(100, (trialUsed / FREE_TRIAL_LIMIT) * 100)}%` }} />
             </div>
-            <p className="text-xs text-muted-foreground mt-2">≈ 5 images or 3 short videos. {creditsBalance > 0 ? `You also have ${creditsBalance.toLocaleString()} purchased credits available.` : "Subscribe to a plan or buy credits below to keep creating once your trial is used up."}</p>
+            <p className="text-xs text-muted-foreground mt-2">1 generation = 1 AI image, or one voiceover up to 1,500 characters. {creditsBalance > 0 ? `You also have ${creditsBalance.toLocaleString()} purchased credits available.` : "Subscribe to a plan or buy credits below to keep creating once your trial is used up."}</p>
           </div>
         </div>
       )}
