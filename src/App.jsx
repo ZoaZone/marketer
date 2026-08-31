@@ -148,8 +148,7 @@ const AuthenticatedApp = () => {
         <Route path="/admin" element={<AdminDashboard />} />
       </Route>
 
-            <Route path="/auth/google/callback" element={<GoogleCallback />} />
-      <Route path="*" element={<PageNotFound />} />
+            <Route path="*" element={<PageNotFound />} />
     </Routes>
   );
 };
@@ -164,7 +163,10 @@ function App() {
     <QueryClientProvider client={queryClientInstance}>
       <AuthProvider>
         <Router>
-          <AuthenticatedApp />
+          <Routes>
+            <Route path="/auth/google/callback" element={<GoogleCallback />} />
+            <Route path="*" element={<AuthenticatedApp />} />
+          </Routes>
         </Router>
         <Toaster />
       </AuthProvider>
