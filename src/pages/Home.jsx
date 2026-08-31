@@ -481,7 +481,7 @@ export default function Home() {
             <Link to="/free-trial" className="relative z-10 inline-flex items-center gap-2 px-10 py-5 rounded-full bg-white text-black font-black text-lg hover:scale-105 transition-transform shadow-[0_0_40px_rgba(255,255,255,0.2)]">
               Start Free Trial <ArrowRight className="w-6 h-6" />
             </Link>
-            <p className="text-sm text-neutral-500 mt-6 relative z-10 font-medium">14-day free trial · Cancel anytime</p>
+            <p className="text-sm text-neutral-500 mt-6 relative z-10 font-medium">25 free AI generations · No credit card · Cancel anytime</p>
           </div>
         </div>
       </section>
