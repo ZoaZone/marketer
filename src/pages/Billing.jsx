@@ -7,27 +7,39 @@ import { CreditCard, Check, Zap, Loader2, ExternalLink, Calendar, AlertCircle, M
 import PayPalButton from "@/components/PayPalButton";
 import { recordCommissionFor } from "@/utils/affiliate";
 
-// $0.06 per AI generation credit (~50% platform margin over the ~$0.04 raw
-// provider cost). Free trial includes 25 generations (≈5 images / 3 short videos).
-const PRICE_PER_CREDIT = 0.06;
-const FREE_TRIAL_LIMIT = 25;
+// Plans come from the canonical catalog. This page used to carry its own
+// hardcoded list of three — Starter/Growth/Agency — while /pricing
+// advertised nine, so five plans (Creator, Indie, Studio, Dubbing House,
+// BYO Providers) could be marketed but never actually bought from inside
+// the app, and the two lists quoted different allowances for the same
+// money. Both now render from src/config/plans.js.
+import {
+  LANE1_PLANS, LANE2_PLANS, BYOK_PLAN, PLAN_BY_KEY,
+  AI_CREDIT_RETAIL_USD, FREE_TRIAL_GENERATIONS, allowanceFor,
+} from "@/config/plans";
+
+const PRICE_PER_CREDIT = AI_CREDIT_RETAIL_USD;
+const FREE_TRIAL_LIMIT = FREE_TRIAL_GENERATIONS;
 const CREDIT_PACKS = [10, 25, 50, 100];
 
-const PLANS = [
+const PLAN_GROUPS = [
   {
-    name: "Starter", key: "starter", price_monthly: 49, price_yearly: 470, tier: 1,
-    color: "border-white/10",
-    features: ["1 client account", "500 AI generations/mo", "1,000 bulk messages/mo", "3 social accounts", "Basic funnel builder", "Email support"],
+    id: "business",
+    label: "Business",
+    blurb: "Pooled AI credits for marketing content — images, short video, voiceover, campaigns.",
+    plans: LANE1_PLANS,
   },
   {
-    name: "Growth", key: "growth", price_monthly: 149, price_yearly: 1430, tier: 2,
-    popular: true, color: "border-fuchsia-500/40",
-    features: ["5 client accounts", "2,500 AI generations/mo", "10,000 bulk messages/mo", "15 social accounts", "Advanced funnels", "Website scanner", "Ad creator + script writer", "Priority support"],
+    id: "studio",
+    label: "Studio & Dubbing",
+    blurb: "Render Minutes for per-scene AI video, commercial dubbing and lip-sync.",
+    plans: LANE2_PLANS,
   },
   {
-    name: "Agency", key: "agency", price_monthly: 399, price_yearly: 3830, tier: 3,
-    color: "border-white/10",
-    features: ["Unlimited clients", "10,000 AI generations/mo", "50,000 bulk messages/mo", "Unlimited social accounts", "Affiliate portal", "Agency portal", "Dedicated manager"],
+    id: "addon",
+    label: "Add-on",
+    blurb: "Already have provider accounts? Run jobs on your own keys.",
+    plans: [BYOK_PLAN],
   },
 ];
 
@@ -136,10 +148,16 @@ export default function Billing() {
     setLoadingPortal(false);
   };
 
-  const currentPlan = PLANS.find(p => p.name === sub?.plan_name) || null;
+  // Resolve by tier, not by display name — plan_name is free text that has
+  // been renamed before ("BYOK" -> "BYO Providers") and would silently stop
+  // matching, whereas plan_tier is the enum the whole backend keys off.
+  const currentPlan = PLAN_BY_KEY[sub?.plan_tier] || null;
+  const allowance = allowanceFor(sub);
+  const creditsUsed = Number(sub?.ai_credits_used || 0);
+  const renderUsed = Number(sub?.render_minutes_used || 0);
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-8">
+    <div className="max-w-7xl mx-auto space-y-6 pb-8">
       <div>
         <h1 className="text-2xl font-black text-foreground flex items-center gap-2">
           <CreditCard className="w-6 h-6 text-fuchsia-400" /> Billing
@@ -195,20 +213,43 @@ export default function Billing() {
             </button>
           </div>
 
-          {/* Usage */}
-          <div className="grid grid-cols-3 gap-4 mt-5 pt-5 border-t border-border">
+          {/* Usage against the real metered allowance. These read the same
+              counters the backend debits at submit time, so the bar a
+              customer sees is the bar that actually gates their jobs. */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-5 pt-5 border-t border-border">
             {[
-              { label: "Messages Sent", value: totalSent, limit: currentPlan?.name === "Starter" ? "1,000" : currentPlan?.name === "Growth" ? "10,000" : "50,000" },
-              { label: "AI Generations", value: aiGenCount, limit: currentPlan?.name === "Starter" ? "500" : currentPlan?.name === "Growth" ? "2,500" : "10,000" },
-              { label: "Campaigns", value: campaigns.length, limit: "∞" },
-            ].map(u => (
-              <div key={u.label}>
-                <div className="text-xl font-black text-foreground">{u.value.toLocaleString()}</div>
-                <div className="text-xs text-muted-foreground">{u.label}</div>
-                <div className="text-xs text-muted-foreground/50">of {u.limit}/mo</div>
-              </div>
-            ))}
+              { label: "AI credits", value: creditsUsed, limit: allowance.ai_credits },
+              { label: "Render Minutes", value: renderUsed, limit: allowance.render_minutes },
+              { label: "Messages sent", value: totalSent, limit: currentPlan?.limits?.bulk_messages ?? 0 },
+              { label: "Campaigns", value: campaigns.length, limit: -1 },
+            ].map(u => {
+              const unlimited = u.limit === -1;
+              const pct = unlimited || !u.limit ? 0 : Math.min(100, Math.round((u.value / u.limit) * 100));
+              const over = !unlimited && u.limit > 0 && u.value > u.limit;
+              return (
+                <div key={u.label}>
+                  <div className={`text-xl font-black ${over ? "text-amber-400" : "text-foreground"}`}>{u.value.toLocaleString()}</div>
+                  <div className="text-xs text-muted-foreground">{u.label}</div>
+                  <div className="text-xs text-muted-foreground/50">
+                    {unlimited ? "unlimited" : u.limit > 0 ? `of ${u.limit.toLocaleString()}/mo` : "not included"}
+                  </div>
+                  {!unlimited && u.limit > 0 && (
+                    <div className="mt-1.5 h-1 rounded-full bg-muted/40 overflow-hidden">
+                      <div className={`h-full rounded-full ${over ? "bg-amber-400" : "bg-fuchsia-500"}`} style={{ width: `${pct}%` }} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
+
+          {(allowance.ai_credits > 0 && creditsUsed > allowance.ai_credits) ||
+           (allowance.render_minutes > 0 && renderUsed > allowance.render_minutes) ? (
+            <p className="text-xs text-amber-400/90 mt-3">
+              You are past this month&apos;s included allowance. Further usage bills automatically at the
+              published overage rate — upgrading is usually cheaper than running over for a full month.
+            </p>
+          ) : null}
 
           {sub.current_period_end && (
             <p className="text-xs text-muted-foreground mt-4 flex items-center gap-1.5">
@@ -227,52 +268,73 @@ export default function Billing() {
         </button>
       </div>
 
-      {/* Plans */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {PLANS.map(plan => {
-          const price = billing === "yearly" ? plan.price_yearly : plan.price_monthly;
-          const isCurrent = sub?.plan_name === plan.name;
-          return (
-            <div key={plan.key} className={`bg-card border rounded-2xl p-6 flex flex-col ${plan.popular ? "border-fuchsia-500/40 shadow-lg shadow-fuchsia-500/10" : "border-border"}`}>
-              {plan.popular && <div className="text-xs font-bold text-fuchsia-400 uppercase tracking-widest mb-2">Most Popular</div>}
-              <h3 className="text-lg font-black text-foreground">{plan.name}</h3>
-              <div className="mt-2 mb-4">
-                <span className="text-3xl font-black text-foreground">${price}</span>
-                <span className="text-muted-foreground text-sm">/{billing === "yearly" ? "yr" : "mo"}</span>
-              </div>
-              <ul className="space-y-2 flex-1 mb-5">
-                {plan.features.map(f => (
-                  <li key={f} className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Check className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" /> {f}
-                  </li>
-                ))}
-              </ul>
+      {/* Plans — every purchasable plan, grouped by lane */}
+      {PLAN_GROUPS.map(group => (
+        <section key={group.id} className="mb-8">
+          <h2 className="text-sm font-black uppercase tracking-widest text-muted-foreground mb-1">{group.label}</h2>
+          <p className="text-sm text-muted-foreground/70 mb-4 max-w-2xl">{group.blurb}</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+            {group.plans.map(plan => {
+              const price = billing === "yearly" ? plan.price_yearly : plan.price_monthly;
+              const isCurrent = sub?.plan_tier === plan.key;
+              return (
+                <div key={plan.key} className={`bg-card border rounded-2xl p-6 flex flex-col ${plan.popular ? "border-fuchsia-500/40 shadow-lg shadow-fuchsia-500/10" : "border-border"}`}>
+                  {plan.popular && <div className="text-xs font-bold text-fuchsia-400 uppercase tracking-widest mb-2">Most Popular</div>}
+                  <h3 className="text-lg font-black text-foreground">{plan.name}</h3>
+                  <p className="text-xs text-muted-foreground mt-1 mb-3 min-h-[2.5rem]">{plan.tagline}</p>
+                  <div className="mb-2">
+                    <span className="text-3xl font-black text-foreground">${price.toLocaleString()}</span>
+                    <span className="text-muted-foreground text-sm">/{billing === "yearly" ? "yr" : "mo"}</span>
+                  </div>
+                  {(plan.allowance.ai_credits > 0 || plan.allowance.render_minutes > 0) && (
+                    <div className="mb-4 px-3 py-2 rounded-xl bg-muted/30 border border-border text-xs text-muted-foreground font-medium">
+                      {plan.allowance.render_minutes > 0 && <>{plan.allowance.render_minutes.toLocaleString()} Render Minutes</>}
+                      {plan.allowance.render_minutes > 0 && plan.allowance.ai_credits > 0 && " · "}
+                      {plan.allowance.ai_credits > 0 && <>{plan.allowance.ai_credits.toLocaleString()} AI credits</>}
+                      {" / month"}
+                    </div>
+                  )}
+                  <ul className="space-y-2 flex-1 mb-5">
+                    {plan.features.map(f => (
+                      <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
+                        <Check className="w-3.5 h-3.5 mt-0.5 text-emerald-400 flex-shrink-0" /> <span>{f}</span>
+                      </li>
+                    ))}
+                  </ul>
 
-              {isCurrent ? (
-                <div className="w-full text-center py-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 text-sm font-semibold">
-                  ✓ Current Plan
+                  {isCurrent ? (
+                    <div className="w-full text-center py-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 text-sm font-semibold">
+                      ✓ Current Plan
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <button onClick={() => subscribe(plan.key, plan.name, price)} disabled={loading === plan.key}
+                        className="w-full py-2.5 rounded-xl bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white text-sm font-semibold hover:opacity-90 transition-opacity shadow-lg shadow-fuchsia-500/20 disabled:opacity-50 flex items-center justify-center gap-2">
+                        {loading === plan.key ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                        {loading === plan.key ? "Processing..." : `Choose ${plan.name}`}
+                      </button>
+                      {plan.sales_assisted && (
+                        <a href="mailto:care@digitalstudios.app?subject=Enterprise%20volume%20pricing"
+                          className="block w-full text-center py-2 rounded-xl border border-border text-xs font-semibold text-muted-foreground hover:bg-muted/20 transition-colors">
+                          Talk to sales about custom volume
+                        </a>
+                      )}
+                      <PayPalButton
+                        amount={Math.round(price * 83.5)}
+                        currency="INR"
+                        planName={plan.name}
+                        planTier={plan.key}
+                        sourceApp="marketer"
+                        userEmail={user?.email || ""}
+                      />
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="space-y-2">
-                  <button onClick={() => subscribe(plan.key, plan.name, price)} disabled={loading === plan.key}
-                    className="w-full py-2.5 rounded-xl bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white text-sm font-semibold hover:opacity-90 transition-opacity shadow-lg shadow-fuchsia-500/20 disabled:opacity-50 flex items-center justify-center gap-2">
-                    {loading === plan.key ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                    {loading === plan.key ? "Processing..." : `Upgrade to ${plan.name}`}
-                  </button>
-                  <PayPalButton
-                    amount={Math.round(price * 83.5)}
-                    currency="INR"
-                    planName={plan.name}
-                    planTier={plan.key}
-                    sourceApp="marketer"
-                    userEmail={user?.email || ""}
-                  />
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+              );
+            })}
+          </div>
+        </section>
+      ))}
 
       {/* AI Generation Credits */}
       <div className="bg-card border border-border rounded-2xl p-6">
