@@ -147,7 +147,7 @@ export default function Sidebar({ userTier = 0, isAdmin = false, user = null }) 
               className="w-full h-auto object-contain"
               onError={(e) => e.target.style.display = "none"} />
           </div>
-          <p className="mt-2.5 px-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">
+          <p className="mt-2.5 px-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/90">
             {BRAND.tagline}
           </p>
         </Link>
@@ -161,7 +161,7 @@ export default function Sidebar({ userTier = 0, isAdmin = false, user = null }) 
                 tracking and more contrast keeps the labels quiet but readable. */}
             <button onClick={() => toggle(section.label)}
               aria-expanded={!collapsed[section.label]}
-              className="flex items-center justify-between w-full px-3 py-2 text-[10.5px] font-bold tracking-[0.13em] text-muted-foreground/65 uppercase hover:text-muted-foreground transition-colors rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500/40">
+              className="flex items-center justify-between w-full px-3 py-2 text-[10.5px] font-bold tracking-[0.13em] text-muted-foreground/90 uppercase hover:text-foreground transition-colors rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500/40">
               {section.label}
               <ChevronDown className={`w-3.5 h-3.5 transition-transform ${collapsed[section.label] ? "-rotate-90" : ""}`} />
             </button>
@@ -178,16 +178,24 @@ export default function Sidebar({ userTier = 0, isAdmin = false, user = null }) 
                           ? "bg-fuchsia-500/10 text-fuchsia-400 border border-fuchsia-500/20"
                           : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-foreground"
                       }`}>
-                      <item.icon className={`w-[17px] h-[17px] flex-shrink-0 ${isActive ? "text-fuchsia-400" : "text-muted-foreground/80 group-hover:text-foreground"}`} />
+                      <item.icon className={`w-[17px] h-[17px] flex-shrink-0 ${isActive ? "text-fuchsia-400" : "text-muted-foreground/90 group-hover:text-foreground"}`} />
                       <span className="flex-1 truncate">{item.label}</span>
+                      {/* The pill used to be a 15%-opacity fill with no
+                          border: measured 1.29:1 against the sidebar, i.e.
+                          the box visually dissolved into the background. A
+                          translucent fill cannot reach 3:1 on a near-black
+                          surface however far you push it, so the border does
+                          the work (3.1:1) and the fill only tints. 9px was
+                          also below the legible floor. */}
                       {item.badge && !isLocked && (
-                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wider ${
+                        <span className={`px-1.5 py-[3px] rounded-md text-[10px] font-bold tracking-wider border ${
                           item.badge === "ENT"
-                            ? "bg-amber-500/15 text-amber-400"
-                            : "bg-fuchsia-500/15 text-fuchsia-400"
+                            ? "bg-amber-400/20 text-amber-300 border-amber-400/45"
+                            : "bg-fuchsia-400/20 text-fuchsia-300 border-fuchsia-300/50"
                         }`}>{item.badge}</span>
                       )}
-                      {isLocked && <Lock className="w-3 h-3 text-muted-foreground/30" />}
+                      {/* 1.57:1 before — effectively invisible. */}
+                      {isLocked && <Lock className="w-3.5 h-3.5 text-muted-foreground/70" />}
                     </Link>
                   );
                 })}

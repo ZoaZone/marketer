@@ -60,10 +60,14 @@ const AuthenticatedApp = () => {
   if (isLoadingPublicSettings || isLoadingAuth) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-[#0a0a0a]">
+        {/* This is the mark that flashes on every auth check and page
+            transition, so it has to be the real one. It was a hardcoded
+            letter "M" — a leftover from the MediaStudios name — which meant
+            the old brand appeared briefly on literally every navigation. */}
         <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-fuchsia-500 to-purple-600 flex items-center justify-center shadow-lg shadow-fuchsia-500/20">
-            <span className="text-white font-black text-lg">M</span>
-          </div>
+          <img src="/brand/icon.png" alt="" width="48" height="48"
+            className="w-12 h-12 rounded-xl object-contain"
+            onError={(e) => { e.target.style.display = "none"; }} />
           <div className="w-8 h-8 border-2 border-white/10 border-t-fuchsia-500 rounded-full animate-spin"></div>
         </div>
       </div>
