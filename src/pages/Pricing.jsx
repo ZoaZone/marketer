@@ -7,8 +7,18 @@ import { Check, ArrowRight, ArrowLeft, Loader2, Star, Sparkles, Gift, Mail, Phon
 import { BRAND } from "@/lib/brand";
 import { useSeo, SEO } from "@/lib/seo";
 
-const PRICE_PER_CREDIT = 0.06;
-const FREE_TRIAL_LIMIT = 25;
+import {
+  LANE1_PLANS as CATALOG_LANE1,
+  LANE2_PLANS as CATALOG_LANE2,
+  BYOK_PLAN as CATALOG_BYOK,
+  AI_CREDIT_RETAIL_USD,
+  RENDER_MINUTE_WEIGHTS,
+  FREE_TRIAL_GENERATIONS,
+  BILLING_MODEL,
+} from "@/config/plans";
+
+const PRICE_PER_CREDIT = AI_CREDIT_RETAIL_USD;
+const FREE_TRIAL_LIMIT = FREE_TRIAL_GENERATIONS;
 const CREDIT_PACKS = [10, 25, 50, 100];
 
 const MESSAGING_RATES = [
@@ -17,122 +27,49 @@ const MESSAGING_RATES = [
   { Icon: MessageSquare, label: "WhatsApp",  provider: "Meta Cloud API",        rate: "≈ $0.013 / conversation (US)", byo: "Agency & Enterprise: bring your own Meta BSP token — $0 platform fee" },
 ];
 
-// Lane 1 — Business. Pooled Base44 credits cover images, short video, and
-// voiceover; when a request needs a premium fallback LLM, that usage is
-// resold at +30–50% over provider cost. Each tier's credit pool is a soft
-// monthly cap — going over doesn't hard-stop you, it bills overage.
-// `key` is the canonical id sent to stripeCheckoutCREAM / stored as
-// Subscription.plan_tier — must match its PLANS map and recordCommission's
-// PRICES map exactly (see those files' comments).
-const LANE1_PLANS = [
-  {
-    key: "creator", name: "Creator", price_monthly: 19, price_yearly: 182,
-    desc: "For solo creators just getting started", color: "border-white/10",
-    credits: "300 pooled credits/mo",
-    features: [
-      "300 pooled Base44 credits/month", "Images, short video, voiceover", "1 brand / client account",
-      "Fallback premium LLMs (+30–50% over cost)", "Soft monthly cap — overage billed, never hard-stopped",
-      "Email support",
-    ],
-  },
-  {
-    key: "starter", name: "Starter", price_monthly: 49, price_yearly: 470,
-    desc: "Perfect for small businesses and solopreneurs", color: "border-white/10",
-    credits: "800 pooled credits/mo",
-    features: [
-      "800 pooled Base44 credits/month", "1 brand / client account", "1,000 bulk messages/month",
-      "3 social accounts", "Basic funnel builder", "Lead capture forms",
-      "Fallback premium LLMs (+30–50% over cost)", "Email support",
-    ],
-  },
-  {
-    key: "growth", name: "Growth", price_monthly: 149, price_yearly: 1430,
-    desc: "For growing teams and freelancers managing clients", color: "border-fuchsia-500/50", popular: true,
-    credits: "3,000 pooled credits/mo",
-    features: [
-      "3,000 pooled Base44 credits/month", "5 brand / client accounts", "10,000 bulk messages/month",
-      "15 social accounts", "Advanced funnels & sequences", "Website scanner",
-      "Ad creator + script writer", "Analytics dashboard", "Priority support",
-    ],
-  },
-  {
-    key: "agency", name: "Agency", price_monthly: 399, price_yearly: 3830,
-    desc: "Full power for agencies managing unlimited clients", color: "border-amber-500/30",
-    credits: "9,000 pooled credits/mo + seats",
-    features: [
-      "9,000 pooled Base44 credits/month + additional team seats", "10 brands / unlimited clients",
-      "50,000 bulk messages/month", "Unlimited social accounts",
-      "Affiliate & agency portals", "BYO email/SMS/WhatsApp (zero platform fee)",
-      "API access", "Dedicated account manager",
-    ],
-  },
-];
-
-// Lane 2 — Movie Maker Pro. A separate paid product from Lane 1: it's the
-// only lane that spends real per-minute money on external providers
-// (Replicate, ElevenLabs), so it's metered in weighted render-credits
-// rather than the flat pooled-credit model above. Every tier is a finite,
-// transparent pool with overage — never "unlimited".
-const RENDER_WEIGHTS = [
-  { label: "Video scene", weight: "7×" },
-  { label: "Dubbed minute", weight: "8×" },
-  { label: "Lip-sync", weight: "15×" },
-  { label: "Long-form music track", weight: "6×" },
-];
-
-const LANE2_PLANS = [
-  {
-    key: "indie", name: "Indie", price_monthly: 99, price_yearly: 950,
-    desc: "Get started with AI film production", color: "border-white/10",
-    credits: "40 scene-equivalent render-credits/mo",
-    features: [
-      "40 scene-equivalent render-credits/month", "Per-scene AI video (Kling / MiniMax)",
-      "AI music, dubbing & lip-sync — pay from the same pool", "Movie Maker Pro access",
-      "Finite pool with transparent overage pricing",
-    ],
-  },
-  {
-    key: "studio", name: "Studio", price_monthly: 399, price_yearly: 3830,
-    desc: "For serious multi-scene productions", color: "border-cyan-500/40", popular: true,
-    credits: "200 scenes + 60 dub-min render-credits/mo",
-    features: [
-      "200 scene-equivalent render-credits/month", "+60 dubbing-minute credits included",
-      "Reference-locked characters across scenes", "Priority render queue",
-      "Finite pool with transparent overage pricing",
-    ],
-  },
-  {
-    key: "dubbing_house", name: "Dubbing House", price_monthly: 499, price_yearly: 4790,
-    desc: "For dubbing- and localization-heavy workflows", color: "border-white/10",
-    credits: "400 dub-min render-credits/mo + lip-sync pack",
-    features: [
-      "400 dubbing-minute render-credits/month", "Lip-sync pack included",
-      "Multi-language dubbing pipeline", "Caption burn-in",
-      "Finite pool with transparent overage pricing",
-    ],
-  },
-  {
-    key: "enterprise", name: "Enterprise", price_monthly: 1499, price_yearly: null,
-    desc: "Large-volume production with an SLA", color: "border-cyan-500/40",
-    enterprise: true, contactSales: true,
-    credits: "Large finite render-credit pool, sized to your volume",
-    features: [
-      "Large finite render-credit pool — sized to your volume", "Transparent overage pricing, no hidden caps",
-      "SLA-backed render priority", "Dedicated success manager", "Custom integrations",
-    ],
-  },
-];
-
-const BYOK_PLAN = {
-  key: "byok", name: "BYOK", price_monthly: 49, price_yearly: 470,
-  desc: "Bring your own AI provider keys",
-  features: [
-    "Bring your own Replicate, ElevenLabs, and/or LLM key (via Integrations)",
-    "Lane-2 jobs prefer your key over the platform's",
-    "No per-generation markup on BYOK-covered jobs",
-    "Platform-access fee only — provider usage is billed directly by your own account",
-  ],
+// Plans come from the canonical catalog (src/config/plans.js) so this page,
+// the in-app Billing page and the Stripe checkout function cannot describe
+// the same money differently — which they did: this page advertised nine
+// plans and allowances (300/800/3,000/9,000 pooled credits) that no endpoint
+// enforced, while Billing sold three plans quoting entirely different
+// numbers. Colour/icon are presentation-only and stay here.
+const ACCENT = {
+  creator: { color: "border-white/10", Icon: Sparkles },
+  starter: { color: "border-white/10", Icon: Briefcase },
+  growth: { color: "border-fuchsia-500/40", Icon: Star },
+  agency: { color: "border-white/10", Icon: Briefcase },
+  indie: { color: "border-white/10", Icon: Film },
+  studio: { color: "border-fuchsia-500/40", Icon: Clapperboard },
+  dubbing_house: { color: "border-white/10", Icon: Clapperboard },
+  enterprise: { color: "border-cyan-500/40", Icon: Briefcase },
+  byok: { color: "border-amber-500/30", Icon: KeyRound },
 };
+
+const decorate = (plan) => ({
+  ...plan,
+  ...(ACCENT[plan.key] || {}),
+  desc: plan.tagline,
+  contactSales: !!plan.sales_assisted,
+  credits: [
+    plan.allowance.render_minutes > 0 ? `${plan.allowance.render_minutes.toLocaleString()} Render Minutes/mo` : null,
+    plan.allowance.ai_credits > 0 ? `${plan.allowance.ai_credits.toLocaleString()} AI credits/mo` : null,
+  ].filter(Boolean).join(" · "),
+});
+
+// The weight chips under the Lane 2 header. Derived from the catalog rather
+// than hand-written: the previous hardcoded list (7x/8x/15x/6x) bore no
+// relation to what any operation actually costs, and nothing would have
+// caught it drifting further.
+const RENDER_WEIGHTS = [
+  { label: "Dubbed minute", weight: `${RENDER_MINUTE_WEIGHTS.dubbing_minute}x` },
+  { label: "Video scene (5s)", weight: `${RENDER_MINUTE_WEIGHTS.ai_video_scene}x` },
+  { label: "Lip-sync minute", weight: `${RENDER_MINUTE_WEIGHTS.lipsync_minute}x` },
+  { label: "Music track", weight: `${RENDER_MINUTE_WEIGHTS.music_track}x` },
+];
+
+const LANE1_CARDS = CATALOG_LANE1.map(decorate);
+const LANE2_CARDS = CATALOG_LANE2.map(decorate);
+const BYOK_CARD = decorate(CATALOG_BYOK);
 
 export default function Pricing() {
   useSeo(SEO.pricing);
@@ -201,22 +138,24 @@ export default function Pricing() {
           ))}
         </div>
 
-        {plan.contactSales ? (
-          <a href="mailto:care@zoazoneservices.com?subject=Movie%20Maker%20Pro%20Enterprise"
-            className="w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:opacity-90 shadow-lg">
-            <Mail className="w-4 h-4" /> Contact Sales
+        <button onClick={() => handleCheckout(plan)} disabled={!!loadingPlan}
+          className={`w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+            plan.popular
+              ? "bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white hover:opacity-90 shadow-lg shadow-fuchsia-500/30"
+              : "border border-white/15 text-white/80 hover:border-white/30 hover:text-white"
+          } disabled:opacity-60`}>
+          {loadingPlan === plan.key ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Get Started <ArrowRight className="w-4 h-4" /></>}
+        </button>
+        {/* Enterprise is buyable at list price AND sales-assisted for custom
+            volume — it used to be contact-sales only, with no checkout path
+            behind it at all. */}
+        {plan.contactSales && (
+          <a href="mailto:care@zoazoneservices.com?subject=Enterprise%20volume%20pricing"
+            className="mt-2 w-full py-2.5 rounded-xl font-semibold text-xs transition-all flex items-center justify-center gap-2 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/10">
+            <Mail className="w-3.5 h-3.5" /> Talk to sales about custom volume
           </a>
-        ) : (
-          <button onClick={() => handleCheckout(plan)} disabled={!!loadingPlan}
-            className={`w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
-              plan.popular
-                ? "bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white hover:opacity-90 shadow-lg shadow-fuchsia-500/30"
-                : "border border-white/15 text-white/80 hover:border-white/30 hover:text-white"
-            } disabled:opacity-60`}>
-            {loadingPlan === plan.key ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Get Started <ArrowRight className="w-4 h-4" /></>}
-          </button>
         )}
-        {isIndia && !plan.contactSales && (
+        {isIndia && (
           <div className="mt-3">
             <p className="text-xs text-center text-white/40 mb-2">🇮🇳 India? Pay in INR</p>
             <PayPalButton amount={Math.round(perMonth * 85)} currency="INR" planName={plan.name} planTier={plan.key} sourceApp="marketer" userEmail={user?.email || ""} />
@@ -239,7 +178,7 @@ export default function Pricing() {
             <img src="/brand/wordmark.png" alt={BRAND.name} className="h-12 object-contain" onError={(e) => e.target.style.display="none"} />
           </div>
           <h1 className="text-4xl md:text-5xl font-black mb-4">Choose your plan</h1>
-          <p className="text-white/50 text-lg mb-6">Two lanes, priced for what they actually cost: Business runs on pooled platform credits, Movie Maker Pro meters real external render costs.</p>
+          <p className="text-white/50 text-lg mb-6">Two lanes, priced for what they actually cost: Business runs on pooled AI credits, Studio &amp; Dubbing meters real external render work in Render Minutes.</p>
 
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-fuchsia-500/10 border border-fuchsia-500/20 text-fuchsia-300 text-sm font-medium mb-8">
             <Gift className="w-4 h-4" /> Start free — {FREE_TRIAL_LIMIT} AI generations (~5 images or 3 short videos), no credit card required
@@ -261,8 +200,8 @@ export default function Pricing() {
           <div className="flex items-start gap-3 flex-1">
             <Sparkles className="w-6 h-6 text-fuchsia-400 shrink-0 mt-0.5" />
             <div>
-              <h3 className="text-base font-black text-white mb-0.5">Pay-as-you-go Lane 1 Credits</h3>
-              <p className="text-sm text-white/50">No subscription, or need to top up your pooled Lane 1 credits? Buy anytime. 1 credit = 1 AI image or video scene = ${PRICE_PER_CREDIT.toFixed(2)} + applicable taxes. Credits never expire.</p>
+              <h3 className="text-base font-black text-white mb-0.5">Pay-as-you-go AI Credits</h3>
+              <p className="text-sm text-white/50">No subscription, or need to top up this month&rsquo;s AI credits? Buy anytime. 1 credit = 1 AI image or short video scene = ${PRICE_PER_CREDIT.toFixed(2)} + applicable taxes. Credits never expire.</p>
             </div>
           </div>
           <div className="flex gap-2 flex-wrap shrink-0">
@@ -288,22 +227,22 @@ export default function Pricing() {
             <h2 className="text-xl font-black text-white">Business</h2>
           </div>
         </div>
-        <p className="text-white/40 text-sm mb-6 max-w-2xl">Pooled Base44 credits cover images, short video, and voiceover. When a request needs a premium fallback LLM, that usage is resold at +30–50% over provider cost. Each tier's pool is a soft monthly cap — going over bills overage automatically, it never hard-stops you.</p>
+        <p className="text-white/40 text-sm mb-6 max-w-2xl">{BILLING_MODEL.ai_credit} Your monthly allowance covers images, short video, voiceover, scripts and campaign copy. {BILLING_MODEL.overage}</p>
         <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-5 mb-14">
-          {LANE1_PLANS.map(plan => <PlanCard key={plan.key} plan={plan} />)}
+          {LANE1_CARDS.map(plan => <PlanCard key={plan.key} plan={plan} />)}
         </div>
 
-        {/* Lane 2 — Movie Maker Pro */}
+        {/* Lane 2 — Studio & Dubbing */}
         <div className="mb-4 flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shrink-0">
             <Clapperboard className="w-4 h-4 text-white" />
           </div>
           <div>
             <p className="text-[10px] font-bold tracking-widest text-cyan-400/80 uppercase">Lane 2</p>
-            <h2 className="text-xl font-black text-white">Movie Maker Pro</h2>
+            <h2 className="text-xl font-black text-white">Studio &amp; Dubbing</h2>
           </div>
         </div>
-        <p className="text-white/40 text-sm mb-4 max-w-2xl">A separate product from Lane 1 — this is the only lane that spends real per-minute money on external AI providers, so it's metered in weighted render-credits instead of flat generations. Every tier is a finite, transparent pool with overage pricing — never unlimited.</p>
+        <p className="text-white/40 text-sm mb-4 max-w-2xl">{BILLING_MODEL.render_minute} Every tier is a finite, published pool with published overage — never &ldquo;unlimited&rdquo;. {BILLING_MODEL.byok}</p>
         <div className="flex flex-wrap gap-2 mb-6">
           {RENDER_WEIGHTS.map(w => (
             <div key={w.label} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs text-white/60">
@@ -312,22 +251,22 @@ export default function Pricing() {
           ))}
         </div>
         <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-5 mb-14">
-          {LANE2_PLANS.map(plan => <PlanCard key={plan.key} plan={plan} />)}
+          {LANE2_CARDS.map(plan => <PlanCard key={plan.key} plan={plan} />)}
         </div>
 
-        {/* BYOK */}
+        {/* BYO Providers */}
         <div className="mb-4 flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shrink-0">
             <KeyRound className="w-4 h-4 text-white" />
           </div>
           <div>
             <p className="text-[10px] font-bold tracking-widest text-emerald-400/80 uppercase">Add-on</p>
-            <h2 className="text-xl font-black text-white">Bring Your Own Key (BYOK)</h2>
+            <h2 className="text-xl font-black text-white">Bring Your Own Providers</h2>
           </div>
         </div>
-        <p className="text-white/40 text-sm mb-6 max-w-2xl">Connect your own Replicate, ElevenLabs, and/or LLM key from the Integrations page — Lane-2 jobs prefer your key over the platform's, billed directly by your own provider account. This is a platform-access fee only, not a usage credit pool.</p>
+        <p className="text-white/40 text-sm mb-6 max-w-2xl">Connect your own Replicate, ElevenLabs and/or LLM key from the Integrations page — Lane-2 jobs then run on your account and your provider bills you directly, so they consume none of your Render Minutes. This is a platform-access fee only, not a usage pool. Included free with Studio, Dubbing House and Enterprise.</p>
         <div className="max-w-sm mb-14">
-          <PlanCard plan={BYOK_PLAN} />
+          <PlanCard plan={BYOK_CARD} />
         </div>
 
         {/* Email, SMS & WhatsApp sending */}
