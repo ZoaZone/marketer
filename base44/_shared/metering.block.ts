@@ -60,6 +60,11 @@ const ALLOWANCE: Record<string, { ac: number; rm: number }> = {
 
 const PERIOD_MS = 31 * 24 * 60 * 60 * 1000;
 
+// The signup offer, in AI credits. MUST equal FREE_TRIAL_GENERATIONS in
+// src/config/plans.js — check:plans enforces it, because this number is
+// quoted on the home page, /pricing and the Help Center.
+const FREE_TRIAL_UNITS = 25;
+
 /**
  * Charge a job before any provider call is made. Charging at submit is what
  * makes an allowance a real spend ceiling — charging on completion would let
@@ -88,6 +93,10 @@ async function meterUsage(
   // through the provider dashboards.
   if (user?.role === 'admin') return null;
 
+  // Declared before the free-trial branch below, which charges `ac`.
+  const rm = weight.rm * units;
+  const ac = weight.ac * units;
+
   let sub: any = null;
   try {
     const subs = await base44.asServiceRole.entities.Subscription.filter(
@@ -96,15 +105,81 @@ async function meterUsage(
     sub = (subs || []).find((s: any) => ['active', 'trialing'].includes(s.status)) || null;
   } catch (_) { /* fall through — handled below */ }
 
+  // FREE TRIAL. The signup promise is "25 AI generations, no credit card",
+  // and /pricing, the Help Center and the home page all repeat it — but
+  // only generateImage ever honoured it. generateVoiceover demanded an
+  // active subscription, so a trial user following the normal Quick Create
+  // or Demo Video flow hit a hard 403 at the narration step and could not
+  // finish a single video. The promise now covers credit-weighted (Lane 1)
+  // work generally.
+  //
+  // Lane 2 stays subscription-only: dubbing, per-scene AI video, lip-sync
+  // and music spend real per-minute provider money, and a free account is
+  // exactly what an abuser would use to spend it.
   if (!sub) {
-    return Response.json({
-      error: 'An active subscription is required for this feature.',
-      code: 'no_subscription',
-    }, { status: 403 });
-  }
+    if (weight.rm > 0) {
+      return Response.json({
+        error: 'An active subscription is required for this feature.',
+        code: 'no_subscription',
+      }, { status: 403 });
+    }
 
-  const rm = weight.rm * units;
-  const ac = weight.ac * units;
+    let trialUsed = 0;
+    try {
+      const prior = await base44.asServiceRole.entities.UsageEvent.filter(
+        { owner_email: user.email, billed_as: 'trial' }, '-created_date', 200,
+      );
+      trialUsed = (prior || []).reduce((n: number, e: any) => n + Number(e.ai_credits_charged || 0), 0);
+    } catch (_) {
+      // Cannot read the counter — refuse rather than hand out an
+      // uncountable trial.
+      return Response.json({
+        error: 'Could not check your free-trial balance. Please retry in a moment.',
+        code: 'metering_unavailable',
+      }, { status: 503 });
+    }
+
+    if (trialUsed + ac > FREE_TRIAL_UNITS) {
+      return Response.json({
+        error: `You've used all ${FREE_TRIAL_UNITS} free AI generations. Subscribe to a plan or purchase credits to keep creating.`,
+        code: 'trial_limit_reached',
+        used: trialUsed,
+        limit: FREE_TRIAL_UNITS,
+      }, { status: 403 });
+    }
+
+    const trialRaw = (RAW[kind as keyof typeof RAW] || 0) * units;
+    try {
+      const ev = await base44.asServiceRole.entities.UsageEvent.create({
+        owner_email: user.email,
+        kind,
+        units,
+        ai_credits_charged: ac,
+        render_minutes_charged: 0,
+        billed_as: 'trial',
+        job_id: opts.jobId || '',
+        provider: opts.provider || '',
+      });
+      await base44.asServiceRole.entities.UsageCost.create({
+        usage_event_id: ev?.id || '',
+        owner_email: user.email,
+        kind,
+        units,
+        raw_provider_cost_usd: Number(trialRaw.toFixed(4)),
+        platform_margin_usd: 0,
+        charged_cost_usd: 0,
+        rate_source: 'trial',
+      });
+    } catch (_) {
+      // The counter is the ceiling here — without a recorded event the
+      // trial is unbounded, so this one is load-bearing.
+      return Response.json({
+        error: 'Could not record your free-trial usage. Please retry in a moment.',
+        code: 'metering_unavailable',
+      }, { status: 503 });
+    }
+    return null;
+  }
 
   // Roll the metering window forward if the current one has lapsed.
   const startedAt = sub.usage_period_start ? Date.parse(sub.usage_period_start) : 0;
