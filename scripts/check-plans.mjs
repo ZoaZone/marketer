@@ -143,6 +143,33 @@ console.log("\ninlined metering blocks");
 // ---------------------------------------------------------------------------
 // 5. The margin must never reach the browser bundle.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// 6. No second price map may exist under src/. Three have appeared so far
+//    (Pricing.jsx, Billing.jsx, lib/planPrices.js), each "kept in sync by
+//    comment discipline", each drifted. The catalog is the only one allowed.
+// ---------------------------------------------------------------------------
+console.log("\nduplicate price maps");
+{
+  const dupes = [];
+  const walk = (dir) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const p = `${dir}/${e.name}`;
+      if (e.isDirectory()) { walk(p); continue; }
+      if (!/\.(js|jsx)$/.test(e.name)) continue;
+      if (p.endsWith("src/config/plans.js")) continue;
+      const src = readFileSync(p, "utf8");
+      // A literal object mapping three or more plan keys to bare numbers is
+      // a price map by any other name.
+      const keys = ALL_PLANS.map((x) => x.key);
+      const hits = keys.filter((k) => new RegExp(`\\b${k}\\s*:\\s*\\d{2,}\\b`).test(src));
+      if (hits.length >= 3) dupes.push(`${p} (${hits.slice(0, 4).join(", ")}…)`);
+    }
+  };
+  walk("src");
+  if (dupes.length) for (const d of dupes) bad(`${d} looks like a second price map — import from @/config/plans instead`);
+  else ok("no second price map under src/");
+}
+
 console.log("\nmargin confidentiality");
 {
   const leaks = [];

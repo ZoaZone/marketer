@@ -12,7 +12,8 @@
     "preview": "vite preview",
     "check:plans": "node scripts/check-plans.mjs",
     "test:metering": "node scripts/test-metering.mjs",
-    "verify": "npm run lint && npm run check:plans && npm run test:metering && npm run build"
+    "verify": "npm run lint && npm run check:plans && npm run test:metering && npm run test:advisor && npm run build",
+    "test:advisor": "node scripts/test-advisor.mjs"
   },
   "dependencies": {
     "@base44/sdk": "^0.8.44",
