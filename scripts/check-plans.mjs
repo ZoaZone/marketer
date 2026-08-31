@@ -148,6 +148,29 @@ console.log("\ninlined metering blocks");
 //    (Pricing.jsx, Billing.jsx, lib/planPrices.js), each "kept in sync by
 //    comment discipline", each drifted. The catalog is the only one allowed.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// 7. SEO descriptions must fit what Google actually shows (~160 chars), and
+//    the structured data must not hardcode a price range that the catalog
+//    can move underneath it.
+// ---------------------------------------------------------------------------
+console.log("\nSEO metadata");
+{
+  const LIMIT = 165;
+  const seoSrc = readFileSync("src/lib/seo.js", "utf8");
+  for (const m of seoSrc.matchAll(/description:\s*\n?\s*"([^"]+)"/g)) {
+    if (m[1].length > LIMIT) bad(`seo.js description is ${m[1].length} chars (limit ${LIMIT}): "${m[1].slice(0, 50)}…"`);
+  }
+  const html = readFileSync("index.html", "utf8");
+  for (const m of html.matchAll(/<meta (?:name|property)="([^"]*(?:description|title)[^"]*)" content="([^"]+)"/g)) {
+    if (m[2].length > LIMIT) bad(`index.html ${m[1]} is ${m[2].length} chars (limit ${LIMIT})`);
+  }
+  // A literal price in the structured data means it will go stale.
+  if (/(?:lowPrice|highPrice|offerCount):\s*"\d/.test(seoSrc)) {
+    bad("seo.js hardcodes a price or plan count in JSON-LD — derive it from the catalog");
+  }
+  if (!problems.length) ok("descriptions within limit, JSON-LD derived from the catalog");
+}
+
 console.log("\nduplicate price maps");
 {
   const dupes = [];
