@@ -23,7 +23,8 @@ block = block
   .replace(/const num = \(v: string \| undefined, fallback: number\)/, "const num = (v, fallback)")
   .replace(/const WEIGHTS: Record<string, \{ rm: number; ac: number \}>/, "const WEIGHTS")
   .replace(/const ALLOWANCE: Record<string, \{ ac: number; rm: number \}>/, "const ALLOWANCE")
-  .replace(/RAW\[kind as keyof typeof RAW\]/, "RAW[kind]")
+  .replace(/RAW\[kind as keyof typeof RAW\]/g, "RAW[kind]")
+  .replace(/\(n: number, e: any\)/g, "(n, e)")
   .replace(
     /async function meterUsage\([\s\S]*?\): Promise<Response \| null> \{/,
     "async function meterUsage(base44, user, kind, units, opts = {}) {",
@@ -40,7 +41,7 @@ const mod = await import(
 const { meterUsage } = mod;
 
 // --- fake base44 -----------------------------------------------------------
-function fake(subOverrides) {
+function fake(subOverrides, trialPrior = []) {
   const sub = {
     id: "s1", owner_email: "u@x.com", status: "active", plan_tier: "studio",
     usage_period_start: new Date().toISOString(),
@@ -59,7 +60,10 @@ function fake(subOverrides) {
             filter: async () => (subOverrides === null ? [] : [sub]),
             update: async (_id, patch) => Object.assign(sub, patch),
           },
-          UsageEvent: { create: async (d) => { events.push(d); return { id: `e${events.length}` }; } },
+          UsageEvent: {
+            create: async (d) => { events.push(d); return { id: `e${events.length}` }; },
+            filter: async () => trialPrior,
+          },
           UsageCost: { create: async (d) => { costs.push(d); return { id: "c1" }; } },
         },
       },
@@ -127,11 +131,48 @@ await t("a lapsed billing window resets the counters", async () => {
   assert.notEqual(f.sub.usage_period_start, old, "window should roll forward");
 });
 
-await t("no active subscription is refused with 403", async () => {
+await t("no subscription is refused for Lane 2 — dubbing is never free", async () => {
   const f = fake(null);
   const r = await meterUsage(f.client, USER, "dubbing_minute", 1, {});
   assert.ok(r);
   assert.equal(r.status, 403);
+});
+
+await t("FREE TRIAL: a trial user CAN generate a voiceover", async () => {
+  // This is the signup promise. Before the trial branch existed this
+  // returned 403 and Quick Create died at the narration step.
+  const f = fake(null);
+  const r = await meterUsage(f.client, USER, "voiceover", 3, {});
+  assert.equal(r, null, "trial user must be allowed");
+  assert.equal(f.events[0].billed_as, "trial");
+  assert.equal(f.events[0].ai_credits_charged, 3);
+});
+
+await t("FREE TRIAL: is capped at 25 and refuses the job that would exceed it", async () => {
+  const spent = [{ ai_credits_charged: 24 }];
+  const f = fake(null, spent);
+  const r = await meterUsage(f.client, USER, "voiceover", 3, {});
+  assert.ok(r, "should refuse");
+  assert.equal(r.status, 403);
+  assert.equal(f.events.length, 0, "nothing recorded on refusal");
+  const f2 = fake(null, spent);
+  assert.equal(await meterUsage(f2.client, USER, "voiceover", 1, {}), null);
+});
+
+await t("FREE TRIAL: never charges the customer, and margin is zero", async () => {
+  const f = fake(null);
+  await meterUsage(f.client, USER, "voiceover", 2, {});
+  assert.equal(f.costs[0].charged_cost_usd, 0);
+  assert.equal(f.costs[0].platform_margin_usd, 0);
+  assert.ok(f.costs[0].raw_provider_cost_usd > 0, "but real COGS is still recorded");
+});
+
+await t("FREE TRIAL: an uncountable trial is refused, not handed out", async () => {
+  const f = fake(null);
+  f.client.asServiceRole.entities.UsageEvent.filter = async () => { throw new Error("down"); };
+  const r = await meterUsage(f.client, USER, "voiceover", 1, {});
+  assert.ok(r, "must not allow an uncounted trial");
+  assert.equal(r.status, 503);
 });
 
 await t("a cancelled subscription cannot spend", async () => {
