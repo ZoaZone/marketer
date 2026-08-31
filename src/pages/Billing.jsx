@@ -408,7 +408,7 @@ export default function Billing() {
       </div>
 
       <p className="text-center text-xs text-muted-foreground">
-        Questions? <a href="mailto:care@digitalstudios.app" className="text-fuchsia-400 hover:underline">care@digitalstudios.app</a> · 14-day free trial on Growth plan
+        Questions? <a href="mailto:care@digitalstudios.app" className="text-fuchsia-400 hover:underline">care@digitalstudios.app</a> · Every account starts with 25 free AI generations
       </p>
     </div>
   );

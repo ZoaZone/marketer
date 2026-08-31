@@ -393,8 +393,17 @@ export default function Home() {
 
       <section id="pricing" className="py-32 px-6">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-20">
-            <h2 className="text-4xl md:text-5xl font-black text-white mb-6">Simple pricing.<br /><span className="text-neutral-500">Unfair advantage.</span></h2>
+          <div className="text-center mb-12">
+            <h2 className="text-4xl md:text-5xl font-black text-white mb-4">Simple pricing.<br /><span className="text-neutral-500">Unfair advantage.</span></h2>
+            {/* State the count explicitly. With only the two lane headings and
+                a big "From $19", the section read as if there were just two
+                plans — the tier rows below were being taken for feature
+                bullets. Derived from the catalog so it cannot go stale. */}
+            <p className="text-neutral-400 text-sm md:text-base max-w-xl mx-auto">
+              {CATALOG_LANE1.length + CATALOG_LANE2.length} plans across two lanes, plus a{" "}
+              {CATALOG_BYOK.name} add-on at ${CATALOG_BYOK.price_monthly}/mo.
+              Pick the lane that matches your work, then the tier that matches your volume.
+            </p>
           </div>
           
           {/* Credits callout */}
@@ -411,7 +420,7 @@ export default function Home() {
             </Link>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-6 items-start max-w-3xl mx-auto">
+          <div className="grid md:grid-cols-2 gap-6 items-start max-w-5xl mx-auto">
             {LANES.map((lane) =>
               <div key={lane.key} className="relative rounded-3xl p-7 border border-white/10 bg-white/5 backdrop-blur-xl transition-transform hover:-translate-y-1 flex flex-col">
                 <div className="flex items-center gap-3 mb-4">
@@ -422,21 +431,28 @@ export default function Home() {
                 </div>
                 <h3 className="text-xl font-black text-white mb-1.5">{lane.name}</h3>
                 <p className="text-neutral-400 text-xs mb-5">{lane.desc}</p>
-                <div className="flex items-baseline gap-1 mb-4">
-                  <span className="text-neutral-500 text-xs">From</span>
-                  <span className="text-4xl font-black text-white">${lane.fromPrice}</span>
-                  <span className="text-neutral-500 font-medium text-sm">/mo + tax</span>
-                </div>
-                {/* Every tier by name — a visitor should not have to click
-                    through to /pricing to learn that Studio, Dubbing House,
-                    Enterprise or BYO Providers exist. */}
-                <div className="mb-6 rounded-2xl border border-white/10 bg-black/20 divide-y divide-white/5">
+                {/* Every tier as its own row. These were previously small
+                    enough to be mistaken for feature bullets sitting under a
+                    single "From $19" headline, which is why the page looked
+                    like it offered two plans. The per-lane "from" price now
+                    sits as a caption above the list rather than dominating
+                    it. */}
+                <p className="text-[11px] text-neutral-500 mb-2">
+                  {lane.tiers.length} plans · from <span className="text-neutral-300 font-bold">${lane.fromPrice}</span>/mo + tax
+                </p>
+                <div className="mb-6 rounded-2xl border border-white/10 bg-black/25 divide-y divide-white/5 overflow-hidden">
                   {lane.tiers.map((t) =>
-                    <div key={t.name} className="flex items-baseline justify-between gap-3 px-3.5 py-2">
-                      <span className="text-xs font-bold text-white">{t.name}</span>
-                      <span className="text-[10px] text-neutral-500 flex-1 truncate text-right">{t.note}</span>
-                      <span className="text-xs font-black text-white whitespace-nowrap">${t.price.toLocaleString()}</span>
-                    </div>
+                    <Link key={t.name} to="/pricing"
+                      className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-white/5 transition-colors">
+                      <span className="min-w-0">
+                        <span className="block text-sm font-bold text-white truncate">{t.name}</span>
+                        <span className="block text-[11px] text-neutral-400 truncate">{t.note}</span>
+                      </span>
+                      <span className="text-base font-black text-white whitespace-nowrap">
+                        ${t.price.toLocaleString()}
+                        <span className="text-[10px] font-medium text-neutral-500">/mo</span>
+                      </span>
+                    </Link>
                   )}
                 </div>
                 <div className="space-y-3 mb-8 flex-1">
