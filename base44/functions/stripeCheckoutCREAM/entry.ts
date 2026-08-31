@@ -3,12 +3,21 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 const STRIPE_KEY = Deno.env.get('STRIPE_SECRET_KEY') || '';
 const APP_URL = 'https://digitalstudios.app';
 
-// Canonical prices for every self-serve plan — cents, USD. This is the
-// single source of truth Pricing.jsx displays and recordCommission's PRICES
-// map mirrors for affiliate commission math; keep all three in sync.
+// Prices in cents, USD. MIRROR OF src/config/plans.js — that file is the
+// canonical catalog; this copy exists only because a Base44 function
+// deployment cannot import a frontend module. `npm run check:plans` parses
+// this map and fails the build if it drifts from the catalog, so do not
+// hand-edit it without updating src/config/plans.js in the same commit.
+// recordCommission's PRICES map is verified against the same source.
+//
 // Yearly = monthly × 12 × 0.8 (20% off), rounded to the nearest dollar.
-// Lane-2 Enterprise ($1,499+/mo) is deliberately absent — negotiated/custom
-// pricing, "Contact Sales" only, never a self-serve Stripe Checkout plan.
+//
+// Enterprise IS self-serve purchasable at its $1,499 list price. It used to
+// be marketing-page-only with no checkout path and no way to provision it,
+// which is why the app had "no enterprise plan defined" despite advertising
+// one. Sales-assisted custom volume is still available on top — see the
+// sales_assisted flag in the catalog — but a customer who simply wants to
+// pay list price with a card can now do so.
 const PLANS: Record<string, { name: string; price_monthly: number; price_yearly: number; tier: string }> = {
   // Lane 1 — Business (pooled Base44 credits + fallback LLMs)
   creator: { name: 'Creator', price_monthly: 1900,  price_yearly: 18200,  tier: 'creator' },
@@ -18,9 +27,11 @@ const PLANS: Record<string, { name: string; price_monthly: number; price_yearly:
   // Lane 2 — Movie Maker Pro (weighted render-credits via the external worker)
   indie:         { name: 'Indie',         price_monthly: 9900,  price_yearly: 95000,  tier: 'indie' },
   studio:        { name: 'Studio',        price_monthly: 39900, price_yearly: 383000, tier: 'studio' },
-  dubbing_house: { name: 'Dubbing House', price_monthly: 49900, price_yearly: 479000, tier: 'dubbing_house' },
-  // BYOK — platform-access fee only; the user's own provider keys do the rest
-  byok: { name: 'BYOK', price_monthly: 4900, price_yearly: 47000, tier: 'byok' },
+  dubbing_house: { name: 'Dubbing House', price_monthly: 49900,  price_yearly: 479000,  tier: 'dubbing_house' },
+  enterprise:    { name: 'Enterprise',    price_monthly: 149900, price_yearly: 1439000, tier: 'enterprise' },
+  // BYO Providers — platform-access fee only; the customer's own keys pay
+  // for the actual generation, so this plan carries no usage allowance.
+  byok: { name: 'BYO Providers', price_monthly: 4900, price_yearly: 47000, tier: 'byok' },
 };
 
 async function stripeRequest(endpoint: string, body: Record<string, unknown> | URLSearchParams) {
@@ -82,6 +93,14 @@ Deno.serve(async (req) => {
 
       await base44.entities.Subscription.update(sub.id, {
         status: 'active',
+        // Reset the allowance window at the moment payment clears, not at
+        // the moment the pending record was created — a customer who sat on
+        // the Stripe page for a day still gets a full first month.
+        usage_period_start: new Date().toISOString(),
+        ai_credits_used: 0,
+        render_minutes_used: 0,
+        overage_ai_credits: 0,
+        overage_render_minutes: 0,
         stripe_customer_id: session.customer || sub.stripe_customer_id || '',
         stripe_subscription_id: session.subscription || sub.stripe_subscription_id || '',
       });
@@ -102,6 +121,13 @@ Deno.serve(async (req) => {
         plan_tier: selectedPlan.tier,
         status: 'active',
         current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        // Start the metering window now so the plan's monthly allowance is
+        // fresh from the moment it goes active.
+        usage_period_start: new Date().toISOString(),
+        ai_credits_used: 0,
+        render_minutes_used: 0,
+        overage_ai_credits: 0,
+        overage_render_minutes: 0,
       });
       return Response.json({ success: true, subscription_id: sub.id, message: `Subscribed to ${selectedPlan.name}`, demo: true });
     }
@@ -146,6 +172,11 @@ Deno.serve(async (req) => {
       stripe_subscription_id: session.subscription || '',
       status: 'pending',
       current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      usage_period_start: new Date().toISOString(),
+      ai_credits_used: 0,
+      render_minutes_used: 0,
+      overage_ai_credits: 0,
+      overage_render_minutes: 0,
     });
 
     return Response.json({ success: true, checkout_url: session.url, session_id: session.id });

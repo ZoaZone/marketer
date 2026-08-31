@@ -611,7 +611,7 @@ HASHTAGS:
             <p className="text-xs text-muted-foreground">
               {user?.settings?.api_keys?.sendgrid_key
                 ? "Emails send from your own SendGrid account — billed directly by SendGrid, no platform fee."
-                : "Emails send via digitalstudios.app's built-in delivery (Base44 → Resend → SendGrid). Included in your plan's monthly quota; overage is billed at provider cost + 30% platform fee."}
+                : "Emails send via digitalstudios.app's built-in delivery (Base44 → Resend → SendGrid). Included in your plan's monthly quota; overage is billed per message at the rate shown on the Billing page."}
               {" "}<Link to="/settings" className="text-fuchsia-400 hover:underline">Manage in Settings</Link> · <Link to="/billing" className="text-fuchsia-400 hover:underline">View pricing</Link>
             </p>
           </div>

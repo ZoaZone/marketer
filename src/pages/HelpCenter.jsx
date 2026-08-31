@@ -125,7 +125,7 @@ const FAQS = [
       { q: "What plans are available?", a: "Starter ($49/mo), Growth ($149/mo) and Agency ($399/mo) — see Pricing for the full feature comparison. All plans include a monthly AI generation and bulk-messaging allowance." },
       { q: "Can I upgrade or downgrade my plan?", a: "Yes — go to Billing and select a new plan. Upgrades take effect immediately; downgrades apply at the end of your billing cycle." },
       { q: "Do you offer annual billing discounts?", a: "Yes — annual billing saves about 20% versus monthly. Switch to annual on the Pricing or Billing page." },
-      { q: "Do you charge extra for sending Email, SMS or WhatsApp campaigns?", a: "Sending is included up to your plan's monthly message quota. Beyond that, it's billed at provider cost plus a 30% platform usage fee — or bring your own SendGrid/Twilio/WhatsApp Business credentials for $0 platform fee. See Billing for current per-message rates." },
+      { q: "Do you charge extra for sending Email, SMS or WhatsApp campaigns?", a: "Sending is included up to your plan's monthly message quota. Beyond that it's billed per message at the rates shown on the Billing page — or bring your own SendGrid/Twilio/WhatsApp Business credentials and send at $0 platform fee." },
     ],
   },
   {

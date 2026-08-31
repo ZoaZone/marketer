@@ -39,6 +39,13 @@ export default [
     },
     rules: {
       "no-unused-vars": "off",
+      // A reference to a name that is neither imported nor declared is a
+      // ReferenceError the moment the component renders — it blanks the
+      // page — but nothing else catches it: Vite happily bundles the bare
+      // identifier and the build stays green. This config had no-undef off,
+      // so deleting a `const` while leaving its usage behind shipped
+      // silently. Caught exactly that on /pricing.
+      "no-undef": "error",
       "react/jsx-uses-vars": "error",
       "react/jsx-uses-react": "error",
       "unused-imports/no-unused-imports": "error",

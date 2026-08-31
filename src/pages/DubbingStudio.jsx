@@ -167,7 +167,7 @@ export default function DubbingStudio() {
       if (!res?.estimate_available) {
         // Say why there's no number rather than showing nothing and letting the
         // operator assume the run is free.
-        setError("Submitted. Cost estimates are unavailable — DUBBING_RATE_USD_PER_MINUTE is not configured on the app.");
+        setError("Submitted. A cost estimate isn't available for this project yet.");
       }
       qc.invalidateQueries({ queryKey: ["dubbing_projects"] });
     } catch (e) {

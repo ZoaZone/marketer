@@ -52,6 +52,36 @@
       "default": 0,
       "description": "Pay-as-you-go AI generation credits. 1 credit = 1 AI image/video generation, consumed after the free-trial allowance is used up."
     },
+    "usage_period_start": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Start of the current monthly metering window. The submit functions roll this forward and zero the two counters below whenever it is more than 31 days old, so an allowance is a real monthly pool rather than a lifetime one."
+    },
+    "ai_credits_used": {
+      "type": "number",
+      "default": 0,
+      "description": "AI credits consumed in the current metering window. Compared against the plan's allowance.ai_credits (src/config/plans.js)."
+    },
+    "render_minutes_used": {
+      "type": "number",
+      "default": 0,
+      "description": "Render Minutes consumed in the current metering window. Compared against the plan's allowance.render_minutes. BYOK jobs never increment this — the customer's own provider key pays for those."
+    },
+    "overage_ai_credits": {
+      "type": "number",
+      "default": 0,
+      "description": "AI credits consumed beyond the allowance in the current window, billed at the published overage rate."
+    },
+    "overage_render_minutes": {
+      "type": "number",
+      "default": 0,
+      "description": "Render Minutes consumed beyond the allowance in the current window, billed at the published overage rate."
+    },
+    "overage_enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "When false, jobs are rejected at submit once the allowance is exhausted instead of billing overage. Enterprise contracts that cap spend set this false."
+    },
     "description": {
       "type": "string",
       "maxLength": 1000

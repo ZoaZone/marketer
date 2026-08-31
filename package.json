@@ -9,7 +9,10 @@
     "lint": "eslint . --quiet",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p ./jsconfig.json",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "check:plans": "node scripts/check-plans.mjs",
+    "test:metering": "node scripts/test-metering.mjs",
+    "verify": "npm run lint && npm run check:plans && npm run test:metering && npm run build"
   },
   "dependencies": {
     "@base44/sdk": "^0.8.44",
