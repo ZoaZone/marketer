@@ -1,5 +1,7 @@
 import { useEffect } from "react";
 import { BRAND } from "@/lib/brand";
+import { ALL_PLANS, FREE_TRIAL_GENERATIONS } from "@/config/plans";
+import { PRICING_FAQ } from "@/config/faq";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SEO for a client-rendered SPA.
@@ -96,13 +98,13 @@ export const SEO = {
     path: "/",
     title: null, // home uses the brand-first title form
     description:
-      "Create feature-length AI movies with scenes, music, subtitles and dubbing. Generate images and songs, dub any video into any language, and run your marketing — one AI studio. Start free.",
+      "One AI studio for creators, agencies, film studios and dubbing houses: ad creatives, campaigns, films built scene by scene, and dubbing into 22 languages.",
   },
   pricing: {
     path: "/pricing",
     title: "Pricing",
     description:
-      "Plans for creators, studios and agencies. AI video, music, image generation, dubbing and marketing tools from $19/mo. Annual billing saves 20%. Start free — no credit card.",
+      "Plans for creators, agencies, studios and dubbing houses. AI content from $19/mo; per-scene video and 22-language dubbing from $99/mo. Yearly saves 20%.",
   },
   auth: {
     path: "/auth",
@@ -124,7 +126,7 @@ export const SEO = {
     path: "/free-trial",
     title: "Start your free trial",
     description:
-      "Try the full AI creative studio free for 14 days — AI video, song creation, image generation and dubbing. No credit card required to start.",
+      `Try ${BRAND.name} free — ${FREE_TRIAL_GENERATIONS} AI generations covering images and voiceover, enough to take a short narrated video end to end. No credit card required.`,
   },
   beta: {
     path: "/beta",
@@ -151,11 +153,26 @@ export const SEO = {
   },
 };
 
-/** JSON-LD for the home page. Injected once; safe to call repeatedly. */
+/**
+ * JSON-LD. Injected once; safe to call repeatedly.
+ *
+ * The price range and plan count are derived from the canonical catalog.
+ * They were hardcoded as highPrice "499" / offerCount "8", which stopped
+ * being true the moment Enterprise ($1,499) became a real plan — and Google
+ * surfaces price ranges in rich results, so a stale number here is wrong
+ * data shown to searchers, not just an internal tidiness problem.
+ *
+ * The FAQ block reuses the exact text rendered by PricingFAQ (both read
+ * src/config/faq.js). Google requires FAQPage markup to match visible page
+ * content; emitting answers the page does not show risks a manual action.
+ */
 export function injectStructuredData() {
   const id = "ds-structured-data";
   if (document.getElementById(id)) return;
-  const data = {
+
+  const prices = ALL_PLANS.map((p) => p.price_monthly).filter((n) => n > 0);
+
+  const app = {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
     name: BRAND.name,
@@ -167,21 +184,51 @@ export function injectStructuredData() {
     offers: {
       "@type": "AggregateOffer",
       priceCurrency: "USD",
-      lowPrice: "19",
-      highPrice: "499",
-      offerCount: "8",
+      lowPrice: String(Math.min(...prices)),
+      highPrice: String(Math.max(...prices)),
+      offerCount: String(ALL_PLANS.length),
+      url: `${SITE_URL}/pricing`,
+    },
+    publisher: {
+      "@type": "Organization",
+      name: "ZoaZone Services LLC",
+      url: SITE_URL,
+      logo: `${SITE_URL}/brand/lockup-h.png`,
+      email: "care@digitalstudios.app",
+      address: {
+        "@type": "PostalAddress",
+        streetAddress: "1770 Grand Concourse 12A",
+        addressLocality: "Bronx",
+        addressRegion: "NY",
+        postalCode: "10457",
+        addressCountry: "US",
+      },
     },
     featureList: [
-      "AI movie maker with scenes, music and subtitles",
+      "AI movie maker — build a film scene by scene with generated footage",
+      "Commercial dubbing into 22 languages, preserving voice, tone and background score",
+      "Lip-sync for dubbed footage",
       "AI song and music generation",
-      "Video dubbing into any language with voice preservation",
       "AI image generation with reference character and style",
-      "Social scheduling, funnels and bulk messaging",
+      "Ad creatives, social scheduling, funnels and bulk messaging",
+      "Multi-brand agency workspaces and white-label client portals",
+      "Bring your own Replicate, ElevenLabs or LLM provider keys",
     ],
   };
+
+  const faq = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: PRICING_FAQ.map((item) => ({
+      "@type": "Question",
+      name: item.q,
+      acceptedAnswer: { "@type": "Answer", text: item.a },
+    })),
+  };
+
   const s = document.createElement("script");
   s.type = "application/ld+json";
   s.id = id;
-  s.textContent = JSON.stringify(data);
+  s.textContent = JSON.stringify([app, faq]);
   document.head.appendChild(s);
 }
