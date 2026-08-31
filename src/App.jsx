@@ -52,7 +52,6 @@ import DubbingStudio from './pages/DubbingStudio';
 import OAuthConsent from './pages/OAuthConsent';
 import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
-import GoogleCallback from './pages/GoogleCallback';
 
 
 const AuthenticatedApp = () => {
@@ -163,10 +162,7 @@ function App() {
     <QueryClientProvider client={queryClientInstance}>
       <AuthProvider>
         <Router>
-          <Routes>
-            <Route path="/auth/google/callback" element={<GoogleCallback />} />
-            <Route path="*" element={<AuthenticatedApp />} />
-          </Routes>
+          AuthenticatedApp
         </Router>
         <Toaster />
       </AuthProvider>
