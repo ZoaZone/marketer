@@ -125,7 +125,7 @@ const ALLOWANCE: Record<string, { ac: number; rm: number }> = {
   creator: { ac: 150, rm: 0 },
   starter: { ac: 400, rm: 0 },
   growth: { ac: 1250, rm: 0 },
-  agency: { ac: 3500, rm: 0 },
+  agency: { ac: 3500, rm: 25 },
   indie: { ac: 250, rm: 60 },
   studio: { ac: 1000, rm: 250 },
   dubbing_house: { ac: 1000, rm: 400 },

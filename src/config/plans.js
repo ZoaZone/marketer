@@ -126,10 +126,16 @@ const LANE1 = [
     price_monthly: 399,
     price_yearly: 3830,
     tagline: "For agencies delivering for many clients.",
-    allowance: { ai_credits: 3500, render_minutes: 0 },
+    // 25 Render Minutes because the backend already entitles `agency` to
+    // AI music and per-scene video (generateMusic / submitVideo /
+    // submitMusic). With a zero pool an Agency customer's very first music
+    // track billed as instant overage — entitled to a feature the plan
+    // gave them no allowance for.
+    allowance: { ai_credits: 3500, render_minutes: 25 },
     limits: { brands: 10, seats: 15, bulk_messages: 50000 },
     features: [
       "3,500 AI credits/month",
+      "25 Render Minutes/month (AI music + per-scene video)",
       "10 brands / unlimited clients · 15 seats",
       "50,000 bulk messages/month",
       "White-label client portals",
