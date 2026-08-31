@@ -149,6 +149,15 @@ async function meterUsage(
   const weight = WEIGHTS[kind];
   if (!weight || !(units > 0)) return null;
 
+  // Admins are never blocked. Every assertEntitled gate in this codebase
+  // already exempts them, so without the same exemption here the owner's
+  // own account — which has no Subscription record — would start getting
+  // 403s from its own app the moment metering shipped, including from the
+  // internal demo-video and dubbing tooling. Admin usage is deliberately
+  // not charged to anyone's allowance; treat it as house spend and watch it
+  // through the provider dashboards.
+  if (user?.role === 'admin') return null;
+
   let sub: any = null;
   try {
     const subs = await base44.asServiceRole.entities.Subscription.filter(
