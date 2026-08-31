@@ -1,0 +1,88 @@
+{
+  "name": "UsageEvent",
+  "type": "object",
+  "description": "One metered job. USER-VISIBLE: this is what a customer sees on their usage page, so it carries only the units they are billed in (AI credits, Render Minutes) \u2014 never the provider cost or the platform margin behind them. Those live in UsageCost, which is admin-only. See base44/PRICING_INTERNAL.md.",
+  "properties": {
+    "owner_email": {
+      "type": "string"
+    },
+    "kind": {
+      "type": "string",
+      "description": "Which metered operation was run.",
+      "enum": [
+        "ai_generation",
+        "voiceover",
+        "ai_video_scene",
+        "music_track",
+        "dubbing_minute",
+        "lipsync_minute"
+      ]
+    },
+    "units": {
+      "type": "number",
+      "description": "Raw quantity of the operation \u2014 scenes, minutes of source media, characters/1000, or generations."
+    },
+    "ai_credits_charged": {
+      "type": "number",
+      "default": 0
+    },
+    "render_minutes_charged": {
+      "type": "number",
+      "default": 0
+    },
+    "billed_as": {
+      "type": "string",
+      "description": "allowance = drawn from the plan's monthly pool; overage = billed on top; byok = ran on the customer's own provider key and cost them nothing here; trial = free-trial allowance.",
+      "enum": [
+        "allowance",
+        "overage",
+        "byok",
+        "trial"
+      ],
+      "default": "allowance"
+    },
+    "job_id": {
+      "type": "string"
+    },
+    "provider": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000
+    }
+  },
+  "required": [
+    "owner_email",
+    "kind"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "data.owner_email": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
