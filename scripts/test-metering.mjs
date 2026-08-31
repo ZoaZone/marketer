@@ -173,6 +173,14 @@ await t("the customer-facing event never carries cost or margin fields", async (
   assert.ok(!/cost|margin|usd/i.test(keys), `leaked: ${keys}`);
 });
 
+await t("an admin is never blocked, even with no subscription at all", async () => {
+  // Every assertEntitled gate exempts admins; metering must too, or the
+  // owner's own account gets 403s from its own app.
+  const f = fake(null);
+  const r = await meterUsage(f.client, { email: "admin@x.com", role: "admin" }, "dubbing_minute", 500, {});
+  assert.equal(r, null, "admin must not be refused");
+});
+
 await t("a zero/negative unit count is a no-op, not a free pass or a crash", async () => {
   const f = fake();
   assert.equal(await meterUsage(f.client, USER, "dubbing_minute", 0, {}), null);
