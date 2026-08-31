@@ -19,7 +19,7 @@
     },
     "proposed_share_pct": {
       "type": "number",
-      "description": "Tier-1: admin-set pool % of sale. Tier-2: % share of the parent's pool (must be ≤ 100 — server-enforced ceiling)."
+      "description": "Tier-1: admin-set pool % of sale. Tier-2: % share of the parent's pool (must be \u2264 100 \u2014 server-enforced ceiling)."
     },
     "parent_affiliate_id": {
       "type": "string",
@@ -41,6 +41,10 @@
     "expires_at": {
       "type": "string",
       "format": "date-time"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000
     }
   },
   "required": [

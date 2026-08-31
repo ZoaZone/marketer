@@ -7,11 +7,11 @@
     },
     "cookie_id": {
       "type": "string",
-      "description": "Persistent anonymous id generated client-side on first touch (stored in localStorage — this is a browser SPA, not a server-rendered site)."
+      "description": "Persistent anonymous id generated client-side on first touch (stored in localStorage \u2014 this is a browser SPA, not a server-rendered site)."
     },
     "referred_user_id": {
       "type": "string",
-      "description": "Purchasing user's email — set at conversion time, empty until then."
+      "description": "Purchasing user's email \u2014 set at conversion time, empty until then."
     },
     "landing_code": {
       "type": "string",
@@ -28,6 +28,10 @@
     "attribution_window_days": {
       "type": "number",
       "default": 30
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000
     }
   },
   "required": [
