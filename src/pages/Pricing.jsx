@@ -6,6 +6,8 @@ import PayPalButton from "@/components/PayPalButton";
 import { Check, ArrowRight, ArrowLeft, Loader2, Star, Sparkles, Gift, Mail, Phone, MessageSquare, Film, Clapperboard, KeyRound, Briefcase } from "lucide-react";
 import { BRAND } from "@/lib/brand";
 import { useSeo, SEO } from "@/lib/seo";
+import PlanAdvisor from "@/components/PlanAdvisor";
+import PricingFAQ from "@/components/PricingFAQ";
 
 import {
   LANE1_PLANS as CATALOG_LANE1,
@@ -217,6 +219,13 @@ export default function Pricing() {
           </Link>
         </div>
 
+        {/* Help me choose. Sits above the tables on purpose: a visitor who
+            already knows what they want scrolls past it, and one who does
+            not would otherwise have to reverse-engineer nine plans. */}
+        <div className="mb-14">
+          <PlanAdvisor onChoose={handleCheckout} />
+        </div>
+
         {/* Lane 1 — Business */}
         <div className="mb-4 flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-fuchsia-500 to-purple-600 flex items-center justify-center shrink-0">
@@ -268,6 +277,8 @@ export default function Pricing() {
         <div className="max-w-sm mb-14">
           <PlanCard plan={BYOK_CARD} />
         </div>
+
+        <PricingFAQ />
 
         {/* Email, SMS & WhatsApp sending */}
         <div className="bg-white/3 border border-white/8 rounded-3xl p-7 mb-8">

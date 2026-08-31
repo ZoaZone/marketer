@@ -7,6 +7,7 @@ import {
   Film, Music, Sliders, PenTool, Briefcase, Clapperboard } from
 "lucide-react";
 import { BRAND } from "@/lib/brand";
+import WhoItsFor from "@/components/WhoItsFor";
 import { LANE1_PLANS as CATALOG_LANE1, LANE2_PLANS as CATALOG_LANE2, BYOK_PLAN as CATALOG_BYOK } from "@/config/plans";
 import { useSeo, SEO, injectStructuredData } from "@/lib/seo";
 
@@ -385,6 +386,11 @@ export default function Home() {
       </section>
 
       {/* PRICING */}
+      {/* Who it's for — sits between the feature list and the price table
+          so a visitor learns which sector they belong to before being asked
+          to pick a tier. */}
+      <WhoItsFor />
+
       <section id="pricing" className="py-32 px-6">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-20">

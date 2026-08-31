@@ -3,7 +3,15 @@ import { useOutletContext } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { ShieldCheck, Users, Megaphone, BarChart3, DollarSign, Loader2, Search, Gift, Send, CheckCircle2, X, Plus, Link, Copy, UserCheck, Clock, UserX, UserPlus, Handshake, Mail, Ban, RotateCcw, Wallet, AlertCircle } from "lucide-react";
-import { PLAN_PRICES, PLAN_NAMES } from "@/lib/planPrices";
+// MRR is computed from the canonical catalog. This used to read a separate
+// src/lib/planPrices.js — a fourth hand-maintained copy of the price map,
+// kept in sync "by comment discipline", which had already drifted (it still
+// called the add-on "BYOK" after the catalog renamed it "BYO Providers").
+// A stale copy here silently misreports revenue, so the file was deleted.
+import { ALL_PLANS } from "@/config/plans";
+
+const PLAN_PRICES = Object.fromEntries(ALL_PLANS.map(p => [p.key, p.price_monthly]));
+const PLAN_NAMES = Object.fromEntries(ALL_PLANS.map(p => [p.key, p.name]));
 
 function invokeFn(name, body) {
   return base44.functions.invoke(name, body).then(r => r?.data ?? r);
