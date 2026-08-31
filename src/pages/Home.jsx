@@ -7,6 +7,7 @@ import {
   Film, Music, Sliders, PenTool, Briefcase, Clapperboard } from
 "lucide-react";
 import { BRAND } from "@/lib/brand";
+import { LANE1_PLANS as CATALOG_LANE1, LANE2_PLANS as CATALOG_LANE2, BYOK_PLAN as CATALOG_BYOK } from "@/config/plans";
 import { useSeo, SEO, injectStructuredData } from "@/lib/seo";
 
 
@@ -33,25 +34,37 @@ const FEATURES = [
 { Icon: Zap, title: "Automation Engine", desc: "Trigger sequences from form fills or stage changes. Fully automated.", colSpan: "md:col-span-1", color: "from-yellow-500 to-amber-600" }];
 
 
-// Two lanes, priced for what they actually cost — full breakdown on
-// /pricing. Kept intentionally light here (starting price + a few
-// highlights) rather than duplicating every tier, so this teaser can't
-// drift out of sync with the real price list on /pricing.
-// Kept in sync with /studio's own lane chooser (Studio.jsx's LANES array) —
-// same audience labels and names, so a visitor sees one consistent story
-// from the marketing site through to the app itself.
+// Two lanes, with every tier named. This used to show only a "from $19" /
+// "from $99" teaser, on the theory that not duplicating the tier list kept
+// it from drifting — but the effect was that a visitor to the front page
+// could not see that Studio, Dubbing House, Enterprise or BYO Providers
+// existed at all, and the lane names here ("Quick Create", "Movie Maker
+// Pro") had drifted from /pricing's anyway. The tier rows below are now
+// derived from the canonical catalog, so they cannot go stale, and the full
+// feature comparison still lives on /pricing.
+const LANE_TIERS = (plans) => plans.map(p => ({
+  name: p.name,
+  price: p.price_monthly,
+  note: [
+    p.allowance.render_minutes > 0 ? `${p.allowance.render_minutes.toLocaleString()} RM` : null,
+    p.allowance.ai_credits > 0 ? `${p.allowance.ai_credits.toLocaleString()} credits` : null,
+  ].filter(Boolean).join(" · "),
+}));
+
 const LANES = [
   {
-    key: "business", name: "Quick Create", audience: "For Business / Marketing", icon: Briefcase,
-    desc: "For businesses, influencers, and marketers — ad creatives, campaigns, and quick AI video on pooled platform credits, no per-minute AI billing.",
+    key: "business", name: "Business", audience: "For Business / Marketing", icon: Briefcase,
+    desc: "For businesses, influencers, and marketers — ad creatives, campaigns, and quick AI video, metered in simple AI credits.",
     fromPrice: 19, color: "from-fuchsia-500 to-purple-600",
-    features: ["Pooled AI credits — images, short video, voiceover", "Ad Creator, Social Scheduling, Bulk Messaging", "Funnel Builder, Lead Capture & Analytics"],
+    tiers: LANE_TIERS(CATALOG_LANE1),
+    features: ["AI credits — images, short video, voiceover", "Ad Creator, Social Scheduling, Bulk Messaging", "Funnel Builder, Lead Capture & Analytics"],
   },
   {
-    key: "movie-maker-pro", name: "Movie Maker Pro", audience: "For Film & Studios", icon: Clapperboard,
-    desc: "For film studios, artists, and dubbing houses — feature-length AI films with per-scene AI video, music, dubbing, and lip-sync on weighted render-credits.",
+    key: "movie-maker-pro", name: "Studio & Dubbing", audience: "For Film & Studios", icon: Clapperboard,
+    desc: "For film studios, artists, and dubbing houses — feature-length AI films with per-scene AI video, music, dubbing, and lip-sync, metered in Render Minutes.",
     fromPrice: 99, color: "from-cyan-500 to-blue-600",
-    features: ["Per-scene AI video (Kling / MiniMax)", "AI music, dubbing & lip-sync", "Finite render-credit pool, transparent overage"],
+    tiers: [...LANE_TIERS(CATALOG_LANE2), { name: CATALOG_BYOK.name, price: CATALOG_BYOK.price_monthly, note: "your own keys" }],
+    features: ["Per-scene AI video (Kling / MiniMax)", "AI music, dubbing & lip-sync", "Finite Render Minute pool, published overage"],
   },
 ];
 
@@ -403,10 +416,22 @@ export default function Home() {
                 </div>
                 <h3 className="text-xl font-black text-white mb-1.5">{lane.name}</h3>
                 <p className="text-neutral-400 text-xs mb-5">{lane.desc}</p>
-                <div className="flex items-baseline gap-1 mb-6">
+                <div className="flex items-baseline gap-1 mb-4">
                   <span className="text-neutral-500 text-xs">From</span>
                   <span className="text-4xl font-black text-white">${lane.fromPrice}</span>
                   <span className="text-neutral-500 font-medium text-sm">/mo + tax</span>
+                </div>
+                {/* Every tier by name — a visitor should not have to click
+                    through to /pricing to learn that Studio, Dubbing House,
+                    Enterprise or BYO Providers exist. */}
+                <div className="mb-6 rounded-2xl border border-white/10 bg-black/20 divide-y divide-white/5">
+                  {lane.tiers.map((t) =>
+                    <div key={t.name} className="flex items-baseline justify-between gap-3 px-3.5 py-2">
+                      <span className="text-xs font-bold text-white">{t.name}</span>
+                      <span className="text-[10px] text-neutral-500 flex-1 truncate text-right">{t.note}</span>
+                      <span className="text-xs font-black text-white whitespace-nowrap">${t.price.toLocaleString()}</span>
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-3 mb-8 flex-1">
                   {lane.features.map((f) =>
