@@ -104,7 +104,7 @@ const NAV_SECTIONS = [
   },
 ];
 
-export default function Sidebar({ userTier = 0, isAdmin = false, user = null }) {
+export default function Sidebar({ userTier = 0, isAdmin = false, user = null, subscription = null }) {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   // Marketing tools are de-emphasized: collapsed by default (everything
@@ -112,6 +112,13 @@ export default function Sidebar({ userTier = 0, isAdmin = false, user = null }) 
   const [collapsed, setCollapsed] = useState({ "MARKETING (optional)": true });
 
   const toggle = (label) => setCollapsed(p => ({ ...p, [label]: !p[label] }));
+
+  // Plan name for the account badge. PLAN_BY_KEY is the same catalog the
+  // pricing and billing surfaces read, so the label can never drift from what
+  // the customer was actually sold.
+  const planLabel =
+    (subscription?.plan_tier && PLAN_BY_KEY[subscription.plan_tier]?.name) ||
+    (subscription?.plan_tier ? String(subscription.plan_tier) : "Free");
   const logout = () => {
     localStorage.removeItem("base44_access_token");
     localStorage.removeItem("base44_refresh_token");
@@ -239,6 +246,16 @@ export default function Sidebar({ userTier = 0, isAdmin = false, user = null }) 
             <div className="flex-1 min-w-0">
               {user.full_name && <p className="text-xs font-semibold text-foreground truncate">{user.full_name}</p>}
               <p className="text-[10px] text-muted-foreground truncate">{user.email || "—"}</p>
+              {/* Which plan the session is actually on. The subscription was
+                  already loaded in AppLayout for tier gating; surfacing its
+                  name here means the sidebar's locked items have a visible
+                  reason. Falls back to Free when there is no subscription. */}
+              <span
+                title={planLabel}
+                className="mt-1 inline-block max-w-full truncate rounded bg-fuchsia-400/15 px-1.5 py-0.5 text-[10px] font-medium text-fuchsia-300 border border-fuchsia-400/40"
+              >
+                {isAdmin ? "Admin" : planLabel}
+              </span>
             </div>
           </div>
         )}
