@@ -35,7 +35,7 @@ export default function AppLayout() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      <Sidebar userTier={userTier} isAdmin={isAdmin} user={user} />
+      <Sidebar userTier={userTier} isAdmin={isAdmin} user={user} subscription={subscription} />
       <main className="flex-1 overflow-y-auto lg:ml-64">
         <div className="p-4 md:p-6 min-h-full">
           <Outlet context={{ user, userTier, isAdmin, subscription }} />
