@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { PLAN_BY_KEY } from "@/config/plans";
 import {
   LayoutDashboard, Users, Megaphone, Share2, Sparkles, PenTool,
   Search, GitBranch, UserPlus, MailCheck, Image, Globe,
