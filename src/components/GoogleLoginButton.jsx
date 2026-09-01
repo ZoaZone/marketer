@@ -61,11 +61,20 @@ export default function GoogleLoginButton({
           const url = appId
             ? `https://base44.app/api/auth/google?app_id=${appId}`
             : "https://base44.app/api/auth/google";
+          // Normalized handshake: the GIS credential is a Google ID token, so
+          // it must be forwarded as a bearer token (not a malformed or empty
+          // header) for the backend to validate it against Google's
+          // audience/client-id — a broken Authorization header here is
+          // exactly what produces "Could not validate credentials". The
+          // credential is also included in the JSON body so the platform can
+          // read it from either place.
           const res = await fetch(url, {
-            method: "GET",
+            method: "POST",
             headers: {
-              "Authorization": `Bearer ${credential}`,
+              "Content-Type": "application/json",
+              "Authorization": "Bearer " + credential,
             },
+            body: JSON.stringify({ credential, id_token: credential }),
           });
           if (!res.ok) {
             const err = await res.json().catch(() => ({}));
