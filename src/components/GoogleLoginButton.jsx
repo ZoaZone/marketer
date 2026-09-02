@@ -3,6 +3,16 @@ import { appParams } from "@/lib/app-params";
 
 const GOOGLE_CLIENT_ID = "342662050420-hjsrds4v122ggc6np9hlcgp0n2dt5rqd.apps.googleusercontent.com";
 
+// TEMPORARILY DISABLED — flip to true to restore.
+// base44.app/api/auth/google is not a Google ID-token exchange endpoint
+// (probed 2026-09-02: GET -> 401 "No authentication header", POST -> 405).
+// This app's variant POSTs, which is why digitalstudios.app surfaced
+// "Method Not Allowed". Email/password sign-in is unaffected.
+// Restore by flipping this flag once Base44 confirms a supported exchange, or
+// switch call sites to base44.auth.loginWithProvider("google") — which works
+// today but shows "to continue to base44.com".
+const GOOGLE_LOGIN_ENABLED = false;
+
 export default function GoogleLoginButton({
   onSuccess,
   onError,
@@ -11,6 +21,7 @@ export default function GoogleLoginButton({
   base44,
 }) {
   const btnRef = useRef(null);
+  const enabled = GOOGLE_LOGIN_ENABLED;
 
   useEffect(() => {
     if (!window.google?.accounts) {
@@ -101,6 +112,8 @@ export default function GoogleLoginButton({
       window.google?.accounts?.id?.cancel?.();
     };
   }, []);
+
+  if (!enabled) return null;
 
   return (
     <div className="w-full">
