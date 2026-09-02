@@ -24,6 +24,8 @@ export default function GoogleLoginButton({
   const enabled = GOOGLE_LOGIN_ENABLED;
 
   useEffect(() => {
+    // Skip loading the GIS script entirely while disabled.
+    if (!enabled) return;
     if (!window.google?.accounts) {
       const script = document.createElement("script");
       script.src = "https://accounts.google.com/gsi/client";
