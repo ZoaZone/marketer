@@ -350,11 +350,10 @@ export default function Auth() {
                 {loading ? "Signing in..." : "Sign In"}
               </button>
 
-              <div className="flex items-center gap-3 py-1">
-                <div className="h-px flex-1 bg-slate-700" />
-                <span className="text-[10px] uppercase tracking-wider text-slate-500">or</span>
-                <div className="h-px flex-1 bg-slate-700" />
-              </div>
+              {/* The "or" divider is removed along with the button. While
+                  GoogleLoginButton renders null (see GOOGLE_LOGIN_ENABLED in
+                  that component) a standalone divider strands an "or" under the
+                  Sign In button with nothing after it. Restore both together. */}
               <GoogleLoginButton base44={base44} onSuccess={handleGoogleSuccess} onError={handleGoogleError} theme="filled_black" text="signin_with" />
 
               <button type="button" onClick={() => resetFlow("reset")}
