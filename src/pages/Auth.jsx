@@ -384,11 +384,7 @@ export default function Auth() {
               </button>
               {mode === "signup" && (
                 <>
-                  <div className="flex items-center gap-3 py-1">
-                    <div className="h-px flex-1 bg-slate-700" />
-                    <span className="text-[10px] uppercase tracking-wider text-slate-500">or</span>
-                    <div className="h-px flex-1 bg-slate-700" />
-                  </div>
+                  {/* Divider removed with the button — see the sign-in branch above. */}
                   <GoogleLoginButton base44={base44} onSuccess={handleGoogleSuccess} onError={handleGoogleError} theme="filled_black" text="signin_with" />
                 </>
               )}
