@@ -54,7 +54,11 @@ Deno.serve(async (req) => {
 
     const job = await workerRes.json().catch(() => ({}));
     return Response.json(
-      { status: job.status, progress: job.progress, url: job.url, error: job.error },
+      // vocals: true means this is a real Suno song with vocals; false (or
+      // absent, for an older/in-flight job) means the MusicGen instrumental
+      // fallback ran instead — the frontend uses this to tell the user
+      // honestly which one they actually got.
+      { status: job.status, progress: job.progress, url: job.url, vocals: job.vocals, error: job.error },
       { headers: CORS }
     );
   } catch (error) {

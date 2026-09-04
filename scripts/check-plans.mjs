@@ -218,7 +218,7 @@ console.log("\nmargin confidentiality");
       ];
       // Env-var names for the confidential rate table must not ship either —
       // they name the cost model to anyone reading the bundle.
-      const rateIdents = /DUBBING_RATE_USD|LIPSYNC_RATE_USD|VIDEO_RATE_USD|AI_GENERATION_COST_USD|TTS_RATE_USD|MUSIC_RATE_USD/;
+      const rateIdents = /DUBBING_RATE_USD|LIPSYNC_RATE_USD|VIDEO_RATE_USD|AI_GENERATION_COST_USD|TTS_RATE_USD|MUSIC_RATE_USD|MUSIC_VOCAL_RATE_USD/;
       if (prose.some((re) => re.test(src))) leaks.push(`${p} (prose discloses the markup)`);
       else if (rateIdents.test(src)) leaks.push(`${p} (names a confidential rate env var)`);
     }

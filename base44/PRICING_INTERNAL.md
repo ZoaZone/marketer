@@ -42,6 +42,7 @@ they can be corrected without a code change.
 | ElevenLabs dubbing, no watermark | **$0.50 / min** | `DUBBING_RATE_USD_PER_MINUTE` | VERIFIED — elevenlabs.io/pricing/api, 2026-08-31. (Watermarked is $0.33/min; we ship unwatermarked for commercial use.) |
 | ElevenLabs TTS `eleven_turbo_v2_5` | **$0.05 / 1K chars** | `TTS_RATE_USD_PER_1K_CHARS` | VERIFIED — elevenlabs.io/pricing/api, 2026-08-31 |
 | Replicate `meta/musicgen` | **$0.10 / run** | `MUSIC_RATE_USD_PER_RUN` | VERIFIED — replicate.com/meta/musicgen, 2026-08-31 |
+| Suno vocal song generation | **$0.30 / run** | `MUSIC_VOCAL_RATE_USD_PER_RUN` | UNVERIFIED — no confirmed platform-owned Suno API contract at time of writing (Suno has no official public API; this assumes a third-party reseller charging per-generation). Set conservative (high) so the margin cannot go negative. **Confirm from your chosen Suno API provider's billing dashboard once `SUNO_API_KEY` is provisioned.** |
 | `sync/lipsync-2` | **$3.00 / min** | `LIPSYNC_RATE_USD_PER_MINUTE` | ESTIMATE — sync.so list price is $2.40–3.00/min; Replicate's resale price is not published and could not be read unauthenticated. Set to the top of the range. **Confirm from the Replicate billing dashboard.** |
 | Replicate `kwaivgi/kling-v1.6-standard`, 5s clip | **$0.35 / scene** | `VIDEO_RATE_USD_PER_SCENE` | ESTIMATE — Replicate's own comparison blog quoted $0.25–0.90 in Jul-2025; the live model page renders price client-side and is unreadable unauthenticated. **Confirm from the Replicate billing dashboard.** |
 | Base44 pooled credit (1 image / short scene) | **$0.04** | `AI_GENERATION_COST_USD` | UNVERIFIED — inherited codebase assumption. Base44 does not publish a per-credit unit cost; its plans bundle message + integration credits into one fee. **Confirm from your own Base44 billing.** |
@@ -74,7 +75,8 @@ Weights are `raw_cost / 0.50`, rounded up to absorb price uncertainty:
 | Dubbing, per minute | 1.00 | **1 RM** |
 | Lip-sync, per minute | 6.00 | **6 RM** |
 | AI video scene (5s) | 0.70 | **1 RM** (rounded up — absorbs the Kling uncertainty) |
-| Music track | 0.20 | **0.25 RM** |
+| Music track (instrumental) | 0.20 | **0.25 RM** |
+| Music track (vocal song, Suno) | 0.60 | **1 RM** (rounded up — absorbs the unverified Suno rate) |
 
 ---
 

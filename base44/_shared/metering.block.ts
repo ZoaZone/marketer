@@ -29,6 +29,10 @@ const RAW = {
   voiceover: num(Deno.env.get('TTS_RATE_USD_PER_1K_CHARS'), 0.05) * 1.5,
   ai_video_scene: num(Deno.env.get('VIDEO_RATE_USD_PER_SCENE'), 0.35),
   music_track: num(Deno.env.get('MUSIC_RATE_USD_PER_RUN'), 0.10),
+  // Real vocal song generation (Suno) — no confirmed platform-owned API
+  // contract at time of writing, so this is a conservative estimate, not a
+  // verified price. See base44/PRICING_INTERNAL.md.
+  music_vocal_track: num(Deno.env.get('MUSIC_VOCAL_RATE_USD_PER_RUN'), 0.30),
   dubbing_minute: num(Deno.env.get('DUBBING_RATE_USD_PER_MINUTE'), 0.50),
   lipsync_minute: num(Deno.env.get('LIPSYNC_RATE_USD_PER_MINUTE'), 3.00),
 };
@@ -40,6 +44,7 @@ const WEIGHTS: Record<string, { rm: number; ac: number }> = {
   voiceover: { rm: 0, ac: 1 },
   ai_video_scene: { rm: 1, ac: 0 },
   music_track: { rm: 0.25, ac: 0 },
+  music_vocal_track: { rm: 1, ac: 0 },
   dubbing_minute: { rm: 1, ac: 0 },
   lipsync_minute: { rm: 6, ac: 0 },
 };

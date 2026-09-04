@@ -658,16 +658,16 @@ export default function MovieMaker() {
     setMusicLoading(true); setError("");
     try {
       // generateMusic now runs as an async job on the render worker and
-      // returns a persistent URL directly (the worker already uploads the
-      // result to Base44 storage) — no separate uploadFile step needed
-      // here anymore.
-      const url = await generateMusic({
+      // returns { url, vocals } with a persistent URL directly (the worker
+      // already uploads the result to Base44 storage) — no separate
+      // uploadFile step needed here anymore.
+      const music = await generateMusic({
         prompt: `${genre} film score, cinematic, matching: ${storyPrompt}`,
         instrumental: true,
         durationSeconds: getTotalFilmSeconds(),
       });
-      if (url) {
-        setMusicUrl(url);
+      if (music?.url) {
+        setMusicUrl(music.url);
         setMusicFile({ name: "AI-generated score" }); // display-only placeholder, not a real File — reuses the existing "track set" UI
       } else {
         const msg = "No background music was generated. Try again or upload a track instead.";

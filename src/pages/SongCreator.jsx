@@ -58,6 +58,13 @@ export default function SongCreator() {
   const [dubbedLyrics, setDubbedLyrics] = useState("");
   const [audioBlob, setAudioBlob] = useState(null);
   const [audioUrl, setAudioUrl] = useState("");
+  // Set only after a "Sung / Full song" generation completes — tells the
+  // user honestly which one they actually got, since that depends on
+  // whether a Suno key is configured server-side (platform or BYOK), which
+  // the frontend has no way to know in advance. null = no song generated
+  // yet in this session; true = real vocal song; false = instrumental
+  // fallback (Suno unavailable).
+  const [songHasVocals, setSongHasVocals] = useState(null);
   const [dubbedAudioBlob, setDubbedAudioBlob] = useState(null);
   const [dubbedAudioUrl, setDubbedAudioUrl] = useState("");
   const [loading, setLoading] = useState(false);
@@ -78,6 +85,7 @@ export default function SongCreator() {
           <h1 className="text-2xl font-black text-foreground">Song Creator</h1>
           <p className="text-muted-foreground text-sm leading-relaxed">
             Generate original song lyrics in any language, AI voiceover rendering, and automatic dubbing into other languages — exclusive to the Enterprise plan.
+            Full songs with vocals require a Suno connection (Settings → Integrations); without one, "Sung / Full song" produces an instrumental track.
           </p>
           <Link to="/billing"
             className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-violet-500 to-pink-600 text-white text-sm font-semibold shadow-lg shadow-violet-500/25 hover:opacity-90 transition-opacity">
@@ -105,7 +113,7 @@ export default function SongCreator() {
       });
       setLyrics(result);
       setDubbedLyrics("");
-      setAudioUrl(""); setAudioBlob(null);
+      setAudioUrl(""); setAudioBlob(null); setSongHasVocals(null);
       setDubbedAudioUrl(""); setDubbedAudioBlob(null);
     } catch (e) {
       setError(e?.message || "Lyrics generation failed.");
@@ -146,10 +154,13 @@ export default function SongCreator() {
     setError("");
     try {
       // generateMusic now runs as an async job on the render worker and
-      // returns a persistent URL directly (already uploaded to Base44
-      // storage) — unlike the spoken-TTS path below, there's no local
-      // Blob to track for this one.
-      const url = await generateMusic({
+      // returns { url, vocals } — url is a persistent URL (already
+      // uploaded to Base44 storage), so unlike the spoken-TTS path below
+      // there's no local Blob to track for this one. `vocals` says
+      // honestly whether this is a real Suno song with vocals or the
+      // MusicGen instrumental fallback (Suno not configured) — see
+      // aiClient.js's generateMusic docstring.
+      const music = await generateMusic({
         prompt: theme,
         lyrics: toSpeakableText(lyrics),
         instrumental: false,
@@ -157,9 +168,10 @@ export default function SongCreator() {
         mood,
         durationSeconds: 60,
       });
-      if (url) {
-        setAudioUrl(url);
+      if (music?.url) {
+        setAudioUrl(music.url);
         setAudioBlob(null);
+        setSongHasVocals(music.vocals === true);
       } else {
         setError("Song generation unavailable. Try again later.");
       }
@@ -248,7 +260,7 @@ export default function SongCreator() {
           icon={Music}
           iconGradient="from-violet-500 to-pink-600"
           title="Song Creator"
-          subtitle="AI lyrics, voiceover rendering, and multilingual dubbing"
+          subtitle="AI lyrics, voiceover rendering, and multilingual dubbing — full vocal songs when Suno is connected, instrumental otherwise"
         />
 
         {/* Tab bar */}
@@ -348,7 +360,7 @@ export default function SongCreator() {
                       className="w-full h-full text-sm text-foreground bg-transparent focus:outline-none resize-none leading-relaxed" />
                   </div>
                   <div className="grid grid-cols-2 gap-2">
-                    <button onClick={() => generateAudio(lyrics, (url, blob) => { setAudioUrl(url); setAudioBlob(blob); })} disabled={voiceLoading || songLoading}
+                    <button onClick={() => generateAudio(lyrics, (url, blob) => { setAudioUrl(url); setAudioBlob(blob); setSongHasVocals(null); })} disabled={voiceLoading || songLoading}
                       className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-violet-500/10 border border-violet-500/20 text-violet-400 text-sm font-semibold hover:bg-violet-500/20 transition-all disabled:opacity-50">
                       {voiceLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mic2 className="w-4 h-4" />}
                       {voiceLoading ? "Rendering…" : "Spoken (no music)"}
@@ -359,9 +371,29 @@ export default function SongCreator() {
                       {songLoading ? "Composing…" : "Sung / Full song"}
                     </button>
                   </div>
+                  <p className="text-[11px] text-muted-foreground/70 -mt-2">
+                    "Sung / Full song" produces a real vocal song when a Suno key is connected
+                    (<Link to="/integrations" className="underline hover:text-foreground">Settings → Integrations</Link>);
+                    otherwise it generates an instrumental track.
+                  </p>
                   {audioUrl && (
                     <div className="p-3 rounded-xl bg-card border border-border">
-                      <p className="text-xs font-semibold text-muted-foreground mb-2">Audio — {language}</p>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-semibold text-muted-foreground">Audio — {language}</p>
+                        {songHasVocals !== null && (
+                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                            songHasVocals ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-400"
+                          }`}>
+                            {songHasVocals ? "Full song with vocals (Suno)" : "Instrumental only — Suno not connected"}
+                          </span>
+                        )}
+                      </div>
+                      {songHasVocals === false && (
+                        <p className="text-[11px] text-amber-400/90 mb-2">
+                          This generated an instrumental track, not a sung song — connect a Suno key in{" "}
+                          <Link to="/integrations" className="underline hover:text-foreground">Integrations</Link> to get real vocals.
+                        </p>
+                      )}
                       <audio controls src={audioUrl} className="w-full" />
                     </div>
                   )}

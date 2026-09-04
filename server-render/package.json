@@ -3,7 +3,10 @@
   "version": "1.0.0",
   "type": "module",
   "private": true,
-  "scripts": { "start": "node index.js" },
+  "scripts": {
+    "start": "node index.js",
+    "build": "node --check index.js && node --check music.js && node --check video.js && node --check dub.js && node --check render.js && node --check lane1.js && node --check replicate.js && node --check jobstore.js"
+  },
   "dependencies": {
     "express": "^4.19.2",
     "cors": "^2.8.5",
