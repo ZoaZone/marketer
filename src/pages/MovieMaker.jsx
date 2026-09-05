@@ -679,14 +679,15 @@ export default function MovieMaker() {
         setMusicUrl(music.url);
         setMusicFile({ name: "AI-generated score" }); // display-only placeholder, not a real File — reuses the existing "track set" UI
       } else {
-        const msg = "No background music was generated. Try again or upload a track instead.";
+        const msg = "No background music was generated. Try again or upload a track — the film can be assembled without music in the meantime.";
         setWarnings(prev => prev.includes(msg) ? prev : [...prev, msg]);
       }
     } catch (e) {
       // Music generation failing or timing out is never fatal to the film
       // itself — warn and let the user proceed without it (or try again /
-      // upload a track manually).
-      const msg = e?.message || "Background music generation failed.";
+      // upload a track manually). Music can also be added after composing:
+      // generate or upload a track, then press Assemble Film again.
+      const msg = `${e?.message || "Background music generation failed."} — the film can still be assembled without music, and re-assembled once a track is added.`;
       setWarnings(prev => prev.includes(msg) ? prev : [...prev, msg]);
     }
     setMusicLoading(false);

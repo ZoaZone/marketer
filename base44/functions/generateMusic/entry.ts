@@ -31,6 +31,21 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
  *     inside this gated synchronous call. ElevenLabs sings too, so a
  *     deployment set to "suno" still gets vocals from this endpoint rather
  *     than the error the old stub threw.
+ *
+ * MUSIC GENERATION PATH (the same one submitMusic runs, so the sync and
+ * async entry points cannot disagree):
+ *   1. Base44 InvokeLLM — the DEFAULT PRODUCER: composes the thin request
+ *      into a specific musical brief (instrumentation, tempo, key,
+ *      arrangement, production feel) before any audio is rendered.
+ *   2. OpenAI — SECONDARY FALLBACK for the brief when Base44's AI is
+ *      unavailable.
+ *   3. ElevenLabs (or Replicate) — renders the brief (or the caller's
+ *      verbatim prompt, if both LLMs failed) into audio. Neither LLM can
+ *      produce audio, so "producer" here means brief composition, never
+ *      sound.
+ * Best-effort by design: any brief failure degrades to the original
+ * prompt and never blocks a paid run. Canonical copy of the block:
+ * base44/_shared/musicBrief.block.ts.
  */
 
 const CORS = {
@@ -307,6 +322,81 @@ async function generateWithElevenLabs(
     throw new Error('ElevenLabs returned an empty audio response.');
   }
   return { audio_base64: toBase64(bytes), mime: res.headers.get('content-type') || 'audio/mpeg' };
+}
+
+/* ── Music brief: Base44 InvokeLLM (default) -> OpenAI -> verbatim ─────
+ *
+ * Canonical copy-paste block (base44/_shared/musicBrief.block.ts) — keep
+ * identical with submitMusic/entry.ts, which test/musicBrief.test.js loads
+ * from source. See that file for the full rationale: the LLMs here compose
+ * the musical brief (default producer InvokeLLM, secondary fallback
+ * OpenAI); the audio itself is rendered by ElevenLabs/Replicate below.
+ * ──────────────────────────────────────────────────────────────────── */
+
+const BRIEF_MAX_CHARS = 600;
+
+function buildBriefInstruction(spec: any): string {
+  const facets = [
+    spec?.genre ? `Genre: ${spec.genre}` : null,
+    spec?.mood ? `Mood: ${spec.mood}` : null,
+    spec?.durationSeconds ? `Length: about ${spec.durationSeconds} seconds` : null,
+    spec?.instrumental === false ? 'This is a sung song with vocals.' : 'Instrumental only — no vocals.',
+  ].filter(Boolean).join('\n');
+
+  return [
+    'You are writing a prompt for a text-to-music model. Turn the request below into ONE vivid,',
+    'concrete paragraph describing the music: instrumentation, tempo/BPM, key or tonality,',
+    'arrangement and how it develops, and production feel.',
+    '',
+    'Rules:',
+    `- Under ${BRIEF_MAX_CHARS} characters. Plain prose, no headings, no lists, no preamble.`,
+    '- Describe only the music. Do not write lyrics, and do not restate these instructions.',
+    '- Never name a real artist, band, or song — text-to-music models reject prompts that do.',
+    '',
+    facets,
+    '',
+    `Request: ${spec?.prompt || 'background music'}`,
+  ].join('\n');
+}
+
+function sanitizeBrief(raw: unknown): string | null {
+  const text = typeof raw === 'string' ? raw.trim() : '';
+  if (text.length < 20) return null; // an empty or one-word reply is not a brief
+  return text.replace(/\s+/g, ' ').slice(0, BRIEF_MAX_CHARS);
+}
+
+async function composeMusicBrief(base44: any, spec: any): Promise<string | null> {
+  if (Deno.env.get('MUSIC_BRIEF_LLM')?.trim().toLowerCase() === 'off') return null;
+  if (!spec?.prompt?.trim()) return null;
+
+  const instruction = buildBriefInstruction(spec);
+
+  // 1. Base44 InvokeLLM — the default producer.
+  try {
+    const result = await base44.integrations.Core.InvokeLLM({ prompt: instruction });
+    const brief = sanitizeBrief(result);
+    if (brief) return brief;
+  } catch (_baseError) { /* fall through to OpenAI */ }
+
+  // 2. OpenAI — secondary fallback when Base44's built-in AI is unavailable.
+  const openaiKey = Deno.env.get('OPENAI_API_KEY');
+  if (!openaiKey) return null;
+  try {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${openaiKey}` },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: instruction }],
+      }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return sanitizeBrief(data?.choices?.[0]?.message?.content);
+  } catch (_openaiError) {
+    // 3. Neither LLM answered — the renderer runs the caller's own prompt.
+    return null;
+  }
 }
 
 /* ── Handler ──────────────────────────────────────────────────────────── */
@@ -625,6 +715,16 @@ Deno.serve(async (req) => {
       const overBudget = await meterUsage(base44, user, 'music_track', 1, { provider });
       if (overBudget) return overBudget;
     }
+
+    // Stage 1-2 of the music generation path: compose the musical brief via
+    // Base44 InvokeLLM (default producer) with OpenAI as the secondary
+    // fallback — the same chain submitMusic runs, so both entry points
+    // behave identically. Runs only once the job is entitled and paid for
+    // (a refused job never spends an LLM call), and a null falls through to
+    // the caller's own prompt verbatim — the brief is an improvement, never
+    // a blocker.
+    const brief = await composeMusicBrief(base44, body);
+    if (brief) body.prompt = brief;
 
     const result = provider === 'replicate'
       ? await generateWithReplicate(body)
