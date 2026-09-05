@@ -379,7 +379,7 @@ export async function getVideoStatus(jobId) {
  *   non-fatal to the film — a scene without a generated clip just keeps
  *   its still image.
  */
-export async function generateSceneVideo({ prompt, imageUrl, durationSeconds = 5, aspectRatio = "16:9" } = {}) {
+export async function generateSceneVideo({ prompt, imageUrl, durationSeconds = 5, aspectRatio = "16:9", onProgress } = {}) {
   const jobId = await submitVideo({ prompt, imageUrl, durationSeconds, aspectRatio });
 
   const POLL_MS = 4000;
@@ -399,8 +399,27 @@ export async function generateSceneVideo({ prompt, imageUrl, durationSeconds = 5
     }
     await new Promise((resolve) => setTimeout(resolve, POLL_MS));
     const job = await getVideoStatus(jobId);
-    if (job?.status === "done") return job.url;
+    if (job?.status === "done") {
+      onProgress?.({ jobId, status: "done", progress: 1, elapsedMs: Date.now() - startedAt, budgetMs: TIMEOUT_MS });
+      return job.url;
+    }
     if (job?.status === "error") throw asProviderError(job.error || "Video generation failed.");
+
+    // Report progress on every poll, exactly as dubAudioFile/dubVideoFile
+    // already do. Scene video was the ONLY long-running job kind that read
+    // none of this: a clip takes two to three minutes on the worker, which
+    // runs one job at a time across every kind, so a caller showing a bare
+    // boolean spinner made a healthy generation indistinguishable from a
+    // hang. `status` matters as much as the fraction — "queued" means the
+    // job is waiting behind another one and has not started burning its own
+    // time yet.
+    onProgress?.({
+      jobId,
+      status: job?.status || "processing",
+      progress: typeof job?.progress === "number" ? job.progress : null,
+      elapsedMs: Date.now() - startedAt,
+      budgetMs: TIMEOUT_MS,
+    });
     // else "queued" / "processing" — keep polling
   }
 }

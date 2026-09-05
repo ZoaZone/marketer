@@ -76,6 +76,11 @@ export default function QuickCreate() {
   const useMotion = canMotion && motionMode === "motion";
   const [motionProgress, setMotionProgress] = useState(0);
   const [clipGenerating, setClipGenerating] = useState({});
+  // Live status of the clip currently generating: { status, elapsedMs,
+  // index, total }. A clip takes two to three minutes on a worker that runs
+  // one job at a time, so without this a healthy multi-scene run looks
+  // exactly like a hang.
+  const [clipStatus, setClipStatus] = useState(null);
   const [prompt, setPrompt] = useState("");
   const [outputType, setOutputType] = useState("image"); // "image" | "video"
   const [attachments, setAttachments] = useState([]); // [{ url, name }]
@@ -234,6 +239,9 @@ export default function QuickCreate() {
               imageUrl: built[i].imageUrl,
               durationSeconds: MOTION_CLIP_SECONDS,
               aspectRatio: videoRatio,
+              onProgress: ({ status, elapsedMs }) => setClipStatus({
+                status, elapsedMs, index: i + 1, total: built.length,
+              }),
             });
             if (clipUrl) {
               built[i] = { ...built[i], videoUrl: clipUrl };
@@ -341,6 +349,9 @@ export default function QuickCreate() {
         imageUrl: scene.imageUrl,
         durationSeconds: MOTION_CLIP_SECONDS,
         aspectRatio: videoRatio,
+        onProgress: ({ status, elapsedMs }) => setClipStatus({
+          status, elapsedMs, index: index + 1, total: scenes.length,
+        }),
       });
       if (!clipUrl) throw new Error("No video clip was produced.");
       setScenes(prev => prev.map((item, i) => i === index ? { ...item, videoUrl: clipUrl, seconds: MOTION_CLIP_SECONDS } : item));
@@ -352,6 +363,7 @@ export default function QuickCreate() {
         : detail);
     }
     setClipGenerating(prev => ({ ...prev, [index]: false }));
+    setClipStatus(null);
   };
 
   const handleMusicUpload = async (file) => {
@@ -695,6 +707,22 @@ export default function QuickCreate() {
                       }</>
                     : <><ImageIcon className="w-4 h-4" /> {scenes.length ? "Regenerate Storyboard" : "Generate Storyboard"}</>}
                 </button>
+                {/* Live status for the clip currently generating. The
+                    percentage on the button above only counts COMPLETED
+                    clips, so during a single 2-3 minute generation it sits
+                    frozen — this is the line that shows the run is alive.
+                    "queued" matters too: the render worker runs one job at a
+                    time, so a clip can legitimately be waiting its turn. */}
+                {clipStatus && (
+                  <p className="text-[11px] text-fuchsia-400/90 flex items-center gap-1.5">
+                    <Loader2 className="w-3 h-3 animate-spin shrink-0" />
+                    {clipStatus.status === "queued"
+                      ? "Queued — the render worker is busy with another job"
+                      : `Generating clip ${clipStatus.index} of ${clipStatus.total}`}
+                    {` · ${Math.round((clipStatus.elapsedMs || 0) / 1000)}s elapsed`}
+                    <span className="text-muted-foreground">· usually 2-3 min per clip</span>
+                  </p>
+                )}
                 {scenes.length > 0 && (
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {scenes.map((s, i) => (
