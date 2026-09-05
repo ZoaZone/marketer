@@ -541,7 +541,13 @@ export async function generateMusicJob(spec, onProgress = () => {}) {
   const failures = [];
   for (const provider of fallbackChain(spec)) {
     try {
-      return await runners[provider](spec, onProgress);
+      const result = await runners[provider](spec, onProgress);
+      // Name the provider that actually produced the track. Only failures
+      // were logged before, so a successful run said nothing at all about
+      // WHICH provider served it — leaving "did ElevenLabs run?"
+      // unanswerable from the logs even when everything worked.
+      console.log(`[music] provider ${provider} succeeded (vocals: ${result?.vocals === true}).`);
+      return { ...result, provider };
     } catch (e) {
       failures.push(`${provider}: ${e?.message || e}`);
       console.error(`[music] provider ${provider} failed: ${e?.message || e} — trying the next provider on the chain.`);
@@ -550,5 +556,16 @@ export async function generateMusicJob(spec, onProgress = () => {}) {
     }
   }
 
-  throw new Error(`Music generation failed on every available provider — ${failures.join(" | ")}`);
+  // Name the providers that were never even tried, and why. A chain that
+  // contains only Replicate because no ElevenLabs key is configured used to
+  // fail with a message naming Replicate alone, which reads as "Replicate
+  // is broken" when the real answer is "ElevenLabs was never in the chain".
+  const attempted = fallbackChain(spec);
+  const skipped = ["suno", "elevenlabs", "replicate"]
+    .filter((p) => !attempted.includes(p))
+    .map((p) => `${p} (no key configured on this worker)`);
+  const skippedNote = skipped.length ? ` Not attempted: ${skipped.join(", ")}.` : "";
+  throw new Error(
+    `Music generation failed on every available provider — ${failures.join(" | ")}.${skippedNote}`
+  );
 }

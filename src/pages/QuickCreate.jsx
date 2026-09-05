@@ -240,8 +240,18 @@ export default function QuickCreate() {
               setScenes([...built]);
             }
           } catch (clipError) {
-            // A failed clip is not fatal — the scene keeps its still image and
-            // the assembler pans it instead, so the render still completes.
+            // A provider billing failure will hit every remaining scene
+            // identically, so stop rather than issuing one warning per scene.
+            // It is also the one failure here an operator can actually fix,
+            // which is why it gets the error slot instead of the warning list.
+            if (clipError?.billing) {
+              setError(`${clipError.message} Finishing as a cinematic slideshow — real AI video resumes once the provider account is funded.`);
+              setMotionMode("slideshow");
+              break;
+            }
+            // Any other failed clip is not fatal — the scene keeps its still
+            // image and the assembler pans it instead, so the render still
+            // completes.
             const msg = /403|plan|upgrade/i.test(clipError?.message || "")
               ? "Your plan does not include AI video generation — finishing as a cinematic slideshow instead."
               : `Scene ${i + 1}: ${clipError?.message || "video clip generation failed"} — using the still image for this scene.`;
@@ -336,7 +346,10 @@ export default function QuickCreate() {
       setScenes(prev => prev.map((item, i) => i === index ? { ...item, videoUrl: clipUrl, seconds: MOTION_CLIP_SECONDS } : item));
       setMotionProgress(1);
     } catch (e) {
-      setError(e?.response?.data?.error || e?.message || `Scene ${index + 1} video generation failed.`);
+      const detail = e?.response?.data?.error || e?.message || `Scene ${index + 1} video generation failed.`;
+      setError(e?.billing
+        ? `${detail} Real AI video resumes once the provider account is funded.`
+        : detail);
     }
     setClipGenerating(prev => ({ ...prev, [index]: false }));
   };

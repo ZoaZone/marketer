@@ -11,6 +11,7 @@
 import {
   replicateFetch, isRetryableReplicateError, nextReplicateBackoffDelay, MAX_REPLICATE_RETRY_ATTEMPTS,
   nextCreatePredictionBackoffDelay, MAX_CREATE_PREDICTION_RETRY_ATTEMPTS,
+  isReplicateBillingError,
 } from "./replicate.js";
 
 const POLL_INTERVAL_MS = 3000;
@@ -231,6 +232,21 @@ export async function generateSceneVideo(spec, onProgress = () => {}) {
     const input = buildKlingInput({ prompt, imageUrl, durationSeconds, aspectRatio });
     videoUrl = await generateWithModel(primaryModel, input, token, onProgress, 0.05, 0.7);
   } catch (primaryError) {
+    // The two models are a guard against ONE MODEL being unavailable. They
+    // are not a guard against the ACCOUNT being unfunded — both bill the
+    // same Replicate account on the same token, so a 402 on the primary
+    // guarantees a 402 on the fallback. Failing over anyway just fired a
+    // second doomed request per scene and drew rate limits, which is how a
+    // plain "insufficient credit" ended up buried under a burst of 429s.
+    // Stop here and say the one thing an operator can act on.
+    if (isReplicateBillingError(primaryError)) {
+      console.error(
+        `[generateSceneVideo] ${primaryModel} rejected for billing — not trying ${fallbackModel}, ` +
+        `it bills the same account: ${primaryError.message}`
+      );
+      throw primaryError;
+    }
+
     console.error(
       `[generateSceneVideo] Primary model (${primaryModel}) failed, retrying with fallback (${fallbackModel}):`,
       primaryError?.message || primaryError
@@ -239,6 +255,9 @@ export async function generateSceneVideo(spec, onProgress = () => {}) {
       const input = buildMiniMaxInput({ prompt, imageUrl });
       videoUrl = await generateWithModel(fallbackModel, input, token, onProgress, 0.05, 0.7);
     } catch (fallbackError) {
+      // A billing failure on the fallback is equally actionable — surface it
+      // on its own rather than as half of a combined message.
+      if (isReplicateBillingError(fallbackError)) throw fallbackError;
       throw new Error(
         `Both video models failed. Primary (${primaryModel}): ${primaryError?.message || primaryError}. ` +
         `Fallback (${fallbackModel}): ${fallbackError?.message || fallbackError}`

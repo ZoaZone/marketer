@@ -27,6 +27,29 @@ export function isRetryableReplicateError(err) {
 }
 
 /**
+ * A 402 from Replicate — the account is out of credit. Typed separately
+ * because it is the one Replicate failure that is neither transient nor
+ * fixable in code: retrying it wastes time, and failing over to another
+ * MODEL is pointless because every model bills the same ACCOUNT.
+ *
+ * This used to be an untyped Error, so video.js dutifully "fell back" from
+ * Kling to MiniMax on a dead account and produced a burst of 429s chasing a
+ * request that could never succeed — which is precisely what buried the
+ * real cause ("insufficient credit") in the logs.
+ */
+export class ReplicateBillingError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "ReplicateBillingError";
+    this.billing = true;
+  }
+}
+
+export function isReplicateBillingError(err) {
+  return !!err?.billing;
+}
+
+/**
  * replicateFetch(url, { token, method, body, headers }) — fetch wrapper for
  * api.replicate.com. Always sends Authorization/Accept/User-Agent (plus
  * Content-Type: application/json when a body is given); any caller-supplied
@@ -73,6 +96,11 @@ export async function replicateFetch(url, { token, method = "GET", body, headers
 
   if (!res.ok) {
     const detail = data?.detail || data?.error || JSON.stringify(data).slice(0, 500);
+    // 402 = out of credit. Typed so callers can stop rather than retry or
+    // fail over to another model on the same (unfunded) account.
+    if (res.status === 402) {
+      throw new ReplicateBillingError(`Replicate account has insufficient credit: ${detail}`);
+    }
     throw new Error(`Replicate request failed (${res.status}): ${detail}`);
   }
 

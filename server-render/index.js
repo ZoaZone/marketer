@@ -156,6 +156,16 @@ async function processQueue() {
   processing = true;
   jobs.update(next.id, { status: "processing" });
 
+  // Job lifecycle logging. Until this existed the worker was silent on the
+  // happy path — a music job that SUCCEEDED and a music job that was never
+  // enqueued produced byte-identical logs (nothing), so "no [music] lines"
+  // could not distinguish "it worked" from "it never ran". That ambiguity
+  // cost a full debugging cycle. Every job now announces itself on the way
+  // in and on the way out, whichever way it ends.
+  const startedAt = Date.now();
+  const elapsed = () => `${((Date.now() - startedAt) / 1000).toFixed(1)}s`;
+  console.log(`[job ${next.id}] ${next.kind} started`);
+
   try {
     // Most job kinds report progress as a bare 0-1 fraction; renderProject
     // additionally reports which scene is currently rendering (see
@@ -210,6 +220,7 @@ async function processQueue() {
       // POST /replicate-webhook/:jobToken) — leave status "processing" and
       // skip cleanup scheduling; the webhook handler (or its safety
       // timeout) does both once the job actually finishes.
+      console.log(`[job ${next.id}] ${next.kind} submitted in ${elapsed()}, awaiting provider webhook`);
     } else {
       // Most job kinds resolve to a plain URL string; dubVideo resolves to
       // { url, captionsUrl } since it may also produce a captions sidecar,
@@ -224,9 +235,15 @@ async function processQueue() {
         done.url = result;
       }
       jobs.update(next.id, done);
+      // `provider` is music-only (which of ElevenLabs/Suno/Replicate
+      // actually produced the track) — the single fact that was hardest to
+      // establish from the outside.
+      const via = result && typeof result === "object" && result.provider ? ` via ${result.provider}` : "";
+      console.log(`[job ${next.id}] ${next.kind} done in ${elapsed()}${via} -> ${done.url || "(no url)"}`);
       scheduleCleanup(next.id);
     }
   } catch (e) {
+    console.error(`[job ${next.id}] ${next.kind} FAILED after ${elapsed()}: ${e?.message || e}`);
     jobs.update(next.id, { status: "error", error: String(e?.message || e) });
     scheduleCleanup(next.id);
   } finally {

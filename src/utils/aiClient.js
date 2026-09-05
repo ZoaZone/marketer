@@ -201,6 +201,25 @@ function buildMusicPromptText({ prompt, genre, mood, instrumental }) {
  * the error so UI can route it: `.upgradeRequired` for the cases a
  * subscription change fixes, and `.code` for everything else.
  */
+/**
+ * Turns a worker job's error string into an Error the UI can route on.
+ *
+ * A provider BILLING failure is not the same class of event as a model
+ * hiccup: it affects every scene, every retry and every user until someone
+ * tops the account up, and no amount of retrying will clear it. Callers
+ * previously treated all clip failures alike and degraded to "the still
+ * image will be used instead", so an out-of-credit account presented as a
+ * cosmetic quality issue rather than an outage. `.billing` lets a caller
+ * raise it properly.
+ */
+export function asProviderError(message) {
+  const err = new Error(message);
+  if (/insufficient credit|billing|payment required|402/i.test(message)) {
+    err.billing = true;
+  }
+  return err;
+}
+
 async function submitWorkerJob(functionName, spec, { idField = "jobId", offlineCode, offlineMessage, genericMessage }) {
   let data;
   try {
@@ -381,7 +400,7 @@ export async function generateSceneVideo({ prompt, imageUrl, durationSeconds = 5
     await new Promise((resolve) => setTimeout(resolve, POLL_MS));
     const job = await getVideoStatus(jobId);
     if (job?.status === "done") return job.url;
-    if (job?.status === "error") throw new Error(job.error || "Video generation failed.");
+    if (job?.status === "error") throw asProviderError(job.error || "Video generation failed.");
     // else "queued" / "processing" — keep polling
   }
 }
