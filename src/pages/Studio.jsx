@@ -7,7 +7,7 @@ import { Film, Music, Sliders, Monitor, Plus, Image as ImageIcon, ArrowRight, Br
 
 // The two lanes (Work Package G): Lane 1 (Business/Marketing — Base44-native
 // generation + FFmpeg assembly, no paid Replicate/ElevenLabs calls) and
-// Lane 2 (Movie Maker Pro — adds paid Kling/MusicGen/ElevenLabs generation).
+// Lane 2 (Movie Maker Pro — adds paid Kling/ElevenLabs generation).
 // See src/utils/lane1.js and src/utils/lane2.js for the enforced boundary.
 const LANES = [
   {

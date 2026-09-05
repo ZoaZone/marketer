@@ -14,10 +14,10 @@ import {
 // Lane 2 (Movie Maker Pro) page — imports only from @/utils/lane2, never
 // @/utils/lane1 directly (enforced by eslint.config.js's lane guard). Lane
 // 2 is the only lane allowed to reach the paid Replicate/ElevenLabs
-// generation endpoints (generateSceneVideo/Kling, generateMusic/MusicGen,
+// generation endpoints (generateSceneVideo/Kling, generateMusic/ElevenLabs Music,
 // dubAudioFile/dubVideoFile/ElevenLabs) alongside the shared FFmpeg
 // assembly route (submitRender/getRenderStatus).
-import { generateText, generateVoiceover, generateMusic, uploadFile, generateImage, splitScriptIntoScenes, submitRender, getRenderStatus, generateSceneVideo, dubAudioFile, dubVideoFile as dubVideoJob } from "@/utils/lane2";
+import { generateText, generateVoiceover, generateMusic, MAX_MUSIC_SECONDS, uploadFile, generateImage, splitScriptIntoScenes, submitRender, getRenderStatus, generateSceneVideo, dubAudioFile, dubVideoFile as dubVideoJob } from "@/utils/lane2";
 // dubVideoFile (the aiClient job function) is imported as dubVideoJob — the
 // Dubbing Studio already has a dubVideoFile *state variable* holding the
 // raw uploaded File object for the manual translate+voiceover flow below,
@@ -661,10 +661,18 @@ export default function MovieMaker() {
       // returns a persistent URL directly (the worker already uploads the
       // result to Base44 storage) — no separate uploadFile step needed
       // here anymore.
+      // Cap what we ask a single generation run for. getTotalFilmSeconds()
+      // is unbounded — a ten-scene film asks for minutes of audio, which
+      // no provider returns quickly and which the old MusicGen path could
+      // not produce at all, so "Generate AI background music" reliably
+      // timed out on exactly the long films that most wanted a score. A
+      // shorter track is not a shorter film: the render worker extends the
+      // music with crossfaded repetitions to cover the full runtime (see
+      // buildVariedMusicTrack in server-render/render.js).
       const url = await generateMusic({
         prompt: `${genre} film score, cinematic, matching: ${storyPrompt}`,
         instrumental: true,
-        durationSeconds: getTotalFilmSeconds(),
+        durationSeconds: Math.min(MAX_MUSIC_SECONDS, Math.max(15, getTotalFilmSeconds())),
       });
       if (url) {
         setMusicUrl(url);

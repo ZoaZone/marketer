@@ -6,7 +6,7 @@
 // including submitCapture/getCaptureStatus for Demo Video Maker's
 // walkthrough-recording flow) — it must NEVER invoke a paid Replicate or
 // ElevenLabs generation endpoint
-// (Kling/MiniMax video, MusicGen, ElevenLabs dubbing/lip-sync — that's
+// (Kling/MiniMax video, ElevenLabs music/dubbing/lip-sync — that's
 // Lane 2, see lane2.js). This is enforced two ways:
 //   1. This file simply doesn't import those functions from aiClient.js —
 //      grep aiClient.js's paid-generation exports (submitVideo,

@@ -193,7 +193,11 @@ Deno.serve(async (req) => {
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${openaiKey}` },
         body: JSON.stringify({
           model: "gpt-4o-mini",
-          messages: [{ role: "user", content: finalPrompt }],
+          // finalPromptWithGuardrail, not finalPrompt: the spelling/brand-voice
+          // guardrail applies to every provider in the chain. Sending the bare
+          // prompt here meant a Base44 AI outage silently downgraded output
+          // quality on top of switching models.
+          messages: [{ role: "user", content: finalPromptWithGuardrail }],
         }),
       });
       if (!openaiRes.ok) throw new Error(`OpenAI fallback failed: ${await openaiRes.text()}`);

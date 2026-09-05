@@ -144,11 +144,13 @@ export async function generateVoiceover(text) {
 
 // Combines genre/mood/prompt into one descriptive text prompt for the
 // music-generation worker, which only takes a single free-text
-// description — mirrors generateMusic/entry.ts's (now-unused) buildPromptText.
-// `instrumental`/`lyrics` aren't forwarded to the worker: MusicGen has no
-// vocal synthesis, so it's instrumental-only regardless of what's asked
-// for; `instrumental` only affects whether "instrumental, no vocals" gets
-// appended to the prompt text itself.
+// description — mirrors generateMusic/entry.ts's buildPromptText.
+//
+// `instrumental` and `lyrics` are forwarded as their own fields as well
+// (see generateMusic below): the worker's ElevenLabs provider takes a
+// `force_instrumental` flag and can sing supplied lyrics. The "instrumental,
+// no vocals" text is still appended for the Replicate/MusicGen fallback,
+// which has no such flag and no vocal synthesis at all.
 function buildMusicPromptText({ prompt, genre, mood, instrumental }) {
   const g = genre?.trim();
   const m = mood?.trim() || "cinematic";
@@ -189,28 +191,50 @@ export async function getMusicStatus(jobId) {
  * Generate AI background/song music via the async render-worker job
  * (server-render/music.js) — submits the job, then polls until it
  * completes. This replaced a synchronous Base44 function (generateMusic)
- * that ran the whole Replicate create-poll-download cycle inside one
- * function-gateway call, which only worked for very short clips before
- * timing out.
+ * that ran the whole create-poll-download cycle inside one function-gateway
+ * call, which only worked for very short clips before timing out.
  * - Returns `null` only when there's genuinely nothing to generate from
  *   (no prompt, genre, or mood provided).
- * - Returns a persistent URL string on success — not a Blob. The worker
- *   already uploads the result to Base44 storage before reporting the job
- *   done, so there's nothing left for the caller to upload.
+ * - Returns a persistent URL STRING on success — not a Blob and not an
+ *   object. The worker already uploads the result to Base44 storage before
+ *   reporting the job done, so there's nothing left for the caller to
+ *   upload. (Callers that treat the result as `music.url` silently drop
+ *   every track they generate — that bug shipped in DemoVideoMaker.)
  * - Throws an Error on any failure to start, poll, or complete the job,
  *   including a timeout. Music failing is not inherently fatal to
  *   whatever it's being generated for — see MovieMaker.jsx's
  *   generateBackgroundMusic, which treats a thrown error here as
  *   non-fatal to the film and just warns.
+ *
+ * `durationSeconds` is capped at MAX_MUSIC_SECONDS below and the worker
+ * clamps again per provider. A score shorter than the film it's under is
+ * fine: the render worker extends it with crossfaded repetitions rather
+ * than cutting the film short (see buildVariedMusicTrack in render.js).
  */
+export const MAX_MUSIC_SECONDS = 300;
+
 export async function generateMusic({ prompt, durationSeconds = 30, instrumental = true, lyrics, genre, mood } = {}) {
   if (!prompt?.trim() && !genre?.trim() && !mood?.trim()) return null;
 
   const composedPrompt = buildMusicPromptText({ prompt, genre, mood, instrumental });
-  const jobId = await submitMusic({ prompt: composedPrompt, durationSeconds });
+  const seconds = Math.min(MAX_MUSIC_SECONDS, Math.max(3, Math.round(Number(durationSeconds) || 30)));
+  // `instrumental`/`lyrics` reach the provider now — the ElevenLabs music
+  // model synthesizes vocals, so SongCreator's "Sung / full song" produces
+  // an actual sung track instead of the instrumental MusicGen always
+  // returned no matter what was asked for.
+  const jobId = await submitMusic({
+    prompt: composedPrompt,
+    durationSeconds: seconds,
+    instrumental,
+    lyrics: instrumental === false ? lyrics : undefined,
+  });
 
   const POLL_MS = 2500;
-  const TIMEOUT_MS = 150_000; // ~150s cap
+  // Generous, and deliberately longer than the worst-case generation: the
+  // worker runs one job at a time across every kind (render, music, video,
+  // dub), so this budget covers queue time behind another job as well as
+  // the generation itself.
+  const TIMEOUT_MS = 420_000; // ~7 minutes
 
   const startedAt = Date.now();
   for (;;) {

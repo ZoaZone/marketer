@@ -383,7 +383,10 @@ Deno.serve(async (req) => {
       if (overBudget) return overBudget;
       if (spec.lipsync) {
         const lipOver = await meterUsage(base44, user, 'lipsync_minute', minutes * langs, {
-          usedOwnKey: !!byok.replicateKey, provider: 'replicate',
+          // buildByok writes `replicateToken`, never `replicateKey` — this
+          // was permanently false, charging BYOK users for lip-sync minutes
+          // their own Replicate account had already paid for.
+          usedOwnKey: !!byok.replicateToken, provider: 'replicate',
         });
         if (lipOver) return lipOver;
       }

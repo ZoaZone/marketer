@@ -9,7 +9,7 @@ import { base44 } from "@/api/base44Client";
 // function (no worker URL or shared secret ever touches this client code).
 import { generateText, generateImage, generateVoiceover, uploadFile, splitScriptIntoScenes, assembleLane1Video, submitCapture, getCaptureStatus } from "@/utils/lane1";
 import { VIDEO_RATIOS } from "@/utils/videoAssembler";
-// AI background music (MusicGen, paid Lane 2) — enabled for the walkthrough
+// AI background music (ElevenLabs Music, paid Lane 2) — enabled for the walkthrough
 // so "Music" mode generates a track instead of shipping silent.
 import { generateMusic, generateSceneVideo, submitRender, getRenderStatus } from "@/utils/lane2";
 import { isRealVideoEntitled } from "@/utils/entitlements";
@@ -27,8 +27,8 @@ const CAPTURE_TIMEOUT_MS = 5 * 60 * 1000;
 // worker route (1080p H.264 with real audio) instead of the old
 // client-side Canvas+MediaRecorder path (src/utils/videoAssembler.js's
 // assembleVideo, still in the repo but no longer called here). Background
-// music here is upload-only — Lane 1 doesn't have access to MusicGen
-// (that's a paid Replicate call, Lane 2 only).
+// music here is upload-only — Lane 1 doesn't have access to AI music
+// generation (that's a paid provider call, Lane 2 only).
 const AUDIO_MODES = [
   { id: "voiceover", label: "Voiceover", icon: Mic },
   { id: "music", label: "Music", icon: Music },
@@ -191,7 +191,7 @@ export default function DemoVideoMaker() {
         if (blob) voiceoverUrl = await uploadFile(new File([blob], "demo-vo.mp3", { type: blob.type || "audio/mpeg" }));
         else setWarnings(prev => [...prev, "No voiceover was produced — shipping silent instead."]);
       } else if (audioMode === "music" && !finalMusicUrl) {
-        // No track uploaded: generate AI background music (MusicGen, Lane 2).
+        // No track uploaded: generate AI background music (Lane 2).
         setStatusMsg("Composing AI background music...");
         const totalSeconds = scenes.reduce((s, sc) => s + (sc.seconds || 8), 0);
         try {
@@ -200,7 +200,12 @@ export default function DemoVideoMaker() {
             durationSeconds: Math.min(Math.max(totalSeconds, 20), 120),
             instrumental: true,
           });
-          if (music?.url) finalMusicUrl = music.url;
+          // generateMusic resolves to a URL *string*, not a { url } object.
+          // Reading `music.url` was always undefined, so every generated
+          // track was thrown away and the demo shipped silent with a
+          // "returned no track" warning that had nothing to do with the
+          // provider.
+          if (typeof music === "string" && music) finalMusicUrl = music;
           else setWarnings(prev => [...prev, "AI music generation returned no track — shipping silent."]);
         } catch (e) {
           setWarnings(prev => [...prev, `AI music generation failed (${e?.message || "error"}) — shipping silent.`]);

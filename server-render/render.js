@@ -769,8 +769,19 @@ export async function renderProject(project, onProgress = () => {}) {
 
     let musicPath = null;
     if (MUSIC_ENABLED && project.musicUrl) {
-      musicPath = assetPath(workDir, "music");
-      await downloadTo(project.musicUrl, musicPath);
+      // Non-fatal, same as lane1.js: an unreachable music URL (an expired
+      // provider link, a storage hiccup) must not destroy a film whose
+      // scenes and narration all rendered fine. Every caller already treats
+      // music as optional and best-effort — MovieMaker warns and carries on
+      // when generation fails — so a download failure at render time should
+      // cost the score, not the movie.
+      try {
+        const candidate = assetPath(workDir, "music");
+        await downloadTo(project.musicUrl, candidate);
+        musicPath = candidate;
+      } catch (e) {
+        console.error(`[render] music download failed (${project.musicUrl}): ${e.message} — rendering without background music.`);
+      }
     }
     onProgress(0.2);
 
