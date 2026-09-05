@@ -7,7 +7,7 @@ import { generateText, generateImage, generateVoiceover, uploadFile, splitScript
 // Entitlement is enforced server-side in base44/functions/submitVideo (403);
 // the client check below is UX, so an unentitled user gets an upgrade prompt
 // instead of a failed request.
-import { generateSceneVideo, submitRender, getRenderStatus } from "@/utils/lane2";
+import { generateSceneVideo, generateMusic, submitRender, getRenderStatus } from "@/utils/lane2";
 import { VIDEO_RATIOS } from "@/utils/videoAssembler";
 import {
   Wand2, Image as ImageIcon, Video, Loader2, Download, Save, CheckCircle2,
@@ -15,16 +15,15 @@ import {
   ChevronLeft, Check, Film, Lightbulb,
 } from "lucide-react";
 
-// Lane 1 (Business/Marketing) page — imports only from @/utils/lane1,
-// never @/utils/lane2 or aiClient.js's paid-generation exports directly
-// (enforced by eslint.config.js's lane guard). Short-video assembly
+// Quick Create uses Lane 1 for standard generation and assembly, plus
+// server-gated Lane 2 calls for entitled AI video clips and AI music.
+// Short-video assembly
 // happens server-side via lane1.js's assembleLane1Video (the shared
 // FFmpeg-assembly worker route — 1080p, real H.264 with audio,
 // loudnorm/contrast finishing pass), not the old client-side
 // Canvas+MediaRecorder path (src/utils/videoAssembler.js's assembleVideo,
-// still in the repo but no longer called here). Background music here is
-// upload-only — Lane 1 doesn't have access to AI music generation (that's a paid
-// Replicate call, Lane 2 only).
+// still in the repo but no longer called here). Paid clip and music calls
+// remain protected by their backend subscription and usage gates.
 //
 // The video path is a linear, gated stepper (Work Package G): each step's
 // "Next" stays disabled until that step's own artifact exists (script
@@ -76,6 +75,7 @@ export default function QuickCreate() {
   const [motionMode, setMotionMode] = useState(canMotion ? "motion" : "slideshow");
   const useMotion = canMotion && motionMode === "motion";
   const [motionProgress, setMotionProgress] = useState(0);
+  const [clipGenerating, setClipGenerating] = useState({});
   const [prompt, setPrompt] = useState("");
   const [outputType, setOutputType] = useState("image"); // "image" | "video"
   const [attachments, setAttachments] = useState([]); // [{ url, name }]
@@ -107,6 +107,7 @@ export default function QuickCreate() {
   const [musicUrl, setMusicUrl] = useState("");
   const [musicName, setMusicName] = useState("");
   const [uploadingMusic, setUploadingMusic] = useState(false);
+  const [generatingMusic, setGeneratingMusic] = useState(false);
   const [assembling, setAssembling] = useState(false);
   const [muxProgress, setMuxProgress] = useState(0);
   const [videoResult, setVideoResult] = useState("");
@@ -114,7 +115,7 @@ export default function QuickCreate() {
 
   const resetVideoPipeline = () => {
     setStep(0); setScript(""); setScenes([]); setVoiceoverUrl("");
-    setMusicUrl(""); setMusicName(""); setVideoResult(""); setVideoSaved(false);
+    setMusicUrl(""); setMusicName(""); setGeneratingMusic(false); setVideoResult(""); setVideoSaved(false);
     setWarnings([]); setError("");
   };
 
@@ -232,6 +233,7 @@ export default function QuickCreate() {
               prompt: built[i].text || prompt,
               imageUrl: built[i].imageUrl,
               durationSeconds: MOTION_CLIP_SECONDS,
+              aspectRatio: videoRatio,
             });
             if (clipUrl) {
               built[i] = { ...built[i], videoUrl: clipUrl };
@@ -292,6 +294,53 @@ export default function QuickCreate() {
     setGeneratingVoiceover(false);
   };
 
+  const generateAiMusic = async () => {
+    if (!canMotion) {
+      setError("Your plan does not include AI music generation.");
+      setUpgradeRequired(true);
+      return;
+    }
+    setGeneratingMusic(true); setError(""); setUpgradeRequired(false);
+    try {
+      const durationSeconds = Math.max(10, scenes.reduce((sum, scene) => sum + (Number(scene.seconds) || 8), 0));
+      const result = await generateMusic({
+        prompt: `Cinematic background score matching this short video: ${prompt}`,
+        durationSeconds,
+        instrumental: true,
+        mood: "cinematic",
+      });
+      if (!result?.url) throw new Error("No music track was produced.");
+      setMusicUrl(result.url);
+      setMusicName("AI-generated background music");
+    } catch (e) {
+      const message = e?.response?.data?.error || e?.message || "AI music generation failed.";
+      setError(message);
+      if (/plan|subscription|upgrade|403/i.test(message)) setUpgradeRequired(true);
+    }
+    setGeneratingMusic(false);
+  };
+
+  const generateSingleClip = async (scene, index) => {
+    if (!scene?.imageUrl) return setError("Generate the scene image first.");
+    setError("");
+    setMotionProgress(0);
+    setClipGenerating(prev => ({ ...prev, [index]: true }));
+    try {
+      const clipUrl = await generateSceneVideo({
+        prompt: scene.text || prompt,
+        imageUrl: scene.imageUrl,
+        durationSeconds: MOTION_CLIP_SECONDS,
+        aspectRatio: videoRatio,
+      });
+      if (!clipUrl) throw new Error("No video clip was produced.");
+      setScenes(prev => prev.map((item, i) => i === index ? { ...item, videoUrl: clipUrl, seconds: MOTION_CLIP_SECONDS } : item));
+      setMotionProgress(1);
+    } catch (e) {
+      setError(e?.response?.data?.error || e?.message || `Scene ${index + 1} video generation failed.`);
+    }
+    setClipGenerating(prev => ({ ...prev, [index]: false }));
+  };
+
   const handleMusicUpload = async (file) => {
     if (!file) return;
     setUploadingMusic(true);
@@ -311,7 +360,7 @@ export default function QuickCreate() {
     try {
       const effectiveAudioMode = (audioMode === "voiceover" && !voiceoverUrl) || (audioMode === "music" && !musicUrl) ? "silent" : audioMode;
       if (audioMode === "voiceover" && !voiceoverUrl) setWarnings(prev => [...prev, "No voiceover was generated — shipping silent instead."]);
-      if (audioMode === "music" && !musicUrl) setWarnings(prev => [...prev, "No music track uploaded — shipping silent. Use Movie Maker Pro for AI-composed music."]);
+      if (audioMode === "music" && !musicUrl) setWarnings(prev => [...prev, "No music track was generated or uploaded — shipping silent."]);
 
       // Two assemblers, picked by what the scenes actually contain. The Lane 2
       // render worker understands scene.videoUrl and stitches real clips;
@@ -325,11 +374,14 @@ export default function QuickCreate() {
       if (hasClips) {
         const jobId = await submitRender({
           scenes, ratio: videoRatio, resolution,
-          audioMode: effectiveAudioMode,
-          voiceoverUrl: voiceoverUrl || undefined,
-          musicUrl: musicUrl || undefined,
+          voiceoverUrl: effectiveAudioMode === "voiceover" ? voiceoverUrl : undefined,
+          musicUrl: effectiveAudioMode === "music" ? musicUrl : undefined,
         });
+        const renderStartedAt = Date.now();
         for (;;) {
+          if (Date.now() - renderStartedAt > 20 * 60 * 1000) {
+            throw new Error("Video assembly timed out after 20 minutes. Please try again.");
+          }
           await new Promise(r => setTimeout(r, 4000));
           const job = await getRenderStatus(jobId);
           if (typeof job?.progress === "number") setMuxProgress(job.progress);
@@ -340,11 +392,12 @@ export default function QuickCreate() {
         url = await assembleLane1Video({
           scenes, ratio: videoRatio, resolution,
           audioMode: effectiveAudioMode,
-          voiceoverUrl: voiceoverUrl || undefined,
-          musicUrl: musicUrl || undefined,
+          voiceoverUrl: effectiveAudioMode === "voiceover" ? voiceoverUrl : undefined,
+          musicUrl: effectiveAudioMode === "music" ? musicUrl : undefined,
         }, { onProgress: setMuxProgress });
       }
 
+      if (!url) throw new Error("Video assembly completed without a playable result.");
       setVideoResult(url);
       setStep(6); // advance straight to Publish/Export once assembled
     } catch (e) {
@@ -592,6 +645,18 @@ export default function QuickCreate() {
                   )}
                 </div>
 
+                <div>
+                  <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">Video format</label>
+                  <div className="flex gap-2 flex-wrap">
+                    {VIDEO_RATIOS.map(r => (
+                      <button key={r} type="button" onClick={() => setVideoRatio(r)} disabled={generatingStoryboard}
+                        className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-all ${videoRatio === r ? "bg-fuchsia-500/15 border-fuchsia-500/50 text-fuchsia-400" : "border-border text-muted-foreground hover:bg-muted/20"}`}>
+                        {r}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="flex items-center gap-3">
                   <label className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
                     Scenes ({useMotion ? `~${MOTION_CLIP_SECONDS}s clips` : "~8s each"})
@@ -657,8 +722,23 @@ export default function QuickCreate() {
                     ))}
                   </div>
                 </div>
-                <div className="grid grid-cols-4 gap-2">
-                  {scenes.map((s, i) => <img key={i} src={s.imageUrl} alt="" className="w-full aspect-video object-cover rounded-lg border border-border" />)}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {scenes.map((s, i) => (
+                    <div key={i} className="space-y-1.5">
+                      {s.videoUrl ? (
+                        <video src={s.videoUrl} controls muted playsInline className="w-full aspect-video object-cover rounded-lg border border-border" />
+                      ) : (
+                        <img src={s.imageUrl} alt="" className="w-full aspect-video object-cover rounded-lg border border-border" />
+                      )}
+                      {useMotion && (
+                        <button type="button" onClick={() => generateSingleClip(s, i)} disabled={clipGenerating[i]}
+                          className="w-full flex items-center justify-center gap-1 px-2 py-1 rounded-md border border-fuchsia-500/30 text-[10px] font-semibold text-fuchsia-400 hover:bg-fuchsia-500/10 disabled:opacity-50">
+                          {clipGenerating[i] && <Loader2 className="w-3 h-3 animate-spin" />}
+                          {clipGenerating[i] ? "Generating…" : s.videoUrl ? "Regenerate clip" : "Generate video clip"}
+                        </button>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -686,13 +766,22 @@ export default function QuickCreate() {
                   </div>
                 )}
                 {audioMode === "music" && (
-                  <label className="w-full max-w-md flex items-center gap-3 p-3 rounded-xl border border-border text-left cursor-pointer hover:bg-muted/20 transition-all">
-                    <Music className="w-4 h-4 shrink-0 text-muted-foreground" />
-                    <span className="flex-1 text-sm text-muted-foreground truncate">{uploadingMusic ? "Uploading…" : musicName || "Upload a music track (required)"}</span>
-                    {uploadingMusic ? <Loader2 className="w-4 h-4 animate-spin shrink-0" /> : musicUrl ? <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" /> : null}
-                    <input type="file" accept="audio/*" className="hidden" disabled={uploadingMusic}
-                      onChange={e => { handleMusicUpload(e.target.files?.[0]); e.target.value = ""; }} />
-                  </label>
+                  <div className="w-full max-w-md space-y-2">
+                    <button type="button" onClick={generateAiMusic} disabled={generatingMusic || !canMotion}
+                      className="w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-fuchsia-500/15 border border-fuchsia-500/50 text-fuchsia-400 text-sm font-semibold hover:bg-fuchsia-500/25 disabled:opacity-50">
+                      {generatingMusic ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                      {generatingMusic ? "Generating AI music…" : musicUrl ? "Regenerate AI Music" : "Generate AI Music"}
+                    </button>
+                    {!canMotion && <p className="text-[11px] text-muted-foreground">AI music is available on Agency and Movie Maker Pro plans. You can still upload your own track.</p>}
+                    <label className="w-full flex items-center gap-3 p-3 rounded-xl border border-border text-left cursor-pointer hover:bg-muted/20 transition-all">
+                      <Music className="w-4 h-4 shrink-0 text-muted-foreground" />
+                      <span className="flex-1 text-sm text-muted-foreground truncate">{uploadingMusic ? "Uploading…" : musicName || "Or upload a music track"}</span>
+                      {uploadingMusic ? <Loader2 className="w-4 h-4 animate-spin shrink-0" /> : musicUrl ? <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" /> : null}
+                      <input type="file" accept="audio/*" className="hidden" disabled={uploadingMusic}
+                        onChange={e => { handleMusicUpload(e.target.files?.[0]); e.target.value = ""; }} />
+                    </label>
+                    {musicUrl && <audio src={musicUrl} controls className="w-full" />}
+                  </div>
                 )}
                 {audioMode === "silent" && <p className="text-sm text-muted-foreground">No audio — the short will render silent.</p>}
               </div>

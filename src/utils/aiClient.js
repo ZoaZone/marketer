@@ -247,7 +247,7 @@ export async function generateMusic({ prompt, durationSeconds = 30, instrumental
   // (render, music, video, dub), so this budget covers queue time behind
   // another job as well as the generation itself. A full sung song takes
   // materially longer than an instrumental bed, so it gets the larger cap.
-  const TIMEOUT_MS = instrumental === false ? 420_000 : 300_000;
+  const TIMEOUT_MS = instrumental === false ? 720_000 : 600_000;
 
   const startedAt = Date.now();
   for (;;) {
