@@ -15,6 +15,22 @@
 // ── BEGIN METERING BLOCK ──────────────────────────────────────────────────
 const PLATFORM_MARGIN_PCT = 0.25;
 
+// ElevenLabs runs carry an ADDITIONAL platform margin on top of
+// PLATFORM_MARGIN_PCT, charged to the customer in the same units they
+// already see (Render Minutes / AI credits) so the surcharge is visible in
+// their usage rather than hidden in a dollar figure they never see.
+//
+// Three deliberate exemptions:
+//   - Admins — exempted before this is ever reached, like every other gate.
+//   - BYOK runs — the customer's own ElevenLabs key pays the provider
+//     directly, so there is no platform cost to add a margin to.
+//   - Free-trial runs — the signup promise is a fixed number of free
+//     generations; silently making each one cost 1.25 would break the "25
+//     free AI generations" figure quoted on the home page and /pricing.
+// Everything else on an ElevenLabs-billed run requires recorded consent
+// (see the check in meterUsage) before it is charged.
+const ELEVENLABS_SURCHARGE_PCT = 0.25;
+
 const num = (v: string | undefined, fallback: number) => {
   const n = Number(v);
   return Number.isFinite(n) && n > 0 ? n : fallback;
@@ -99,8 +115,14 @@ async function meterUsage(
   if (user?.role === 'admin') return null;
 
   // Declared before the free-trial branch below, which charges `ac`.
+  // These are the UNSURCHARGED amounts; the ElevenLabs surcharge is applied
+  // further down, only on the subscribed path (never to the free trial).
   const rm = weight.rm * units;
   const ac = weight.ac * units;
+
+  // Does this run bill ElevenLabs against a PLATFORM key? BYOK runs bill the
+  // customer's own account, so there is no platform margin to surcharge.
+  const elevenLabsSurcharged = opts.provider === 'elevenlabs' && !opts.usedOwnKey;
 
   let sub: any = null;
   try {
@@ -196,6 +218,28 @@ async function meterUsage(
 
   const allow = ALLOWANCE[sub.plan_tier] || { ac: 0, rm: 0 };
 
+  // ELEVENLABS SURCHARGE + CONSENT. A surcharged run is refused outright
+  // until the account has recorded consent to the charge, so nobody is ever
+  // billed the extra margin without having agreed to it. The recorded
+  // percentage must cover the current one: raising the surcharge later
+  // invalidates old consent and asks again, rather than silently charging
+  // more than what was agreed to.
+  const surchargeMultiplier = elevenLabsSurcharged ? 1 + ELEVENLABS_SURCHARGE_PCT : 1;
+  if (elevenLabsSurcharged) {
+    const consent = user?.settings?.elevenlabs_surcharge_consent;
+    const consented = consent?.accepted === true
+      && Number(consent.surchargePct) >= ELEVENLABS_SURCHARGE_PCT;
+    if (!consented) {
+      return Response.json({
+        error: `ElevenLabs generations draw ${Math.round(ELEVENLABS_SURCHARGE_PCT * 100)}% more from your plan's monthly allowance than the standard rate. Approve this once in Account → Integrations to enable ElevenLabs features.`,
+        code: 'elevenlabs_consent_required',
+        surcharge_pct: ELEVENLABS_SURCHARGE_PCT,
+      }, { status: 402 });
+    }
+  }
+  const chargeRm = rm * surchargeMultiplier;
+  const chargeAc = ac * surchargeMultiplier;
+
   // BYOK: the customer's own provider key pays. Record it for their usage
   // page, charge nothing, and never touch the allowance counters.
   let billedAs: string = 'allowance';
@@ -207,11 +251,11 @@ async function meterUsage(
   if (opts.usedOwnKey) {
     billedAs = 'byok';
   } else {
-    const rmAfter = usedRm + rm;
-    const acAfter = usedAc + ac;
+    const rmAfter = usedRm + chargeRm;
+    const acAfter = usedAc + chargeAc;
     const rmOver = Math.max(0, rmAfter - allow.rm);
     const acOver = Math.max(0, acAfter - allow.ac);
-    const spillsOver = (rm > 0 && rmOver > overRm) || (ac > 0 && acOver > overAc);
+    const spillsOver = (chargeRm > 0 && rmOver > overRm) || (chargeAc > 0 && acOver > overAc);
 
     if (spillsOver && sub.overage_enabled === false) {
       return Response.json({
@@ -219,7 +263,7 @@ async function meterUsage(
         code: 'allowance_exceeded',
         allowance: { ai_credits: allow.ac, render_minutes: allow.rm },
         used: { ai_credits: usedAc, render_minutes: usedRm },
-        requested: { ai_credits: ac, render_minutes: rm },
+        requested: { ai_credits: chargeAc, render_minutes: chargeRm },
       }, { status: 402 });
     }
 
@@ -248,14 +292,18 @@ async function meterUsage(
   }
 
   // Reporting only — never block a paid-for job on a ledger write.
+  // The recorded charge is the SURCHARGED one (chargeAc/chargeRm), because
+  // that is what actually came out of the customer's allowance; recording
+  // the base figure would make the usage page disagree with the counters.
   const rawCost = (RAW[kind as keyof typeof RAW] || 0) * units;
+  const marginPct = PLATFORM_MARGIN_PCT + (elevenLabsSurcharged ? ELEVENLABS_SURCHARGE_PCT : 0);
   try {
     const ev = await base44.asServiceRole.entities.UsageEvent.create({
       owner_email: user.email,
       kind,
       units,
-      ai_credits_charged: opts.usedOwnKey ? 0 : ac,
-      render_minutes_charged: opts.usedOwnKey ? 0 : rm,
+      ai_credits_charged: opts.usedOwnKey ? 0 : chargeAc,
+      render_minutes_charged: opts.usedOwnKey ? 0 : chargeRm,
       billed_as: billedAs,
       job_id: opts.jobId || '',
       provider: opts.provider || '',
@@ -267,9 +315,9 @@ async function meterUsage(
         kind,
         units,
         raw_provider_cost_usd: Number(rawCost.toFixed(4)),
-        platform_margin_usd: Number((rawCost * PLATFORM_MARGIN_PCT).toFixed(4)),
-        charged_cost_usd: Number((rawCost * (1 + PLATFORM_MARGIN_PCT)).toFixed(4)),
-        rate_source: 'default',
+        platform_margin_usd: Number((rawCost * marginPct).toFixed(4)),
+        charged_cost_usd: Number((rawCost * (1 + marginPct)).toFixed(4)),
+        rate_source: elevenLabsSurcharged ? 'elevenlabs_surcharge' : 'default',
       });
     }
   } catch (_) { /* best effort */ }

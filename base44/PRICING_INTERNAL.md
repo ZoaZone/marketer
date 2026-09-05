@@ -44,6 +44,32 @@ they can be corrected without a code change.
 | Instrumental music, one run (`music_track`) | **$0.10 / run** | `MUSIC_RATE_USD_PER_RUN` | ESTIMATE for the default provider. VERIFIED $0.10/run for the Replicate `meta/musicgen` fallback (replicate.com/meta/musicgen, 2026-08-31); the ElevenLabs Music default now serves this kind at the same assumed rate. ElevenLabs bills music by generated *length*, not per run, so a flat per-run figure only holds while clips stay short — submitMusic caps one run at 600s. **Confirm the per-minute rate from elevenlabs.io/pricing/api and reweight if a full-length score costs materially more than $0.10.** |
 | Vocal song, one run (`music_vocal_track`) | **$0.30 / run** | `MUSIC_VOCAL_RATE_USD_PER_RUN` | UNVERIFIED. Charged for any run that actually produces vocals — ElevenLabs Music with `force_instrumental: false` (the default vocal path), or the opt-in third-party Suno path. Set conservative (high) so the margin cannot go negative on either. **Confirm ElevenLabs' music rate from elevenlabs.io/pricing/api, and — if `SUNO_API_KEY` is ever provisioned — your Suno reseller's per-generation price.** |
 
+### ElevenLabs surcharge (customer-facing, consented)
+
+`ELEVENLABS_SURCHARGE_PCT = 0.25` in the metering block. Any run billed to
+ElevenLabs on a **platform** key charges the customer 25% more of the
+weighted units (Render Minutes / AI credits) than the same job on another
+engine, and the COGS row records the combined margin
+(`rate_source: "elevenlabs_surcharge"`). The raw provider cost is unchanged —
+the uplift is margin, not a different price from ElevenLabs.
+
+Three exemptions, all deliberate:
+
+- **Admins** — exempted before metering is reached, like every other gate.
+- **BYOK** — the customer's own ElevenLabs key pays the provider directly,
+  so there is no platform cost to add margin to.
+- **Free trial** — surcharging trial units would quietly turn the advertised
+  "25 free AI generations" into 20.
+
+No account is charged the surcharge without recorded consent:
+`meterUsage` refuses a surcharged run with `code:
+'elevenlabs_consent_required'` (402) until
+`user.settings.elevenlabs_surcharge_consent` holds `accepted: true` and a
+`surchargePct` at least as large as the current one — so raising the
+surcharge re-asks rather than inheriting agreement given for a smaller
+number. Consent is written by `base44/functions/setElevenLabsConsent`, whose
+copy of the percentage `npm run check:plans` pins to the block's.
+
 ### Unmetered: the music brief
 
 Every music run also makes one small LLM call to turn the caller's thin

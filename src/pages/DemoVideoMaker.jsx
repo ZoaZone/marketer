@@ -217,8 +217,12 @@ export default function DemoVideoMaker() {
 let realVideo = false;
 try {
   const me = await base44.auth.me();
+  // Read the admin flag from the authenticated user record rather than
+  // component state — this is the same source the server gates read, so
+  // the two cannot disagree about who gets real generated video.
+  const meIsAdmin = String(me?.role || "").trim().toLowerCase() === "admin";
   const subs = await base44.entities.Subscription.filter({ owner_email: me?.email }, null, 1);
-  realVideo = isRealVideoEntitled(Array.isArray(subs) ? subs[0] : subs);
+  realVideo = isRealVideoEntitled(Array.isArray(subs) ? subs[0] : subs, meIsAdmin);
 } catch (_e) { realVideo = false; }
 
 let hostedUrl;

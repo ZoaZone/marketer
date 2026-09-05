@@ -20,7 +20,16 @@ export function isByokEntitled(subscription) {
 // the standard Lane 1 still-image (Ken Burns) walkthrough. Same "real,
 // active subscription" test as Billing.jsx's isPaidPlan (any non-free
 // tier with an active or trialing subscription).
-export function isRealVideoEntitled(subscription) {
+//
+// `isAdmin` is checked FIRST and independently of the subscription, the
+// same way every page-level gate and every server-side assertEntitled in
+// this codebase treats an admin. The owner's own account has no
+// Subscription row at all, so a subscription-only test silently answered
+// "not entitled" for them — the admin got the still-image slideshow from
+// the Demo Video maker while every other surface correctly gave them full
+// access.
+export function isRealVideoEntitled(subscription, isAdmin = false) {
+  if (isAdmin) return true;
   return !!subscription
   && ["active", "trialing"].includes(subscription.status)
   && subscription.plan_tier

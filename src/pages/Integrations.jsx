@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { isByokEntitled } from "@/utils/entitlements";
+import ElevenLabsConsentCard from "@/components/billing/ElevenLabsConsentCard";
 
 // Work Package F (BYOK). Replicate, ElevenLabs, and Anthropic/OpenAI do not
 // support OAuth for API-key provisioning — every provider here is a
@@ -249,6 +250,13 @@ export default function Integrations() {
           shown in full after saving, and validated against the provider before being stored.
         </p>
       </div>
+
+      {/* Deliberately OUTSIDE the BYOK gate below: this approval governs
+          ElevenLabs runs on the PLATFORM key, which is every account that
+          has NOT brought its own ElevenLabs key. Putting it behind the same
+          entitlement as BYOK would hide it from exactly the users it
+          applies to. */}
+      <ElevenLabsConsentCard user={user} usingOwnKey={!!apiKeys.elevenlabs?.ciphertext && entitled} />
 
       {entitled ? (
         <div className="space-y-4">
