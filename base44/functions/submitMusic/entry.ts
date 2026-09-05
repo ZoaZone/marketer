@@ -11,17 +11,18 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
  * base44.auth.me() auth guard, same { error } shape on failure.
  *
  * The request body IS the music spec as-is ({ prompt, durationSeconds,
- * model_version, instrumental, lyrics, genre, mood, title } — see
- * server-render/music.js) — this function doesn't interpret it, just
- * forwards it to the worker with the shared secret it needs to accept the
- * job. The one exception is `byok`, which this function adds itself (see
- * buildByok below) — a caller-supplied `byok` field is not trusted or
- * forwarded.
+ * instrumental, lyrics, genre, mood, title, model_version } — see
+ * server-render/music.js) — this function forwards it to the worker with
+ * the shared secret it needs to accept the job, adding only a duration
+ * clamp and the BYOK credentials. `byok` is the one field this function
+ * supplies itself (see buildByok below); a caller-supplied `byok` is not
+ * trusted or forwarded.
  *
- * Provider selection (Suno real vocal song vs. Replicate/MusicGen
- * instrumental) happens inside server-render/music.js, not here — this
- * function only decides which metering `kind` to charge, based on the same
- * "would a Suno key actually be used" check the worker makes.
+ * The worker picks the provider for real; pickProvider below mirrors that
+ * resolution exactly so this function can charge the right metering `kind`
+ * (a vocal song costs 1 RM, an instrumental 0.25 RM) BEFORE the job runs.
+ * The two must never disagree about what will run — see pickProvider's
+ * note.
  */
 
 const CORS = {
@@ -29,6 +30,13 @@ const CORS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
+
+// ElevenLabs Music's own limits (3s–600s per request). The worker clamps
+// again per provider — the Replicate fallback's usable range is far
+// narrower — so this is only the outer bound on what a browser can ask a
+// single charged run to spend.
+const MIN_DURATION_SECONDS = 3;
+const MAX_DURATION_SECONDS = 600;
 
 // BYOK (Work Package F): decrypt any stored user provider keys so the
 // worker can bill the user's own account instead of the platform's. A
@@ -61,9 +69,126 @@ async function buildByok(apiKeys: any, fields: Array<'replicate' | 'elevenlabs' 
   return byok;
 }
 
+/**
+ * Which music provider the worker will actually use for this spec.
+ *
+ * MUST mirror pickProvider() in server-render/music.js. A Base44 function
+ * deployment cannot import from the worker, so this is a hand-kept copy —
+ * if the two drift, this function charges for one provider while a
+ * different one runs, which is exactly how a BYOK user ends up billed for
+ * a job their own key paid for.
+ *
+ *   1. Vocals requested + MUSIC_PROVIDER=suno + a Suno key -> "suno".
+ *   2. An ElevenLabs key -> "elevenlabs" (covers instrumental and vocals
+ *      alike, and is preferred for a vocals request even under
+ *      MUSIC_PROVIDER=replicate, because MusicGen cannot sing).
+ *   3. Otherwise -> "replicate", instrumental-only.
+ */
+function pickProvider(spec: any, byok: Record<string, string>): string {
+  const wantsVocals = spec?.instrumental === false;
+  const configured = Deno.env.get('MUSIC_PROVIDER')?.trim().toLowerCase() || 'elevenlabs';
+  const sunoKey = byok.sunoApiKey || Deno.env.get('SUNO_API_KEY')?.trim();
+  const elevenLabsKey = byok.elevenLabsKey || Deno.env.get('ELEVENLABS_API_KEY')?.trim();
+
+  if (wantsVocals && configured === 'suno' && sunoKey) return 'suno';
+  if (elevenLabsKey && (configured !== 'replicate' || wantsVocals)) return 'elevenlabs';
+  return 'replicate';
+}
+
+/* ── Music brief: Base44 InvokeLLM (default) -> OpenAI -> verbatim ─────
+ *
+ * The provider chain for the AUDIO itself is ElevenLabs/Suno/Replicate —
+ * those are the only ones that can render audio at all. Base44's InvokeLLM
+ * and OpenAI's chat models produce text, so they cannot be music providers;
+ * what they can do, and what this does, is turn the caller's thin request
+ * ("Thriller film score, cinematic, matching: <story>") into a specific
+ * musical brief — instrumentation, tempo, key, arrangement, production
+ * feel — which is exactly the kind of prompt ElevenLabs Music renders well
+ * and the kind a UI form cannot produce on its own.
+ *
+ * So the order the platform asked for holds, with each stage doing the part
+ * it is actually capable of:
+ *   1. Base44 InvokeLLM  — the default, and what AI Credits buy.
+ *   2. OpenAI            — fallback when Base44's AI is unavailable.
+ *   3. ElevenLabs        — renders the brief into audio (see the worker).
+ *
+ * Deliberately best-effort and NOT separately metered: it is one small
+ * prompt-shaping call folded into a music run the caller is already charged
+ * for, and double-charging one user action would be worse than absorbing
+ * it. Any failure — quota, outage, a malformed response — returns null and
+ * the caller's own prompt is used verbatim, so this can only ever improve a
+ * generation, never block one. Set MUSIC_BRIEF_LLM=off to skip it entirely.
+ * ──────────────────────────────────────────────────────────────────── */
+
+const BRIEF_MAX_CHARS = 600;
+
+function buildBriefInstruction(spec: any): string {
+  const facets = [
+    spec?.genre ? `Genre: ${spec.genre}` : null,
+    spec?.mood ? `Mood: ${spec.mood}` : null,
+    spec?.durationSeconds ? `Length: about ${spec.durationSeconds} seconds` : null,
+    spec?.instrumental === false ? 'This is a sung song with vocals.' : 'Instrumental only — no vocals.',
+  ].filter(Boolean).join('\n');
+
+  return [
+    'You are writing a prompt for a text-to-music model. Turn the request below into ONE vivid,',
+    'concrete paragraph describing the music: instrumentation, tempo/BPM, key or tonality,',
+    'arrangement and how it develops, and production feel.',
+    '',
+    'Rules:',
+    `- Under ${BRIEF_MAX_CHARS} characters. Plain prose, no headings, no lists, no preamble.`,
+    '- Describe only the music. Do not write lyrics, and do not restate these instructions.',
+    '- Never name a real artist, band, or song — text-to-music models reject prompts that do.',
+    '',
+    facets,
+    '',
+    `Request: ${spec?.prompt || 'background music'}`,
+  ].join('\n');
+}
+
+function sanitizeBrief(raw: unknown): string | null {
+  const text = typeof raw === 'string' ? raw.trim() : '';
+  if (text.length < 20) return null; // an empty or one-word reply is not a brief
+  return text.replace(/\s+/g, ' ').slice(0, BRIEF_MAX_CHARS);
+}
+
+async function composeMusicBrief(base44: any, spec: any): Promise<string | null> {
+  if (Deno.env.get('MUSIC_BRIEF_LLM')?.trim().toLowerCase() === 'off') return null;
+  if (!spec?.prompt?.trim()) return null;
+
+  const instruction = buildBriefInstruction(spec);
+
+  // 1. Base44 InvokeLLM — the platform default.
+  try {
+    const result = await base44.integrations.Core.InvokeLLM({ prompt: instruction });
+    const brief = sanitizeBrief(result);
+    if (brief) return brief;
+  } catch (_baseError) { /* fall through to OpenAI */ }
+
+  // 2. OpenAI — fallback when Base44's built-in AI is unavailable.
+  const openaiKey = Deno.env.get('OPENAI_API_KEY');
+  if (!openaiKey) return null;
+  try {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${openaiKey}` },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: instruction }],
+      }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return sanitizeBrief(data?.choices?.[0]?.message?.content);
+  } catch (_openaiError) {
+    // 3. Neither LLM answered — the worker renders the caller's own prompt.
+    return null;
+  }
+}
+
 // COST GATE. isByokEntitled below only decides WHOSE api key pays; it never
 // gated access, so before this any authenticated user — free tier included —
-// could call this endpoint directly and bill the platform. MusicGen bills per generation against the platform Replicate key.
+// could call this endpoint directly and bill the platform. Music generation bills per run against a platform provider key (ElevenLabs by default; Replicate or Suno when MUSIC_PROVIDER and the available keys say so — see pickProvider above).
 // The eslint lane guard stops Lane 1 *code* importing Lane 2, but a lint rule
 // is not an access control: it does nothing about a direct HTTP call.
 const GENERATION_ENTITLED_TIERS = ["byok","indie","studio","dubbing_house","enterprise","agency"];
@@ -375,32 +500,58 @@ Deno.serve(async (req) => {
     }
 
     const spec = await req.json().catch(() => ({}));
+
+    // Clamp here as well as in the worker: durationSeconds arrives straight
+    // from the browser, and one run is charged the same whether it asks for
+    // 30 seconds or ten minutes of provider time.
+    if (spec.durationSeconds !== undefined) {
+      const n = Number(spec.durationSeconds);
+      spec.durationSeconds = Number.isFinite(n) && n > 0
+        ? Math.min(MAX_DURATION_SECONDS, Math.max(MIN_DURATION_SECONDS, Math.round(n)))
+        : undefined;
+    }
+
     const entitled = await isByokEntitled(base44, user);
-    const byok = entitled ? await buildByok(user.settings?.api_keys || {}, ['replicate', 'suno']) : {};
+    // All three providers' keys are forwarded; which one the worker
+    // actually reaches for is decided by pickProvider below (and, for real,
+    // by the identical resolution in server-render/music.js).
+    const byok = entitled
+      ? await buildByok(user.settings?.api_keys || {}, ['replicate', 'elevenlabs', 'suno'])
+      : {};
     if (Object.keys(byok).length) spec.byok = byok;
 
-    // Mirrors exactly the check server-render/music.js's generateMusicJob
-    // makes to decide which provider actually runs — a real Suno vocal song
-    // only happens when the caller asked for vocals AND a Suno key (the
-    // platform's, or the user's own BYOK key) is actually available.
-    // Otherwise the job silently falls back to the Replicate/MusicGen
-    // instrumental path, same as always. This determines which metering
-    // `kind` gets charged, so the two can never disagree about what ran.
-    const wantsVocals = spec?.instrumental === false;
-    const sunoAvailable = !!(byok.sunoApiKey || Deno.env.get('SUNO_API_KEY')?.trim());
-    const usingSuno = wantsVocals && sunoAvailable;
+    const provider = pickProvider(spec, byok);
+    // Vocals are only actually produced by Suno, or by ElevenLabs when
+    // vocals were asked for. MusicGen cannot sing at all, so a vocals
+    // request that lands there is charged — and reported — as the
+    // instrumental it will be.
+    const producesVocals = provider === 'suno' || (provider === 'elevenlabs' && spec?.instrumental === false);
 
-    // SPEND CEILING. One generation run per submission — a real vocal song
-    // (Suno) or an instrumental MusicGen clip, whichever will actually run.
-    const overBudget = await meterUsage(base44, user, usingSuno ? 'music_vocal_track' : 'music_track', 1, {
-      // A BYOK key is only "used" if it's the one actually paying for this
-      // specific run — a BYOK Suno key does nothing for a plain
-      // instrumental job, and a BYOK Replicate key does nothing once Suno
-      // is the path taken.
-      usedOwnKey: usingSuno ? !!byok.sunoApiKey : !!byok.replicateToken,
-      provider: usingSuno ? 'suno' : 'replicate',
-    });
+    // SPEND CEILING. One generation run per submission, charged as the
+    // vocal-song kind (1 RM) or the instrumental kind (0.25 RM) according
+    // to what will actually run.
+    //
+    // `usedOwnKey` reads the field buildByok actually sets — replicateToken
+    // / elevenLabsKey / sunoApiKey — and only the one paying for THIS run.
+    // It used to read `byok.replicateKey`, which buildByok never writes, so
+    // it was permanently false and every BYOK user was charged Render
+    // Minutes for jobs their own provider account had already paid for.
+    const usedOwnKey =
+      provider === 'suno' ? !!byok.sunoApiKey
+      : provider === 'elevenlabs' ? !!byok.elevenLabsKey
+      : !!byok.replicateToken;
+
+    const overBudget = await meterUsage(
+      base44, user,
+      producesVocals ? 'music_vocal_track' : 'music_track', 1,
+      { usedOwnKey, provider },
+    );
     if (overBudget) return overBudget;
+
+    // Enrich the prompt only once the run is entitled and paid for, so a
+    // job that is about to be refused never spends an LLM call.
+    const brief = await composeMusicBrief(base44, spec);
+    if (brief) spec.prompt = brief;
 
     let workerRes: Response;
     try {

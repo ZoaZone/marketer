@@ -8,28 +8,29 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
  * auth guard, and the same { success: true, audio_base64, mime } / { error }
  * response contract.
  *
- * Music generation is long-running, and this function call is synchronous
- * end-to-end (create prediction, poll it, download the audio, return it) —
- * it has to fit inside Base44's function gateway timeout, which is much
- * shorter than MusicGen generation can take for a long clip. The duration
- * clamp below is deliberately tight (≤ ~15s of audio) specifically so a
- * generation is likely to finish inside that gateway window; this is a
- * stopgap, not a real fix for the underlying constraint.
+ * This call is synchronous end-to-end, so whatever it does has to fit
+ * inside Base44's function gateway timeout. The async job path
+ * (submitMusic + getMusicStatus, running on server-render/) is what the
+ * frontend actually uses and is the right place for a long generation;
+ * this endpoint stays as a direct, single-request alternative and keeps a
+ * duration clamp tight enough to finish inside the gateway window.
  *
- * Option B (proper, later): convert this to the same async job pattern as
- * the render worker (server-render/) — a submit endpoint that starts the
- * Replicate prediction and returns a job id immediately, plus a separate
- * poll endpoint — so a long generation never has to complete inside a
- * single synchronous request. Not implemented yet; the tight duration
- * clamp is the interim workaround.
- *
- * Provider is selected by MUSIC_PROVIDER (defaults to "replicate" if unset):
- *   - "replicate": MusicGen (or whichever model REPLICATE_MUSIC_MODEL names)
- *     on Replicate. This is the only implemented path today.
- *   - "suno": stubbed — throws a clear "not yet configured" error. Suno has
- *     no official public API as of writing; this branch exists so the
- *     provider abstraction is ready to fill in if/when that changes,
- *     without having to guess at undocumented endpoints in the meantime.
+ * Provider is selected by MUSIC_PROVIDER (defaults to "elevenlabs"):
+ *   - "elevenlabs" (default): ElevenLabs Music, POST /v1/music. A single
+ *     request that returns the finished audio bytes — no prediction to
+ *     create, poll and then re-download, which is what made the Replicate
+ *     path a poor fit for a gated synchronous function in the first place.
+ *     It also synthesizes vocals, so `instrumental`/`lyrics` below are
+ *     finally honoured rather than accepted and ignored.
+ *   - "replicate": MusicGen (or whichever model REPLICATE_MUSIC_MODEL
+ *     names). Kept as a fallback so a deployment can switch back with an
+ *     env var. Instrumental-only.
+ *   - "suno": falls through to "elevenlabs" here. The third-party Suno
+ *     path exists only on the async worker (server-render/music.js), where
+ *     a full ~2-4 minute song has room to render; it could never complete
+ *     inside this gated synchronous call. ElevenLabs sings too, so a
+ *     deployment set to "suno" still gets vocals from this endpoint rather
+ *     than the error the old stub threw.
  */
 
 const CORS = {
@@ -54,6 +55,16 @@ const POLL_TIMEOUT_MS = 12_000;
 const MIN_DURATION_SECONDS = 5;
 const MAX_DURATION_SECONDS = 15;
 
+// ElevenLabs accepts 3s–600s per request, but this endpoint is still
+// synchronous and still gated, so the cap here is about the gateway
+// window, not the provider's limit. Callers that want a full-length score
+// use submitMusic (the async worker job), which clamps to the provider's
+// real 600s ceiling instead.
+const EL_MIN_DURATION_SECONDS = 3;
+const EL_MAX_DURATION_SECONDS = 30;
+const EL_DEFAULT_MODEL_ID = 'music_v1';
+const EL_DEFAULT_OUTPUT_FORMAT = 'mp3_44100_128';
+
 interface GenerateMusicBody {
   prompt?: string;
   durationSeconds?: number;
@@ -76,13 +87,12 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// Combines genre/mood/prompt into one descriptive text prompt — MusicGen
-// takes a single free-text description, not structured fields.
-// `instrumental` and `lyrics` are accepted in the request body for API
-// contract completeness (and so a future vocal-capable provider, e.g. a
-// real Suno integration, has something to key off of) but are not used
-// building this Replicate/MusicGen request: MusicGen has no vocal synthesis,
-// so it's instrumental-only regardless of what's asked for here.
+// Combines genre/mood/prompt into one descriptive text prompt — both
+// providers take a single free-text description, not structured fields.
+// `instrumental`/`lyrics` are handled separately per provider: ElevenLabs
+// takes a `force_instrumental` flag and can sing supplied lyrics (see
+// generateWithElevenLabs), while MusicGen has no vocal synthesis at all and
+// is instrumental-only no matter what's asked for.
 function buildPromptText(body: GenerateMusicBody): string {
   const genre = body.genre?.trim();
   const mood = body.mood?.trim() || 'cinematic';
@@ -93,9 +103,22 @@ function buildPromptText(body: GenerateMusicBody): string {
   return segments.join(', ') || 'cinematic instrumental background music';
 }
 
-function clampDuration(seconds: number | undefined): number {
+function clampDuration(
+  seconds: number | undefined,
+  min = MIN_DURATION_SECONDS,
+  max = MAX_DURATION_SECONDS,
+): number {
   const n = typeof seconds === 'number' && Number.isFinite(seconds) ? seconds : 10;
-  return Math.min(MAX_DURATION_SECONDS, Math.max(MIN_DURATION_SECONDS, Math.round(n)));
+  return Math.min(max, Math.max(min, Math.round(n)));
+}
+
+// MUSIC_PROVIDER, normalized for THIS endpoint. "suno" maps to
+// "elevenlabs" — see the module docstring: the Suno path is worker-only,
+// and ElevenLabs covers the same vocal case within the gateway window.
+function resolveProvider(): string {
+  const raw = Deno.env.get('MUSIC_PROVIDER')?.trim().toLowerCase() || '';
+  if (!raw || raw === 'suno') return 'elevenlabs';
+  return raw;
 }
 
 /* ── Replicate provider ────────────────────────────────────────────────
@@ -220,15 +243,75 @@ async function generateWithReplicate(body: GenerateMusicBody): Promise<{ audio_b
   return { audio_base64: toBase64(bytes), mime };
 }
 
-/* ── Suno provider (stub) ─────────────────────────────────────────────── */
+/* ── ElevenLabs provider (default) ─────────────────────────────────────
+ * POST https://api.elevenlabs.io/v1/music?output_format=<fmt>
+ *   headers: xi-api-key, Content-Type: application/json
+ *   body:    { prompt, music_length_ms, model_id, force_instrumental }
+ *   returns: raw audio bytes — no JSON envelope, no prediction to poll
+ * ──────────────────────────────────────────────────────────────────── */
 
-async function generateWithSuno(_body: GenerateMusicBody): Promise<{ audio_base64: string; mime: string }> {
-  throw new Error('Suno provider not yet configured');
+async function generateWithElevenLabs(
+  body: GenerateMusicBody
+): Promise<{ audio_base64: string; mime: string }> {
+  const apiKey = Deno.env.get('ELEVENLABS_API_KEY');
+  if (!apiKey?.trim()) {
+    throw new Error('ELEVENLABS_API_KEY is not configured.');
+  }
+
+  const modelId = Deno.env.get('ELEVENLABS_MUSIC_MODEL_ID')?.trim() || EL_DEFAULT_MODEL_ID;
+  const outputFormat =
+    Deno.env.get('ELEVENLABS_MUSIC_OUTPUT_FORMAT')?.trim() || EL_DEFAULT_OUTPUT_FORMAT;
+  const seconds = clampDuration(body.durationSeconds, EL_MIN_DURATION_SECONDS, EL_MAX_DURATION_SECONDS);
+
+  // Lyrics only mean anything when vocals were actually asked for; a score
+  // meant to sit under narration stays instrumental so it doesn't fight the
+  // voiceover, which is why `force_instrumental` defaults to true.
+  const basePrompt = buildPromptText(body);
+  const lyrics = body.lyrics?.trim();
+  const promptText =
+    body.instrumental === false && lyrics
+      ? `${basePrompt}\n\nSing the following lyrics:\n${lyrics}`
+      : basePrompt;
+
+  const res = await fetch(
+    `https://api.elevenlabs.io/v1/music?output_format=${encodeURIComponent(outputFormat)}`,
+    {
+      method: 'POST',
+      headers: {
+        'xi-api-key': apiKey,
+        'Content-Type': 'application/json',
+        Accept: 'audio/mpeg',
+      },
+      body: JSON.stringify({
+        prompt: promptText,
+        music_length_ms: seconds * 1000,
+        model_id: modelId,
+        force_instrumental: body.instrumental !== false,
+      }),
+    }
+  );
+
+  if (!res.ok) {
+    // Surface ElevenLabs' own error text verbatim. Its music endpoint
+    // returns a structured, actionable reason for the failures a user can
+    // do something about — `bad_prompt` (the prompt named a real artist or
+    // quoted copyrighted lyrics, and the body carries a `prompt_suggestion`)
+    // and quota exhaustion — so collapsing it to "generation failed" would
+    // throw away the only useful part.
+    const detail = await res.text().catch(() => `${res.status} ${res.statusText}`);
+    throw new Error(`ElevenLabs music generation failed (${res.status}): ${detail}`);
+  }
+
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  if (!bytes.length) {
+    throw new Error('ElevenLabs returned an empty audio response.');
+  }
+  return { audio_base64: toBase64(bytes), mime: res.headers.get('content-type') || 'audio/mpeg' };
 }
 
 /* ── Handler ──────────────────────────────────────────────────────────── */
 
-// COST GATE. MusicGen bills per generation against the platform Replicate key. Matches submitMusic so the sync and async paths cannot disagree.
+// COST GATE. Music generation bills per run against a platform provider key (ElevenLabs by default, Replicate when MUSIC_PROVIDER says so). Matches submitMusic so the sync and async paths cannot disagree.
 // Added because this endpoint authenticated the caller but never checked what
 // their plan actually included — any signed-in user could bill the platform.
 const MUSIC_ENTITLED_TIERS = ["byok","indie","studio","dubbing_house","enterprise","agency"];
@@ -523,10 +606,16 @@ Deno.serve(async (req) => {
 
     const body = (await req.json().catch(() => ({}))) as GenerateMusicBody;
 
-    const provider = (Deno.env.get('MUSIC_PROVIDER')?.trim().toLowerCase()) || 'replicate';
+    const provider = resolveProvider();
 
+    // Fail on a missing key before metering charges for the run — a job
+    // that cannot possibly reach a provider must not cost the caller an
+    // allowance unit.
     if (provider === 'replicate' && !Deno.env.get('REPLICATE_API_TOKEN')?.trim()) {
       return Response.json({ error: 'REPLICATE_API_TOKEN is not configured.' }, { status: 500, headers: CORS });
+    }
+    if (provider !== 'replicate' && !Deno.env.get('ELEVENLABS_API_KEY')?.trim()) {
+      return Response.json({ error: 'ELEVENLABS_API_KEY is not configured.' }, { status: 500, headers: CORS });
     }
 
     // SPEND CEILING. One generation run per call, on the platform key.
@@ -537,7 +626,9 @@ Deno.serve(async (req) => {
       if (overBudget) return overBudget;
     }
 
-    const result = provider === 'suno' ? await generateWithSuno(body) : await generateWithReplicate(body);
+    const result = provider === 'replicate'
+      ? await generateWithReplicate(body)
+      : await generateWithElevenLabs(body);
 
     return Response.json(
       { success: true, audio_base64: result.audio_base64, mime: result.mime || 'audio/mpeg' },

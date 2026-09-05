@@ -143,11 +143,17 @@ export async function generateVoiceover(text) {
 }
 
 // Combines genre/mood/prompt into one descriptive text prompt for the
-// music-generation worker's Replicate/MusicGen fallback (and as the Suno
-// prompt too, when no lyrics were supplied) — mirrors generateMusic/entry.ts's
-// (now-unused) buildPromptText. `instrumental` only affects whether
-// "instrumental, no vocals" gets appended to this text — it does not by
-// itself decide which provider runs; see generateMusic() below for that.
+// music-generation worker, which takes a single free-text description
+// rather than structured fields — mirrors generateMusic/entry.ts's
+// buildPromptText.
+//
+// `instrumental` and `lyrics` are forwarded as their own fields too (see
+// generateMusic below), because the provider decides what to do with them:
+// ElevenLabs takes a `force_instrumental` flag and can sing supplied
+// lyrics, Suno sings them, and MusicGen can do neither. The "instrumental,
+// no vocals" text appended here is what steers MusicGen, which has no such
+// flag. This text does not by itself decide which provider runs — see
+// generateMusic() below for that.
 function buildMusicPromptText({ prompt, genre, mood, instrumental }) {
   const g = genre?.trim();
   const m = mood?.trim() || "cinematic";
@@ -176,8 +182,9 @@ export async function submitMusic(spec) {
 
 /**
  * Fetch the current status of a music job started via submitMusic().
- * Returns { status, progress, url, error } as reported by the render
- * worker — status is one of "queued" | "processing" | "done" | "error".
+ * Returns { status, progress, url, vocals, error } as reported by the
+ * render worker — status is one of "queued" | "processing" | "done" |
+ * "error".
  */
 export async function getMusicStatus(jobId) {
   const res = await base44.functions.invoke("getMusicStatus", { jobId });
@@ -188,37 +195,45 @@ export async function getMusicStatus(jobId) {
  * Generate AI background music or a real vocal song via the async
  * render-worker job (server-render/music.js) — submits the job, then polls
  * until it completes. This replaced a synchronous Base44 function
- * (generateMusic) that ran the whole Replicate create-poll-download cycle
- * inside one function-gateway call, which only worked for very short clips
- * before timing out.
+ * (generateMusic) that ran the whole create-poll-download cycle inside one
+ * function-gateway call, which only worked for very short clips before
+ * timing out.
  *
- * `instrumental: false` (with `lyrics`) asks for a real sung song. Whether
- * that's what's actually produced depends on whether a Suno key is
- * configured (platform SUNO_API_KEY, or the caller's own BYOK Suno key) —
- * server-render/music.js decides that, submitMusic/entry.ts meters
- * whichever path it takes, and the result here always says which one ran
- * via `vocals`, so a caller never has to guess.
+ * `instrumental: false` (with `lyrics`) asks for a real sung song.
+ * ElevenLabs — the default provider — synthesizes vocals, so this normally
+ * produces one; server-render/music.js picks the provider, submitMusic
+ * meters whichever will run, and the result here always reports what
+ * actually happened via `vocals`, so a caller never has to guess. `vocals`
+ * comes back false when the request could only be served by MusicGen,
+ * which has no vocal synthesis at all.
  *
  * - Returns `null` only when there's genuinely nothing to generate from
  *   (no prompt, genre, mood, or lyrics provided).
- * - Returns `{ url, vocals }` on success — `url` is a persistent URL, not a
- *   Blob (the worker already uploads the result to Base44 storage), and
- *   `vocals` is true only if a real Suno song with vocals was produced;
- *   false means the MusicGen instrumental fallback ran instead — including
- *   when vocals were requested but no Suno key was configured.
+ * - Returns `{ url, vocals }` on success — an OBJECT, not a bare string
+ *   and not a Blob. `url` is already persistent (the worker uploads the
+ *   result to Base44 storage before reporting the job done), so there's
+ *   nothing left for the caller to upload.
  * - Throws an Error on any failure to start, poll, or complete the job,
  *   including a timeout. Music failing is not inherently fatal to
  *   whatever it's being generated for — see MovieMaker.jsx's
  *   generateBackgroundMusic, which treats a thrown error here as
  *   non-fatal to the film and just warns.
+ *
+ * `durationSeconds` is capped at MAX_MUSIC_SECONDS here and the worker
+ * clamps again per provider. A score shorter than the film it sits under
+ * is fine: the render worker extends it with crossfaded repetitions rather
+ * than cutting the film short (see buildVariedMusicTrack in render.js).
  */
+export const MAX_MUSIC_SECONDS = 300;
+
 export async function generateMusic({ prompt, durationSeconds = 30, instrumental = true, lyrics, genre, mood } = {}) {
   if (!prompt?.trim() && !genre?.trim() && !mood?.trim() && !lyrics?.trim()) return null;
 
   const composedPrompt = buildMusicPromptText({ prompt, genre, mood, instrumental });
+  const seconds = Math.min(MAX_MUSIC_SECONDS, Math.max(3, Math.round(Number(durationSeconds) || 30)));
   const jobId = await submitMusic({
     prompt: composedPrompt,
-    durationSeconds,
+    durationSeconds: seconds,
     instrumental,
     lyrics: instrumental === false ? lyrics : undefined,
     genre,
@@ -227,10 +242,12 @@ export async function generateMusic({ prompt, durationSeconds = 30, instrumental
   });
 
   const POLL_MS = 2500;
-  // A real Suno song takes much longer than a 15s MusicGen instrumental
-  // clip (server-render/music.js budgets up to ~5 minutes for it) — give
-  // the vocal path a longer cap than the instrumental one.
-  const TIMEOUT_MS = instrumental === false ? 330_000 : 150_000;
+  // Generous on both paths, and deliberately longer than the worst-case
+  // generation: the worker runs one job at a time across every kind
+  // (render, music, video, dub), so this budget covers queue time behind
+  // another job as well as the generation itself. A full sung song takes
+  // materially longer than an instrumental bed, so it gets the larger cap.
+  const TIMEOUT_MS = instrumental === false ? 420_000 : 300_000;
 
   const startedAt = Date.now();
   for (;;) {

@@ -7,7 +7,7 @@ import { Users, Briefcase, Building2, Clapperboard, Languages, GraduationCap } f
  * Every claim below maps to something that ships today: the Lane 1 content
  * tools (images, script, voiceover, Ken Burns assembly, scheduling, bulk
  * messaging, funnels), the Lane 2 render worker (per-scene AI video via
- * Kling/MiniMax, MusicGen), and the dubbing workspace (ElevenLabs dubbing
+ * Kling/MiniMax, ElevenLabs Music), and the dubbing workspace (ElevenLabs dubbing
  * with voice and background-score preservation, 22 languages, glossary and
  * speaker mapping, optional lip-sync). Do not add a sector here whose
  * described workflow the app cannot actually complete — an aspirational

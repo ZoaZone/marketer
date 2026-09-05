@@ -38,7 +38,7 @@ const PROVIDERS = [
     id: "suno",
     label: "Suno",
     icon: Music,
-    description: "Powers real full song generation with vocals in Song Creator. Without this, Song Creator's \"Sung / Full song\" option generates an instrumental-only track instead — Suno has no public API of its own, so this connects a third-party Suno API provider.",
+    description: "Optional alternative vocal-song engine for Song Creator. Vocals already work without it — ElevenLabs is the default and sings — so connect this only if you specifically want Suno. Suno has no public API of its own, so this connects a third-party Suno API provider.",
     getKeyUrl: null,
     placeholder: "your Suno API provider key...",
   },

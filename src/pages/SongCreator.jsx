@@ -85,7 +85,7 @@ export default function SongCreator() {
           <h1 className="text-2xl font-black text-foreground">Song Creator</h1>
           <p className="text-muted-foreground text-sm leading-relaxed">
             Generate original song lyrics in any language, AI voiceover rendering, and automatic dubbing into other languages — exclusive to the Enterprise plan.
-            Full songs with vocals require a Suno connection (Settings → Integrations); without one, "Sung / Full song" produces an instrumental track.
+            "Sung / Full song" produces a real vocal track from your lyrics.
           </p>
           <Link to="/billing"
             className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-violet-500 to-pink-600 text-white text-sm font-semibold shadow-lg shadow-violet-500/25 hover:opacity-90 transition-opacity">
@@ -153,13 +153,15 @@ export default function SongCreator() {
     setSongLoading(true);
     setError("");
     try {
-      // generateMusic now runs as an async job on the render worker and
-      // returns { url, vocals } — url is a persistent URL (already
-      // uploaded to Base44 storage), so unlike the spoken-TTS path below
-      // there's no local Blob to track for this one. `vocals` says
-      // honestly whether this is a real Suno song with vocals or the
-      // MusicGen instrumental fallback (Suno not configured) — see
-      // aiClient.js's generateMusic docstring.
+      // generateMusic runs as an async job on the render worker and returns
+      // { url, vocals } — url is a persistent URL (already uploaded to
+      // Base44 storage), so unlike the spoken-TTS path below there's no
+      // local Blob to track for this one. `vocals` says honestly whether a
+      // sung track was actually produced: ElevenLabs (the default provider)
+      // and Suno both sing, but if neither is configured the job degrades to
+      // the MusicGen instrumental and reports vocals: false rather than
+      // passing an instrumental off as a song. See aiClient.js's
+      // generateMusic docstring.
       const music = await generateMusic({
         prompt: theme,
         lyrics: toSpeakableText(lyrics),
@@ -384,13 +386,14 @@ export default function SongCreator() {
                           <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
                             songHasVocals ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-400"
                           }`}>
-                            {songHasVocals ? "Full song with vocals (Suno)" : "Instrumental only — Suno not connected"}
+                            {songHasVocals ? "Full song with vocals" : "Instrumental only — no vocal provider configured"}
                           </span>
                         )}
                       </div>
                       {songHasVocals === false && (
                         <p className="text-[11px] text-amber-400/90 mb-2">
-                          This generated an instrumental track, not a sung song — connect a Suno key in{" "}
+                          This generated an instrumental track, not a sung song — no vocal-capable provider is
+                          configured. Add an ElevenLabs (or Suno) key in{" "}
                           <Link to="/integrations" className="underline hover:text-foreground">Integrations</Link> to get real vocals.
                         </p>
                       )}

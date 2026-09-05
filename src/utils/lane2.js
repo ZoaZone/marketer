@@ -3,7 +3,7 @@
 // Lane 2 may use everything Lane 1 can (Base44-native generation, the
 // shared FFmpeg-assembly + capture worker routes — see assembly.js) plus
 // the paid Replicate/ElevenLabs generation endpoints: per-scene
-// Kling/MiniMax video, MusicGen background music, and ElevenLabs dubbing
+// Kling/MiniMax video, ElevenLabs Music background music, and ElevenLabs dubbing
 // (audio/video, including lip-sync). Lane 1 (lane1.js) must never import
 // any of the paid-generation exports below — see lane1.js's header
 // comment and eslint.config.js's no-restricted-imports guard.
@@ -31,8 +31,8 @@ import {
   getCaptureStatus,
 } from "./assembly.js";
 
-// Paid generation — Replicate (Kling/MiniMax video, MusicGen) and
-// ElevenLabs (dubbing/lip-sync). Lane 2 only.
+// Paid generation — Replicate (Kling/MiniMax video, lip-sync) and
+// ElevenLabs (music, dubbing). Lane 2 only.
 import {
   submitVideo,
   getVideoStatus,
@@ -40,6 +40,7 @@ import {
   submitMusic,
   getMusicStatus,
   generateMusic,
+  MAX_MUSIC_SECONDS,
   submitDubAudio,
   submitDubVideo,
   getDubStatus,
@@ -65,6 +66,7 @@ export {
   submitMusic,
   getMusicStatus,
   generateMusic,
+  MAX_MUSIC_SECONDS,
   submitDubAudio,
   submitDubVideo,
   getDubStatus,

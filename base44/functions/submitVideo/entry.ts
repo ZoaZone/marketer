@@ -394,7 +394,10 @@ Deno.serve(async (req) => {
     const overBudget = await meterUsage(
       base44, user, 'ai_video_scene',
       Math.max(1, Math.ceil((Number(spec.durationSeconds) || 5) / 5)),
-      { usedOwnKey: !!byok.replicateKey, provider: 'replicate' },
+      // `replicateToken` is the field buildByok actually sets; this read
+      // `byok.replicateKey`, which is never written, so it was permanently
+      // false and BYOK users were charged for jobs their own key paid for.
+      { usedOwnKey: !!byok.replicateToken, provider: 'replicate' },
     );
     if (overBudget) return overBudget;
 

@@ -23,7 +23,7 @@ import {
 // loudnorm/contrast finishing pass), not the old client-side
 // Canvas+MediaRecorder path (src/utils/videoAssembler.js's assembleVideo,
 // still in the repo but no longer called here). Background music here is
-// upload-only — Lane 1 doesn't have access to MusicGen (that's a paid
+// upload-only — Lane 1 doesn't have access to AI music generation (that's a paid
 // Replicate call, Lane 2 only).
 //
 // The video path is a linear, gated stepper (Work Package G): each step's

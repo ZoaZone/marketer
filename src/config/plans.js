@@ -35,7 +35,7 @@ export const AI_CREDIT_RETAIL_USD = 0.06;
  * Render Minute (RM) — the Lane 2 (Studio & Dubbing) unit, defined as one
  * minute of dubbed output. Heavier operations cost proportionally more:
  * lip-sync is 6 RM/min, one 5-second AI video scene is 1 RM, one generated
- * instrumental music track is 0.25 RM, one full vocal song (Suno) is 1 RM.
+ * instrumental music track is 0.25 RM, one full vocal song is 1 RM.
  * Users see the weights (they are a product feature); they never see the
  * provider costs behind them.
  */

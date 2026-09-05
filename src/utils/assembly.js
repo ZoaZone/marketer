@@ -17,7 +17,7 @@
 //      its own narration/music pipeline — that's not exposed here or to
 //      Lane 1 at all, only submitCapture/getCaptureStatus are.)
 //
-// Paid generation — Replicate (Kling/MiniMax, MusicGen, lip-sync) and
+// Paid generation — Replicate (Kling/MiniMax, lip-sync) and ElevenLabs (music, dubbing) and
 // ElevenLabs (dubbing) — has real per-scene/per-minute cost and is Lane 2
 // only; see lane2.js, never re-exported here.
 //
