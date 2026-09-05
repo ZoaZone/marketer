@@ -600,6 +600,16 @@ export default function MovieMaker() {
         });
         if (url) newClips.push({ videoUrl: url, duration: clipSeconds });
       } catch (e) {
+        // A provider billing failure is not a per-scene hiccup — it will hit
+        // every remaining shot and every retry until the account is topped
+        // up. Raise it as a hard error and stop the loop rather than
+        // collecting one "the still image will be used instead" warning per
+        // scene, which is how an out-of-credit account came to look like a
+        // quality problem instead of an outage.
+        if (e?.billing) {
+          setError(`${e.message} Scene video generation is paused until the provider account is funded.`);
+          break;
+        }
         const msg = shotCount > 1
           ? `Shot ${shot + 1} of ${shotCount} failed for this scene: ${e?.message || "unknown error"}`
           : (e?.message || "Video clip generation failed. The still image will be used instead.");
