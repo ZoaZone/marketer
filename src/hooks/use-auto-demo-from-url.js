@@ -172,11 +172,12 @@ export function useAutoDemoFromUrl(user) {
       setStepLabel("Adding background music…");
       let musicUrl;
       try {
-        musicUrl = await generateMusic({
+        const music = await generateMusic({
           prompt: `Background music for a product demo video about ${pageInfo.title || url}`,
           durationSeconds: Math.min(60, Math.max(15, captureSeconds)),
           instrumental: true,
         });
+        musicUrl = music?.url;
       } catch (_e) {
         // Non-fatal — the demo still assembles fine with narration alone.
         setWarnings((prev) => [...prev, "Background music generation failed — the demo will play without it."]);

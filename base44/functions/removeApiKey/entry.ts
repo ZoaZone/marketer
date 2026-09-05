@@ -3,7 +3,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 /**
  * removeApiKey — Work Package F (BYOK). Deletes a provider's stored key from
  * user.settings.api_keys, reverting that provider to the platform fallback
- * key. Body: { provider: "replicate" | "elevenlabs" | "llm" }.
+ * key. Body: { provider: "replicate" | "elevenlabs" | "llm" | "suno" }.
  */
 
 const CORS = {
@@ -12,7 +12,7 @@ const CORS = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
-const PROVIDERS = ['replicate', 'elevenlabs', 'llm'];
+const PROVIDERS = ['replicate', 'elevenlabs', 'llm', 'suno'];
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
@@ -25,7 +25,7 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const provider = body?.provider;
     if (!PROVIDERS.includes(provider)) {
-      return Response.json({ error: 'provider must be one of: replicate, elevenlabs, llm.' }, { status: 400, headers: CORS });
+      return Response.json({ error: 'provider must be one of: replicate, elevenlabs, llm, suno.' }, { status: 400, headers: CORS });
     }
 
     const currentSettings = user.settings || {};

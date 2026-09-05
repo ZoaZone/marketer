@@ -25,10 +25,12 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
  *   - "replicate": MusicGen (or whichever model REPLICATE_MUSIC_MODEL
  *     names). Kept as a fallback so a deployment can switch back with an
  *     env var. Instrumental-only.
- *   - "suno": accepted as a legacy alias for "elevenlabs". Suno has no
- *     public API; this value only ever selected a stub that threw, so
- *     mapping it forward means a deployment still holding the old setting
- *     generates music instead of failing every request.
+ *   - "suno": falls through to "elevenlabs" here. The third-party Suno
+ *     path exists only on the async worker (server-render/music.js), where
+ *     a full ~2-4 minute song has room to render; it could never complete
+ *     inside this gated synchronous call. ElevenLabs sings too, so a
+ *     deployment set to "suno" still gets vocals from this endpoint rather
+ *     than the error the old stub threw.
  */
 
 const CORS = {
@@ -110,8 +112,9 @@ function clampDuration(
   return Math.min(max, Math.max(min, Math.round(n)));
 }
 
-// MUSIC_PROVIDER, normalized. "suno" maps to "elevenlabs" — see the module
-// docstring; it never had a working implementation to preserve.
+// MUSIC_PROVIDER, normalized for THIS endpoint. "suno" maps to
+// "elevenlabs" — see the module docstring: the Suno path is worker-only,
+// and ElevenLabs covers the same vocal case within the gateway window.
 function resolveProvider(): string {
   const raw = Deno.env.get('MUSIC_PROVIDER')?.trim().toLowerCase() || '';
   if (!raw || raw === 'suno') return 'elevenlabs';
@@ -341,6 +344,10 @@ const RAW = {
   voiceover: num(Deno.env.get('TTS_RATE_USD_PER_1K_CHARS'), 0.05) * 1.5,
   ai_video_scene: num(Deno.env.get('VIDEO_RATE_USD_PER_SCENE'), 0.35),
   music_track: num(Deno.env.get('MUSIC_RATE_USD_PER_RUN'), 0.10),
+  // Real vocal song generation (Suno) — no confirmed platform-owned API
+  // contract at time of writing, so this is a conservative estimate, not a
+  // verified price. See base44/PRICING_INTERNAL.md.
+  music_vocal_track: num(Deno.env.get('MUSIC_VOCAL_RATE_USD_PER_RUN'), 0.30),
   dubbing_minute: num(Deno.env.get('DUBBING_RATE_USD_PER_MINUTE'), 0.50),
   lipsync_minute: num(Deno.env.get('LIPSYNC_RATE_USD_PER_MINUTE'), 3.00),
 };
@@ -352,6 +359,7 @@ const WEIGHTS: Record<string, { rm: number; ac: number }> = {
   voiceover: { rm: 0, ac: 1 },
   ai_video_scene: { rm: 1, ac: 0 },
   music_track: { rm: 0.25, ac: 0 },
+  music_vocal_track: { rm: 1, ac: 0 },
   dubbing_minute: { rm: 1, ac: 0 },
   lipsync_minute: { rm: 6, ac: 0 },
 };

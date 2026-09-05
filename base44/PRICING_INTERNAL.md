@@ -41,7 +41,8 @@ they can be corrected without a code change.
 |---|---|---|---|
 | ElevenLabs dubbing, no watermark | **$0.50 / min** | `DUBBING_RATE_USD_PER_MINUTE` | VERIFIED — elevenlabs.io/pricing/api, 2026-08-31. (Watermarked is $0.33/min; we ship unwatermarked for commercial use.) |
 | ElevenLabs TTS `eleven_turbo_v2_5` | **$0.05 / 1K chars** | `TTS_RATE_USD_PER_1K_CHARS` | VERIFIED — elevenlabs.io/pricing/api, 2026-08-31 |
-| ElevenLabs Music (`music_v1`) | **$0.10 / run** | `MUSIC_RATE_USD_PER_RUN` | ESTIMATE — carried over unchanged from the Replicate `meta/musicgen` rate this path replaced (VERIFIED $0.10/run, replicate.com/meta/musicgen, 2026-08-31). ElevenLabs bills music by generated *length*, not per run, so a flat per-run figure only holds while clips stay short; submitMusic caps one run at 600s. **Confirm the per-minute rate from elevenlabs.io/pricing/api and reweight if a full-length score costs materially more than $0.10.** |
+| Instrumental music, one run (`music_track`) | **$0.10 / run** | `MUSIC_RATE_USD_PER_RUN` | ESTIMATE for the default provider. VERIFIED $0.10/run for the Replicate `meta/musicgen` fallback (replicate.com/meta/musicgen, 2026-08-31); the ElevenLabs Music default now serves this kind at the same assumed rate. ElevenLabs bills music by generated *length*, not per run, so a flat per-run figure only holds while clips stay short — submitMusic caps one run at 600s. **Confirm the per-minute rate from elevenlabs.io/pricing/api and reweight if a full-length score costs materially more than $0.10.** |
+| Vocal song, one run (`music_vocal_track`) | **$0.30 / run** | `MUSIC_VOCAL_RATE_USD_PER_RUN` | UNVERIFIED. Charged for any run that actually produces vocals — ElevenLabs Music with `force_instrumental: false` (the default vocal path), or the opt-in third-party Suno path. Set conservative (high) so the margin cannot go negative on either. **Confirm ElevenLabs' music rate from elevenlabs.io/pricing/api, and — if `SUNO_API_KEY` is ever provisioned — your Suno reseller's per-generation price.** |
 | `sync/lipsync-2` | **$3.00 / min** | `LIPSYNC_RATE_USD_PER_MINUTE` | ESTIMATE — sync.so list price is $2.40–3.00/min; Replicate's resale price is not published and could not be read unauthenticated. Set to the top of the range. **Confirm from the Replicate billing dashboard.** |
 | Replicate `kwaivgi/kling-v1.6-standard`, 5s clip | **$0.35 / scene** | `VIDEO_RATE_USD_PER_SCENE` | ESTIMATE — Replicate's own comparison blog quoted $0.25–0.90 in Jul-2025; the live model page renders price client-side and is unreadable unauthenticated. **Confirm from the Replicate billing dashboard.** |
 | Base44 pooled credit (1 image / short scene) | **$0.04** | `AI_GENERATION_COST_USD` | UNVERIFIED — inherited codebase assumption. Base44 does not publish a per-credit unit cost; its plans bundle message + integration credits into one fee. **Confirm from your own Base44 billing.** |
@@ -74,7 +75,8 @@ Weights are `raw_cost / 0.50`, rounded up to absorb price uncertainty:
 | Dubbing, per minute | 1.00 | **1 RM** |
 | Lip-sync, per minute | 6.00 | **6 RM** |
 | AI video scene (5s) | 0.70 | **1 RM** (rounded up — absorbs the Kling uncertainty) |
-| Music track | 0.20 | **0.25 RM** |
+| Music track (instrumental) | 0.20 | **0.25 RM** |
+| Music track (vocal song, Suno) | 0.60 | **1 RM** (rounded up — absorbs the unverified Suno rate) |
 
 ---
 

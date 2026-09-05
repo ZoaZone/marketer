@@ -3,7 +3,7 @@ import { useOutletContext, Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Plug, ShieldCheck, ExternalLink, Trash2, Loader2, CheckCircle2,
-  AlertCircle, Eye, EyeOff, Video, Mic, Brain, KeyRound, Lock,
+  AlertCircle, Eye, EyeOff, Video, Mic, Brain, KeyRound, Lock, Music,
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { isByokEntitled } from "@/utils/entitlements";
@@ -33,6 +33,14 @@ const PROVIDERS = [
     description: "Powers Movie Maker Pro's dubbing and lip-sync.",
     getKeyUrl: "https://elevenlabs.io/app/settings/api-keys",
     placeholder: "sk_...",
+  },
+  {
+    id: "suno",
+    label: "Suno",
+    icon: Music,
+    description: "Optional alternative vocal-song engine for Song Creator. Vocals already work without it — ElevenLabs is the default and sings — so connect this only if you specifically want Suno. Suno has no public API of its own, so this connects a third-party Suno API provider.",
+    getKeyUrl: null,
+    placeholder: "your Suno API provider key...",
   },
   {
     id: "llm",

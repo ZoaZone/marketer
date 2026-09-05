@@ -200,12 +200,14 @@ export default function DemoVideoMaker() {
             durationSeconds: Math.min(Math.max(totalSeconds, 20), 120),
             instrumental: true,
           });
-          // generateMusic resolves to a URL *string*, not a { url } object.
-          // Reading `music.url` was always undefined, so every generated
-          // track was thrown away and the demo shipped silent with a
-          // "returned no track" warning that had nothing to do with the
-          // provider.
-          if (typeof music === "string" && music) finalMusicUrl = music;
+          // generateMusic resolves to { url, vocals }. This read `music.url`
+          // back when the function returned a bare URL string, so it was
+          // always undefined and every generated track was thrown away —
+          // the demo shipped silent with a "returned no track" warning that
+          // had nothing to do with the provider. The contract is an object
+          // now, so the same expression is finally correct; keep the two in
+          // step if it ever changes again.
+          if (music?.url) finalMusicUrl = music.url;
           else setWarnings(prev => [...prev, "AI music generation returned no track — shipping silent."]);
         } catch (e) {
           setWarnings(prev => [...prev, `AI music generation failed (${e?.message || "error"}) — shipping silent.`]);

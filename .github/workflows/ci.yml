@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  app:
+    name: App — lint, plan-catalog check, entitlement/metering tests, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # `npm run verify` runs, in order: lint, check:plans (plan-catalog /
+      # metering-block drift check), test:metering (scripts/test-metering.mjs
+      # — the metering block's behaviour under plain Node), test:advisor,
+      # test (Vitest — see test/, entitlement + metering coverage), then
+      # build. Kept as one command so CI and a local `npm run verify` never
+      # diverge.
+      - run: npm run verify
+        env:
+          # vite build fails loudly without an app id configured — CI only
+          # needs the build to compile, not to be a deployable artifact, so
+          # a placeholder is enough here. Never a real key/secret.
+          VITE_BASE44_APP_ID: ci-build-placeholder
+
+  server-render:
+    name: server-render worker — install, build (syntax check)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server-render
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server-render/package-lock.json
+      - run: npm ci
+      # server-render is a plain long-running Node service with no bundler
+      # and (deliberately, to avoid inventing conventions for an unreviewed
+      # config) no ESLint setup of its own — "build" here means what it can
+      # mean for this kind of service: every module actually parses cleanly.
+      - run: npm run build

@@ -11,9 +11,18 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
  * base44.auth.me() auth guard, same { error } shape on failure.
  *
  * The request body IS the music spec as-is ({ prompt, durationSeconds,
- * instrumental, lyrics, model_version } — see server-render/music.js) —
- * this function forwards it to the worker with the shared secret it needs
- * to accept the job, adding only the BYOK credentials and a duration clamp.
+ * instrumental, lyrics, genre, mood, title, model_version } — see
+ * server-render/music.js) — this function forwards it to the worker with
+ * the shared secret it needs to accept the job, adding only a duration
+ * clamp and the BYOK credentials. `byok` is the one field this function
+ * supplies itself (see buildByok below); a caller-supplied `byok` is not
+ * trusted or forwarded.
+ *
+ * The worker picks the provider for real; pickProvider below mirrors that
+ * resolution exactly so this function can charge the right metering `kind`
+ * (a vocal song costs 1 RM, an instrumental 0.25 RM) BEFORE the job runs.
+ * The two must never disagree about what will run — see pickProvider's
+ * note.
  */
 
 const CORS = {
@@ -43,7 +52,7 @@ async function decryptSecret(stored: { ciphertext: string; iv: string }, keyB64:
   return new TextDecoder().decode(plainBuf);
 }
 
-async function buildByok(apiKeys: any, fields: Array<'replicate' | 'elevenlabs'>): Promise<Record<string, string>> {
+async function buildByok(apiKeys: any, fields: Array<'replicate' | 'elevenlabs' | 'suno'>): Promise<Record<string, string>> {
   const encryptionKey = Deno.env.get('BYOK_ENCRYPTION_KEY');
   const byok: Record<string, string> = {};
   if (!encryptionKey) return byok;
@@ -54,14 +63,41 @@ async function buildByok(apiKeys: any, fields: Array<'replicate' | 'elevenlabs'>
       const plain = await decryptSecret(record, encryptionKey);
       if (field === 'replicate') byok.replicateToken = plain;
       if (field === 'elevenlabs') byok.elevenLabsKey = plain;
+      if (field === 'suno') byok.sunoApiKey = plain;
     } catch (_) { /* ignore — fall back to platform key */ }
   }
   return byok;
 }
 
+/**
+ * Which music provider the worker will actually use for this spec.
+ *
+ * MUST mirror pickProvider() in server-render/music.js. A Base44 function
+ * deployment cannot import from the worker, so this is a hand-kept copy —
+ * if the two drift, this function charges for one provider while a
+ * different one runs, which is exactly how a BYOK user ends up billed for
+ * a job their own key paid for.
+ *
+ *   1. Vocals requested + MUSIC_PROVIDER=suno + a Suno key -> "suno".
+ *   2. An ElevenLabs key -> "elevenlabs" (covers instrumental and vocals
+ *      alike, and is preferred for a vocals request even under
+ *      MUSIC_PROVIDER=replicate, because MusicGen cannot sing).
+ *   3. Otherwise -> "replicate", instrumental-only.
+ */
+function pickProvider(spec: any, byok: Record<string, string>): string {
+  const wantsVocals = spec?.instrumental === false;
+  const configured = Deno.env.get('MUSIC_PROVIDER')?.trim().toLowerCase() || 'elevenlabs';
+  const sunoKey = byok.sunoApiKey || Deno.env.get('SUNO_API_KEY')?.trim();
+  const elevenLabsKey = byok.elevenLabsKey || Deno.env.get('ELEVENLABS_API_KEY')?.trim();
+
+  if (wantsVocals && configured === 'suno' && sunoKey) return 'suno';
+  if (elevenLabsKey && (configured !== 'replicate' || wantsVocals)) return 'elevenlabs';
+  return 'replicate';
+}
+
 // COST GATE. isByokEntitled below only decides WHOSE api key pays; it never
 // gated access, so before this any authenticated user — free tier included —
-// could call this endpoint directly and bill the platform. Music generation bills per run against a platform provider key (ElevenLabs by default, Replicate when MUSIC_PROVIDER says so).
+// could call this endpoint directly and bill the platform. Music generation bills per run against a platform provider key (ElevenLabs by default; Replicate or Suno when MUSIC_PROVIDER and the available keys say so — see pickProvider above).
 // The eslint lane guard stops Lane 1 *code* importing Lane 2, but a lint rule
 // is not an access control: it does nothing about a direct HTTP call.
 const GENERATION_ENTITLED_TIERS = ["byok","indie","studio","dubbing_house","enterprise","agency"];
@@ -106,6 +142,10 @@ const RAW = {
   voiceover: num(Deno.env.get('TTS_RATE_USD_PER_1K_CHARS'), 0.05) * 1.5,
   ai_video_scene: num(Deno.env.get('VIDEO_RATE_USD_PER_SCENE'), 0.35),
   music_track: num(Deno.env.get('MUSIC_RATE_USD_PER_RUN'), 0.10),
+  // Real vocal song generation (Suno) — no confirmed platform-owned API
+  // contract at time of writing, so this is a conservative estimate, not a
+  // verified price. See base44/PRICING_INTERNAL.md.
+  music_vocal_track: num(Deno.env.get('MUSIC_VOCAL_RATE_USD_PER_RUN'), 0.30),
   dubbing_minute: num(Deno.env.get('DUBBING_RATE_USD_PER_MINUTE'), 0.50),
   lipsync_minute: num(Deno.env.get('LIPSYNC_RATE_USD_PER_MINUTE'), 3.00),
 };
@@ -117,6 +157,7 @@ const WEIGHTS: Record<string, { rm: number; ac: number }> = {
   voiceover: { rm: 0, ac: 1 },
   ai_video_scene: { rm: 1, ac: 0 },
   music_track: { rm: 0.25, ac: 0 },
+  music_vocal_track: { rm: 1, ac: 0 },
   dubbing_minute: { rm: 1, ac: 0 },
   lipsync_minute: { rm: 6, ac: 0 },
 };
@@ -369,15 +410,6 @@ Deno.serve(async (req) => {
 
     const spec = await req.json().catch(() => ({}));
 
-    // Which provider the worker will actually use, so the BYOK key that
-    // gets forwarded, the `usedOwnKey` decision and the recorded provider
-    // label all agree with what really runs. Must mirror
-    // server-render/music.js's resolveProvider(), including the "suno"
-    // legacy alias — a mismatch here would forward the wrong key and bill
-    // a BYOK user for a job their own account paid for.
-    const providerEnv = Deno.env.get('MUSIC_PROVIDER')?.trim().toLowerCase() || '';
-    const provider = !providerEnv || providerEnv === 'suno' ? 'elevenlabs' : providerEnv;
-
     // Clamp here as well as in the worker: durationSeconds arrives straight
     // from the browser, and one run is charged the same whether it asks for
     // 30 seconds or ten minutes of provider time.
@@ -389,19 +421,40 @@ Deno.serve(async (req) => {
     }
 
     const entitled = await isByokEntitled(base44, user);
+    // All three providers' keys are forwarded; which one the worker
+    // actually reaches for is decided by pickProvider below (and, for real,
+    // by the identical resolution in server-render/music.js).
     const byok = entitled
-      ? await buildByok(user.settings?.api_keys || {}, provider === 'replicate' ? ['replicate'] : ['elevenlabs'])
+      ? await buildByok(user.settings?.api_keys || {}, ['replicate', 'elevenlabs', 'suno'])
       : {};
     if (Object.keys(byok).length) spec.byok = byok;
 
-    // SPEND CEILING. One generation run per submission.
+    const provider = pickProvider(spec, byok);
+    // Vocals are only actually produced by Suno, or by ElevenLabs when
+    // vocals were asked for. MusicGen cannot sing at all, so a vocals
+    // request that lands there is charged — and reported — as the
+    // instrumental it will be.
+    const producesVocals = provider === 'suno' || (provider === 'elevenlabs' && spec?.instrumental === false);
+
+    // SPEND CEILING. One generation run per submission, charged as the
+    // vocal-song kind (1 RM) or the instrumental kind (0.25 RM) according
+    // to what will actually run.
     //
     // `usedOwnKey` reads the field buildByok actually sets — replicateToken
-    // / elevenLabsKey. It used to read `byok.replicateKey`, which buildByok
-    // never writes, so it was permanently false and every BYOK user was
-    // charged Render Minutes for jobs their own provider account paid for.
-    const usedOwnKey = provider === 'replicate' ? !!byok.replicateToken : !!byok.elevenLabsKey;
-    const overBudget = await meterUsage(base44, user, 'music_track', 1, { usedOwnKey, provider });
+    // / elevenLabsKey / sunoApiKey — and only the one paying for THIS run.
+    // It used to read `byok.replicateKey`, which buildByok never writes, so
+    // it was permanently false and every BYOK user was charged Render
+    // Minutes for jobs their own provider account had already paid for.
+    const usedOwnKey =
+      provider === 'suno' ? !!byok.sunoApiKey
+      : provider === 'elevenlabs' ? !!byok.elevenLabsKey
+      : !!byok.replicateToken;
+
+    const overBudget = await meterUsage(
+      base44, user,
+      producesVocals ? 'music_vocal_track' : 'music_track', 1,
+      { usedOwnKey, provider },
+    );
     if (overBudget) return overBudget;
 
     let workerRes: Response;
