@@ -43,6 +43,19 @@ they can be corrected without a code change.
 | ElevenLabs TTS `eleven_turbo_v2_5` | **$0.05 / 1K chars** | `TTS_RATE_USD_PER_1K_CHARS` | VERIFIED — elevenlabs.io/pricing/api, 2026-08-31 |
 | Instrumental music, one run (`music_track`) | **$0.10 / run** | `MUSIC_RATE_USD_PER_RUN` | ESTIMATE for the default provider. VERIFIED $0.10/run for the Replicate `meta/musicgen` fallback (replicate.com/meta/musicgen, 2026-08-31); the ElevenLabs Music default now serves this kind at the same assumed rate. ElevenLabs bills music by generated *length*, not per run, so a flat per-run figure only holds while clips stay short — submitMusic caps one run at 600s. **Confirm the per-minute rate from elevenlabs.io/pricing/api and reweight if a full-length score costs materially more than $0.10.** |
 | Vocal song, one run (`music_vocal_track`) | **$0.30 / run** | `MUSIC_VOCAL_RATE_USD_PER_RUN` | UNVERIFIED. Charged for any run that actually produces vocals — ElevenLabs Music with `force_instrumental: false` (the default vocal path), or the opt-in third-party Suno path. Set conservative (high) so the margin cannot go negative on either. **Confirm ElevenLabs' music rate from elevenlabs.io/pricing/api, and — if `SUNO_API_KEY` is ever provisioned — your Suno reseller's per-generation price.** |
+
+### Unmetered: the music brief
+
+Every music run also makes one small LLM call to turn the caller's thin
+request into a musical brief before it reaches the renderer — Base44
+`InvokeLLM` first, an admin OpenAI key as fallback (`composeMusicBrief` in
+`base44/functions/submitMusic/entry.ts`). It is **not** charged separately:
+double-charging one user action would be worse than absorbing a
+prompt-shaping call into the music run's own price. That does mean a small
+platform-side cost per music generation that no `UsageEvent` records — one
+`InvokeLLM` prompt of a few hundred tokens. If music volume ever makes that
+material, either fold it into `MUSIC_RATE_USD_PER_RUN` or set
+`MUSIC_BRIEF_LLM=off` to disable the enrichment entirely.
 | `sync/lipsync-2` | **$3.00 / min** | `LIPSYNC_RATE_USD_PER_MINUTE` | ESTIMATE — sync.so list price is $2.40–3.00/min; Replicate's resale price is not published and could not be read unauthenticated. Set to the top of the range. **Confirm from the Replicate billing dashboard.** |
 | Replicate `kwaivgi/kling-v1.6-standard`, 5s clip | **$0.35 / scene** | `VIDEO_RATE_USD_PER_SCENE` | ESTIMATE — Replicate's own comparison blog quoted $0.25–0.90 in Jul-2025; the live model page renders price client-side and is unreadable unauthenticated. **Confirm from the Replicate billing dashboard.** |
 | Base44 pooled credit (1 image / short scene) | **$0.04** | `AI_GENERATION_COST_USD` | UNVERIFIED — inherited codebase assumption. Base44 does not publish a per-credit unit cost; its plans bundle message + integration credits into one fee. **Confirm from your own Base44 billing.** |

@@ -46,6 +46,10 @@ export async function loadServerModule(filePath, beginMarker, endMarker, exportN
     .replace(/stored: \{ ciphertext: string; iv: string \}, keyB64: string/g, "stored, keyB64")
     .replace(/const byok: Record<string, string> = \{\}/g, "const byok = {}")
     .replace(/spec: any, byok: Record<string, string>\): string/g, "spec, byok)")
+    // submitMusic's music-brief chain (Base44 InvokeLLM -> OpenAI).
+    .replace(/\(spec: any\): string/g, "(spec)")
+    .replace(/\(raw: unknown\): string \| null/g, "(raw)")
+    .replace(/\(base44: any, spec: any\): Promise<string \| null>/g, "(base44, spec)")
     // The canonical metering block (base44/_shared/metering.block.ts) —
     // same replacements scripts/test-metering.mjs already uses to run it
     // under plain Node, reused here so both files load the same way.
