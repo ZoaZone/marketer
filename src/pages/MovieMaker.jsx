@@ -5,6 +5,7 @@ import { mine } from "@/utils/scope";
 import { useMovieProjectPersistence } from "@/hooks/use-movie-project-persistence";
 import { useAutoDemoFromUrl } from "@/hooks/use-auto-demo-from-url";
 import PageHeader from "@/components/ui/PageHeader";
+import SceneClipPlayer from "@/components/movie-maker/SceneClipPlayer";
 import {
   Film, Sparkles, Lock, Plus, Trash2, Loader2, ChevronRight,
   ChevronLeft, Mic, Music, Globe, Upload, Check, AlertCircle,
@@ -1418,21 +1419,15 @@ export default function MovieMaker() {
                   </div>
                 </div>
 
-                {/* Scene preview — shows the first shot only; all clips play
-                    in order at assembly time. */}
-                {scene.videoUrl ? (
-                  <div className="relative">
-                    <video src={scene.videoUrl} controls className="w-full h-32 object-cover rounded-xl border border-border" />
-                    {scene.clips?.length > 1 && (
-                      <span className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded-md bg-black/70 text-[10px] font-semibold text-white">
-                        {scene.clips.length} shots · {sceneDuration(scene)}s
-                      </span>
-                    )}
-                  </div>
-                ) : scene.imageUrl && (
-                  <img src={scene.imageUrl} alt={`Scene ${i+1}`}
-                    className="w-full h-32 object-cover rounded-xl border border-border" />
-                )}
+                {/* Scene preview — plays every chained shot in order,
+                    looping continuously, the same order assembly renders
+                    them in; a scene with no clip visibly says so. */}
+                <SceneClipPlayer
+                  clips={scene.clips}
+                  videoUrl={scene.videoUrl}
+                  imageUrl={scene.imageUrl}
+                  totalSeconds={sceneDuration(scene)}
+                />
               </div>
             ))}
           </div>

@@ -828,6 +828,40 @@ export async function renderProject(project, onProgress = () => {}) {
     ]);
 
     let finalPath = concatPath;
+
+    // ── Optional project-level narration ─────────────────────────────────
+    // Quick Create sends ONE voiceover track for the whole film
+    // (project.voiceoverUrl) rather than Movie Maker's per-scene voiceUrl
+    // fields — and renderProject otherwise only mixes per-scene audio, so
+    // Quick Create's "real AI video" path silently produced motion clips
+    // with NO narration at all. Mix the track over the concatenated film
+    // here. Non-fatal, same as music: an unreachable or corrupt narration
+    // file must not sink a film whose scenes all rendered fine.
+    if (project.voiceoverUrl) {
+      try {
+        const narrationPath = assetPath(workDir, "narration");
+        await downloadTo(project.voiceoverUrl, narrationPath);
+        const narrationSeconds = await probeDuration(narrationPath).catch(() => 0);
+        if (narrationSeconds <= 0) {
+          throw new Error("the downloaded narration file has no readable audio stream");
+        }
+        const voicedPath = path.join(workDir, "voiced.mp4");
+        // apad holds the narration under the film's whole runtime; amix with
+        // duration=first trims the mix to the video's own length.
+        await run("ffmpeg", [
+          "-y", "-i", concatPath, "-i", narrationPath,
+          "-filter_complex", "[1:a]apad[nar];[0:a][nar]amix=inputs=2:duration=first:dropout_transition=0[aout]",
+          "-map", "0:v", "-map", "[aout]",
+          "-c:v", "copy", "-c:a", "aac",
+          "-shortest",
+          voicedPath,
+        ]);
+        finalPath = voicedPath;
+      } catch (e) {
+        console.error(`[render] narration mix failed (${project.voiceoverUrl}): ${e.message} — shipping without the project voiceover.`);
+      }
+    }
+
     if (musicPath) {
       // Non-fatal, same as the download above: by this point every scene
       // and the narration have already rendered — a corrupt/unreadable
@@ -835,9 +869,15 @@ export async function renderProject(project, onProgress = () => {}) {
       // crossfade/mix must not sink the whole film after all that work.
       // Ship without the score rather than error the job; the user can
       // regenerate or upload a track and re-assemble.
+      // The fallback on failure below must be this pre-music path, not the
+      // raw concat — reverting to concat would also throw away the
+      // narration mixed in just above.
+      const preMusicPath = finalPath;
       try {
         const musicVolume = typeof project.musicVolume === "number" ? project.musicVolume : 0.18;
-        const filmSeconds = (await probeDuration(concatPath).catch(() => 0)) || totalSceneSeconds;
+        // Probe the post-narration path (finalPath), not the raw concat — the
+        // film the music has to cover includes the narration-mixed variant.
+        const filmSeconds = (await probeDuration(finalPath).catch(() => 0)) || totalSceneSeconds;
         const musicNaturalSeconds = await probeDuration(musicPath).catch(() => 0);
         if (musicNaturalSeconds <= 0) {
           // ffprobe can read no duration at all — almost certainly a broken
@@ -868,7 +908,7 @@ export async function renderProject(project, onProgress = () => {}) {
         // belt-and-suspenders for the same truncation.
         await run("ffmpeg", [
           "-y",
-          "-i", concatPath,
+          "-i", finalPath,
           ...mixInputArgs,
           "-filter_complex", `[1:a]volume=${musicVolume}[music];[0:a][music]amix=inputs=2:duration=first:dropout_transition=0[aout]`,
           "-map", "0:v", "-map", "[aout]",
@@ -879,7 +919,7 @@ export async function renderProject(project, onProgress = () => {}) {
         finalPath = mixedPath;
       } catch (e) {
         console.error(`[render] music mix failed: ${e.message} — shipping the film without background music.`);
-        finalPath = concatPath;
+        finalPath = preMusicPath;
       }
     }
     onProgress(0.9);

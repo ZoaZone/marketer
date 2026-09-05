@@ -263,7 +263,22 @@ export default function QuickCreate() {
     if (!scenes.length) { setError("Generate the storyboard first."); return; }
     setError(""); setGeneratingVoiceover(true);
     try {
-      const blob = await generateVoiceover(scenes.map(s => s.text).join(". "));
+      // Rewrite the storyboard's written text into natural spoken narration
+      // first, the same idea as Movie Maker's toSpokenDialogue — feeding the
+      // raw scene descriptions to TTS verbatim is what made the voiceover
+      // read as flat description rather than a voice actually speaking the
+      // script. Best-effort: the verbatim text is the fallback.
+      const raw = scenes.map(s => s.text).join(". ");
+      let spoken = raw;
+      try {
+        const rewritten = await generateText({
+          type: "script",
+          prompt: `Rewrite the following as natural, conversational spoken narration only — remove any scene labels, visual directions, parentheticals, or stage directions, and phrase it the way a narrator would actually say it aloud. Return plain spoken text only, nothing else.\n\n${raw}`,
+          tone: "Professional",
+        });
+        if (rewritten?.trim()) spoken = rewritten.trim();
+      } catch { /* verbatim fallback */ }
+      const blob = await generateVoiceover(spoken);
       if (blob) {
         const url = await uploadFile(new File([blob], "quick-create-vo.mp3", { type: blob.type || "audio/mpeg" }));
         setVoiceoverUrl(url || "");
@@ -619,7 +634,7 @@ export default function QuickCreate() {
             {step === 3 && (
               <div className="space-y-4">
                 <h3 className="font-semibold text-foreground">Short Video</h3>
-                <p className="text-sm text-muted-foreground">{scenes.length} scenes · {scenes.length * 8}s total. Choose the format for the final short.</p>
+                <p className="text-sm text-muted-foreground">{scenes.length} scenes · {scenes.reduce((a, s) => a + (Number(s.seconds) || 8), 0)}s total. Choose the format for the final short.</p>
                 <div>
                   <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">Aspect Ratio</label>
                   <div className="flex gap-2 flex-wrap">

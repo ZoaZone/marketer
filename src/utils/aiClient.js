@@ -306,7 +306,14 @@ export async function generateSceneVideo({ prompt, imageUrl, durationSeconds = 5
   const jobId = await submitVideo({ prompt, imageUrl, durationSeconds, aspectRatio });
 
   const POLL_MS = 4000;
-  const TIMEOUT_MS = 300_000; // ~5 minutes — video generation is much slower than music
+  // 10 minutes. Kling itself can take several minutes per clip, and the worker
+  // runs ONE job at a time across every kind (render, music, video, dub — see
+  // server-render/index.js), so a clip submitted behind an in-flight render or
+  // music job spends real minutes just sitting queued. A 5-minute wall-clock
+  // budget failed those jobs client-side while the worker was still working on
+  // them, and the scene silently fell back to its still image — the exact
+  // "video generation isn't generating / just a cinematic still" symptom.
+  const TIMEOUT_MS = 600_000;
 
   const startedAt = Date.now();
   for (;;) {
