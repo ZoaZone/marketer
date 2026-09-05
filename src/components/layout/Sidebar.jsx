@@ -212,8 +212,11 @@ export default function Sidebar({ userTier = 0, isAdmin = false, user = null, su
           </div>
         ))}
 
-        {/* Agency/Affiliate — Agency tier */}
-        {userTier >= 3 && (
+        {/* Agency/Affiliate — Agency tier, or any admin. Every other gate
+            in the app (page guards, server assertEntitled) exempts admins;
+            this one did not, so the owner's own account could not reach the
+            Affiliate or Agency portals from the nav at all. */}
+        {(isAdmin || userTier >= 3) && (
           <div className="mt-2 pt-2 border-t border-sidebar-border space-y-0.5">
             <Link to="/affiliate" onClick={() => setMobileOpen(false)}
               className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${location.pathname === "/affiliate" ? "bg-fuchsia-500/10 text-fuchsia-400 border border-fuchsia-500/20" : "text-sidebar-foreground hover:bg-sidebar-accent"}`}>

@@ -18,7 +18,7 @@ import {
 // generation endpoints (generateSceneVideo/Kling, generateMusic/ElevenLabs Music,
 // dubAudioFile/dubVideoFile/ElevenLabs) alongside the shared FFmpeg
 // assembly route (submitRender/getRenderStatus).
-import { generateText, generateVoiceover, generateMusic, MAX_MUSIC_SECONDS, uploadFile, generateImage, splitScriptIntoScenes, submitRender, getRenderStatus, generateSceneVideo, dubAudioFile, dubVideoFile as dubVideoJob } from "@/utils/lane2";
+import { generateText, generateVoiceover, generateMusic, MAX_MUSIC_SECONDS, uploadFile, generateImage, splitScriptIntoScenes, submitRender, getRenderStatus, generateSceneVideo, dubAudioFile, dubVideoFile as dubVideoJob, probeMediaDuration } from "@/utils/lane2";
 // dubVideoFile (the aiClient job function) is imported as dubVideoJob — the
 // Dubbing Studio already has a dubVideoFile *state variable* holding the
 // raw uploaded File object for the manual translate+voiceover flow below,
@@ -82,6 +82,9 @@ const MAX_SCENES = 12;
 function newScene(n) {
   return {
     id: Date.now() + n, text: "", caption: "", imageUrl: "", videoUrl: "", voiceBlob: null, voiceUrl: "",
+    // Measured length of this scene's generated narration, in seconds.
+    // Load-bearing for timing, not decoration — see sceneDuration below.
+    voiceSeconds: 0,
     // Starts matching the default AI-clip chip (5s) so a fresh scene's
     // "Scene duration" label/slider isn't visibly out of sync with the
     // highlighted chip before the user touches either control.
@@ -99,15 +102,35 @@ function newScene(n) {
 // have something to render.
 const sceneHasVisual = (s) => Boolean((s.clips && s.clips.length) || s.videoUrl || s.imageUrl);
 
-// A scene's duration in the final timeline: the sum of its chained clips'
-// own durations when it has any (each clip contributes its actual length,
-// so a 3-shot scene of 5s+10s+5s occupies 20s) — otherwise the free-range
-// scene.duration, exactly as before. This is the single place that
-// decision is made; every timing computation below (assembly payload,
-// subtitles, duration estimates) goes through this instead of reading
-// scene.duration directly, so they can't drift out of sync with each other.
-const sceneDuration = (s) =>
+// The visual length of a scene: the sum of its chained clips' own
+// durations when it has any (each clip contributes its actual length, so a
+// 3-shot scene of 5s+10s+5s occupies 20s) — otherwise the free-range
+// scene.duration.
+const sceneVisualDuration = (s) =>
   (s.clips && s.clips.length) ? s.clips.reduce((sum, c) => sum + (Number(c.duration) || 0), 0) : Math.max(5, s.duration);
+
+// A scene's duration in the FINAL TIMELINE, which is what every timing
+// computation here needs. This must mirror the rule the render worker
+// actually applies in buildSceneClip:
+//
+//   clipSeconds = max(natural video length, narration length)
+//
+// — a scene is never shorter than its own narration, because cutting a
+// voiceover off mid-sentence would be worse than holding/looping the
+// picture (that gap is SCENE_FILL's job on the worker).
+//
+// Ignoring the narration here is not cosmetic. The client used to compute
+// visual length only, so the moment any scene's voiceover ran longer than
+// its clip, every downstream timing silently disagreed with the rendered
+// film: the exported .srt drifted further out of sync with each such
+// scene, the dubbing caption overrides landed on the wrong shots, and the
+// "Est. duration" readout understated the real runtime.
+//
+// This is the single place that decision is made; assembly payload,
+// subtitles, caption overrides and duration estimates all go through it
+// rather than reading scene.duration or the clip list directly.
+const sceneDuration = (s) =>
+  Math.max(sceneVisualDuration(s), Number(s.voiceSeconds) || 0);
 
 // The AI video-clip model (Kling) only accepts specific discrete durations —
 // this is separate from scene.duration, which is how long the scene occupies
@@ -243,11 +266,27 @@ export default function MovieMaker() {
   const [projectHydrated, setProjectHydrated] = useState(false);
   const location = useLocation();
 
-  // Strip voiceBlob (a browser-only, non-serializable Blob — only the
-  // durable voiceUrl it uploads to is ever worth persisting) before a
-  // scene goes into the saved snapshot.
+  // Strip everything browser-only before a scene goes into the saved
+  // snapshot: the voiceBlob itself (a non-serializable Blob), and — just as
+  // important — any `blob:` voiceUrl, which is an object URL that only
+  // resolves in the tab that created it.
+  //
+  // Persisting a blob: URL was actively harmful, not merely useless. On
+  // reload the scene came back holding a dead URL with no Blob behind it,
+  // and nothing downstream could tell that from a real one: the Voiceover
+  // step showed a broken player, generateAllVoiceovers skipped the scene
+  // because voiceUrl was truthy, and assembleMovie only re-uploads when a
+  // voiceBlob is present — so the dead URL went to the render worker, whose
+  // fetch of it failed and took the entire film's render down with it.
+  // Dropping it here means a reloaded project simply shows that scene as
+  // still needing narration, which is the truth.
   function scenesForSave(list) {
-    return list.map(({ voiceBlob: _voiceBlob, ...rest }) => rest);
+    return list.map(({ voiceBlob: _voiceBlob, ...rest }) => {
+      if (typeof rest.voiceUrl === "string" && rest.voiceUrl.startsWith("blob:")) {
+        return { ...rest, voiceUrl: "", voiceSeconds: 0 };
+      }
+      return rest;
+    });
   }
 
   // Load once on mount — an explicit ?projectId= wins, otherwise the most
@@ -625,7 +664,15 @@ export default function MovieMaker() {
       const blob = await generateVoiceover(spoken);
       if (blob) {
         const url = URL.createObjectURL(blob);
-        updateScene(scene.id, { voiceBlob: blob, voiceUrl: url });
+        // Measure the narration now, while the audio is in hand. The render
+        // worker sizes each scene to at least its own voiceover, so without
+        // this number every timing on this page (the .srt, caption
+        // overrides, the duration estimate, the music length) is computed
+        // against a shorter film than the one that actually gets rendered.
+        // A probe failure leaves it at 0, which just restores the old
+        // visual-only behaviour rather than breaking the scene.
+        const voiceSeconds = (await probeMediaDuration(url, "audio")) || 0;
+        updateScene(scene.id, { voiceBlob: blob, voiceUrl: url, voiceSeconds });
       } else setError("No voiceover was produced. If this persists, verify the ElevenLabs API key is configured.");
     } catch (e) { setError(e?.message || "Voiceover failed."); }
     setVoiceLoading(p => ({ ...p, [scene.id]: false }));
@@ -711,14 +758,26 @@ export default function MovieMaker() {
       // URL uploaded first. Scenes with no voiceBlob (never generated a
       // voiceover) are left as-is and simply render silently.
       const scenesWithPersistedVoice = await Promise.all(readyScenes.map(async (s) => {
-        if (!s.voiceBlob) return s;
+        // A blob: URL with no Blob behind it (a project reloaded in a new
+        // tab) can never be fetched by the worker — drop it rather than
+        // handing the renderer a URL that will fail.
+        if (!s.voiceBlob) {
+          return (typeof s.voiceUrl === "string" && s.voiceUrl.startsWith("blob:"))
+            ? { ...s, voiceUrl: undefined, voiceSeconds: 0 }
+            : s;
+        }
+        // When the upload fails the scene renders silently, so its
+        // narration length must stop counting toward the duration sent
+        // below — otherwise this scene alone would be padded out to the
+        // length of a voiceover the worker never receives, desyncing every
+        // scene after it.
         try {
           const url = await uploadFile(new File([s.voiceBlob], `scene-${s.id}.mp3`, { type: s.voiceBlob.type || "audio/mpeg" }));
-          return url ? { ...s, voiceUrl: url } : { ...s, voiceUrl: undefined };
+          return url ? { ...s, voiceUrl: url } : { ...s, voiceUrl: undefined, voiceSeconds: 0 };
         } catch (_e) {
           const msg = "Couldn't upload one scene's voiceover — that scene will render without narration.";
           setWarnings(prev => prev.includes(msg) ? prev : [...prev, msg]);
-          return { ...s, voiceUrl: undefined };
+          return { ...s, voiceUrl: undefined, voiceSeconds: 0 };
         }
       }));
 

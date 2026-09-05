@@ -23,11 +23,26 @@ import { spawn } from "node:child_process";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
+// Keyed resolution tier first, then aspect ratio — the same shape lane1.js
+// uses, so the two assemblers answer a `resolution` request identically.
+// This worker used to key on ratio alone and hardcode 1080p, which meant
+// Quick Create's resolution selector silently did nothing the moment a
+// storyboard contained a generated clip: the slideshow path (lane1.js)
+// honoured "720p" while the real-AI-video path (this one) quietly shipped
+// 1080p from the same UI control.
 const RESOLUTIONS = {
-  "16:9": { w: 1920, h: 1080 },
-  "9:16": { w: 1080, h: 1920 },
-  "1:1": { w: 1080, h: 1080 },
-  "4:5": { w: 1080, h: 1350 },
+  "1080p": {
+    "16:9": { w: 1920, h: 1080 },
+    "9:16": { w: 1080, h: 1920 },
+    "1:1": { w: 1080, h: 1080 },
+    "4:5": { w: 1080, h: 1350 },
+  },
+  "720p": {
+    "16:9": { w: 1280, h: 720 },
+    "9:16": { w: 720, h: 1280 },
+    "1:1": { w: 720, h: 720 },
+    "4:5": { w: 720, h: 900 },
+  },
 };
 
 const FONT_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
@@ -491,9 +506,26 @@ async function buildSceneClip(scene, sceneIndex, posterImagePath, workDir, w, h,
   let voicePath = null;
   let voiceDuration = 0;
   if (scene.voiceUrl) {
-    voicePath = assetPath(workDir, `scene-${sceneIndex}-voice`);
-    await downloadTo(scene.voiceUrl, voicePath);
-    voiceDuration = await probeDuration(voicePath);
+    // Non-fatal, matching how music and the project-level narration are
+    // already treated: a scene whose voice track can't be fetched or read
+    // renders silently instead of failing, and the rest of the film is
+    // unaffected. This download was unguarded, so a single unreachable
+    // voice URL — a `blob:` object URL persisted from another browser tab
+    // was the reproducible case — burned all three withSceneRetry attempts
+    // and then errored the entire render.
+    const candidateVoicePath = assetPath(workDir, `scene-${sceneIndex}-voice`);
+    try {
+      await downloadTo(scene.voiceUrl, candidateVoicePath);
+      const probed = await probeDuration(candidateVoicePath).catch(() => 0);
+      if (probed > 0) {
+        voicePath = candidateVoicePath;
+        voiceDuration = probed;
+      } else {
+        console.error(`[render] scene ${sceneIndex} voice track has no readable audio (${scene.voiceUrl}) — rendering this scene without narration.`);
+      }
+    } catch (e) {
+      console.error(`[render] scene ${sceneIndex} voice download failed (${scene.voiceUrl}): ${e.message} — rendering this scene without narration.`);
+    }
   }
 
   if (shots.length <= 1) {
@@ -733,7 +765,11 @@ async function uploadResult(filePath) {
  * film's own audio (narration) at project.musicVolume (default 0.18).
  */
 export async function renderProject(project, onProgress = () => {}) {
-  const { w, h } = RESOLUTIONS[project.ratio] || RESOLUTIONS["16:9"];
+  // An unknown/absent resolution or ratio falls back to 1080p 16:9, the
+  // behaviour every existing caller (Movie Maker sends no resolution at
+  // all) already relied on.
+  const resolutionTier = RESOLUTIONS[project.resolution] ? project.resolution : "1080p";
+  const { w, h } = RESOLUTIONS[resolutionTier][project.ratio] || RESOLUTIONS[resolutionTier]["16:9"];
   const workDir = await fs.mkdtemp(path.join(os.tmpdir(), "render-"));
 
   try {

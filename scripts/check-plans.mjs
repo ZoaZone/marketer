@@ -171,6 +171,28 @@ console.log("\nSEO metadata");
   if (!problems.length) ok("descriptions within limit, JSON-LD derived from the catalog");
 }
 
+// ---------------------------------------------------------------------------
+// 4b. The ElevenLabs surcharge percentage the consent function records must
+//     equal the one the metering block actually charges. Below it, every
+//     consent it stores is stale on arrival and every ElevenLabs run is
+//     refused; above it, customers agree to a bigger number than they are
+//     charged.
+// ---------------------------------------------------------------------------
+console.log("\nElevenLabs surcharge");
+{
+  const readPct = (file) => {
+    const src = readFileSync(file, "utf8");
+    const m = src.match(/const ELEVENLABS_SURCHARGE_PCT = ([\d.]+);/);
+    return m ? Number(m[1]) : null;
+  };
+  const blockPct = readPct("base44/_shared/metering.block.ts");
+  const consentPct = readPct("base44/functions/setElevenLabsConsent/entry.ts");
+  if (blockPct === null) bad("metering block has no ELEVENLABS_SURCHARGE_PCT");
+  else if (consentPct === null) bad("setElevenLabsConsent has no ELEVENLABS_SURCHARGE_PCT");
+  else if (blockPct !== consentPct) bad(`surcharge drift: metering block ${blockPct} vs consent function ${consentPct}`);
+  else ok(`consent and metering both charge ${blockPct * 100}%`);
+}
+
 console.log("\nduplicate price maps");
 {
   const dupes = [];

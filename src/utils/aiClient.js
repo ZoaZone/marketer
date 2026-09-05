@@ -123,23 +123,42 @@ export async function proxyImageAsObjectUrl(url) {
  */
 export async function generateVoiceover(text) {
   if (!text?.trim()) return null;
+  let data;
   try {
     // 20000 matches the backend's own MAX_CHARS (ElevenLabs TTS) — the old
     // 2000-char cap here was a leftover from the previous Google Translate
     // TTS backend, which silently cut off long narrations.
     const res = await base44.functions.invoke("generateVoiceover", { text: text.slice(0, 20000) });
-    const data = res?.data ?? res;
-    const b64 = data?.audio_base64;
-    if (!b64) {
-      throw new Error("Voiceover generation failed — check that ELEVENLABS_API_KEY is set in Base44 and the ElevenLabs account is active.");
-    }
-    const binary = atob(b64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    return new Blob([bytes], { type: data?.mime || "audio/mpeg" });
+    data = res?.data ?? res;
   } catch (e) {
+    // The backend refuses narration for reasons the user can act on — an
+    // unentitled plan, a spent free trial, an exhausted allowance, or (now)
+    // ElevenLabs surcharge consent not yet given — and says which in the
+    // response body. This used to wrap EVERY failure, those included, in a
+    // fixed "check that ELEVENLABS_API_KEY is set" string, which sent users
+    // hunting for a missing key that was configured all along. Surface the
+    // server's own reason and keep its code so the UI can act on it.
+    const body = e?.response?.data;
+    if (body?.error) {
+      const err = new Error(body.error);
+      err.code = body.code;
+      if (["upgrade_required", "trial_limit_reached", "allowance_exceeded", "no_subscription"].includes(body.code)) {
+        err.upgradeRequired = true;
+      }
+      if (body.code === "elevenlabs_consent_required") err.consentRequired = true;
+      throw err;
+    }
     throw new Error("Voiceover generation failed — check that ELEVENLABS_API_KEY is set in Base44 and the ElevenLabs account is active. (" + (e?.message || "unknown error") + ")");
   }
+
+  const b64 = data?.audio_base64;
+  if (!b64) {
+    throw new Error(data?.error || "Voiceover generation failed — check that ELEVENLABS_API_KEY is set in Base44 and the ElevenLabs account is active.");
+  }
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: data?.mime || "audio/mpeg" });
 }
 
 // Combines genre/mood/prompt into one descriptive text prompt for the
@@ -164,20 +183,62 @@ function buildMusicPromptText({ prompt, genre, mood, instrumental }) {
 }
 
 /**
+ * Shared submit path for every async worker job (render, music, video,
+ * dub, capture, Lane 1 assembly).
+ *
+ * Each of these Base44 functions can refuse a job for a reason the user can
+ * act on — an unentitled plan (`upgrade_required`), an exhausted monthly
+ * allowance with overage off (`allowance_exceeded`), a spent free trial
+ * (`trial_limit_reached`), a metering write that failed
+ * (`metering_unavailable`) — and each says so in its JSON body. But
+ * base44.functions.invoke THROWS on a non-2xx response, so none of those
+ * bodies were ever read: every submit helper here caught nothing, and the
+ * caller saw whatever generic message the SDK's own error carried instead.
+ * That is why a plan/quota refusal surfaced in Movie Maker as an unexplained
+ * "video generation failed" with nothing pointing at the real cause.
+ *
+ * This unwraps the server's own message, re-throws it verbatim, and marks
+ * the error so UI can route it: `.upgradeRequired` for the cases a
+ * subscription change fixes, and `.code` for everything else.
+ */
+async function submitWorkerJob(functionName, spec, { idField = "jobId", offlineCode, offlineMessage, genericMessage }) {
+  let data;
+  try {
+    const res = await base44.functions.invoke(functionName, spec);
+    data = res?.data ?? res;
+  } catch (e) {
+    const body = e?.response?.data;
+    if (body?.error) {
+      if (body.error === offlineCode) throw new Error(offlineMessage);
+      const err = new Error(body.error);
+      err.code = body.code;
+      if (["upgrade_required", "trial_limit_reached", "allowance_exceeded", "no_subscription"].includes(body.code)) {
+        err.upgradeRequired = true;
+      }
+      if (body.code === "elevenlabs_consent_required") err.consentRequired = true;
+      throw err;
+    }
+    throw e;
+  }
+
+  if (!data?.[idField]) {
+    throw new Error(data?.error === offlineCode ? offlineMessage : (data?.error || genericMessage));
+  }
+  return data[idField];
+}
+
+/**
  * Submit an AI music-generation job (see server-render/music.js for the
  * spec) to the render worker. Returns the job id; poll it with
  * getMusicStatus(). Throws a friendly message if the worker is
  * unreachable, or a generic one for any other failure to start the job.
  */
 export async function submitMusic(spec) {
-  const res = await base44.functions.invoke("submitMusic", spec);
-  const data = res?.data ?? res;
-  if (!data?.jobId) {
-    throw new Error(data?.error === "render_worker_unreachable"
-      ? "The render service is offline. Please try again shortly."
-      : "Could not start music generation.");
-  }
-  return data.jobId;
+  return submitWorkerJob("submitMusic", spec, {
+    offlineCode: "render_worker_unreachable",
+    offlineMessage: "The render service is offline. Please try again shortly.",
+    genericMessage: "Could not start music generation.",
+  });
 }
 
 /**
@@ -269,14 +330,11 @@ export async function generateMusic({ prompt, durationSeconds = 30, instrumental
  * unreachable, or a generic one for any other failure to start the job.
  */
 export async function submitVideo(spec) {
-  const res = await base44.functions.invoke("submitVideo", spec);
-  const data = res?.data ?? res;
-  if (!data?.jobId) {
-    throw new Error(data?.error === "render_worker_unreachable"
-      ? "The render service is offline. Please try again shortly."
-      : "Could not start video generation.");
-  }
-  return data.jobId;
+  return submitWorkerJob("submitVideo", spec, {
+    offlineCode: "render_worker_unreachable",
+    offlineMessage: "The render service is offline. Please try again shortly.",
+    genericMessage: "Could not start video generation.",
+  });
 }
 
 /**
@@ -337,14 +395,12 @@ export async function generateSceneVideo({ prompt, imageUrl, durationSeconds = 5
  * other failure to start the job.
  */
 export async function submitCapture(spec) {
-  const res = await base44.functions.invoke("submitCapture", spec);
-  const data = res?.data ?? res;
-  if (!data?.captureId) {
-    throw new Error(data?.error === "capture_worker_unreachable"
-      ? "The capture service is offline. Please try again shortly."
-      : "Could not start the capture.");
-  }
-  return data.captureId;
+  return submitWorkerJob("submitCapture", spec, {
+    idField: "captureId",
+    offlineCode: "capture_worker_unreachable",
+    offlineMessage: "The capture service is offline. Please try again shortly.",
+    genericMessage: "Could not start the capture.",
+  });
 }
 
 /**
@@ -368,14 +424,11 @@ export async function getCaptureStatus(captureId) {
  * failure to start the job.
  */
 export async function submitDubAudio(spec) {
-  const res = await base44.functions.invoke("submitDubAudio", spec);
-  const data = res?.data ?? res;
-  if (!data?.jobId) {
-    throw new Error(data?.error === "render_worker_unreachable"
-      ? "The render service is offline. Please try again shortly."
-      : "Could not start dubbing.");
-  }
-  return data.jobId;
+  return submitWorkerJob("submitDubAudio", spec, {
+    offlineCode: "render_worker_unreachable",
+    offlineMessage: "The render service is offline. Please try again shortly.",
+    genericMessage: "Could not start dubbing.",
+  });
 }
 
 /**
@@ -387,14 +440,11 @@ export async function submitDubAudio(spec) {
  * failure to start the job.
  */
 export async function submitDubVideo(spec) {
-  const res = await base44.functions.invoke("submitDubVideo", spec);
-  const data = res?.data ?? res;
-  if (!data?.jobId) {
-    throw new Error(data?.error === "render_worker_unreachable"
-      ? "The render service is offline. Please try again shortly."
-      : "Could not start dubbing.");
-  }
-  return data.jobId;
+  return submitWorkerJob("submitDubVideo", spec, {
+    offlineCode: "render_worker_unreachable",
+    offlineMessage: "The render service is offline. Please try again shortly.",
+    genericMessage: "Could not start video dubbing.",
+  });
 }
 
 /**
@@ -564,14 +614,11 @@ export async function dubVideoFile({ sourceUrl, targetLang, sourceLang, numSpeak
  * other failure to start the job.
  */
 export async function submitRender(project) {
-  const res = await base44.functions.invoke("submitRender", project);
-  const data = res?.data ?? res;
-  if (!data?.jobId) {
-    throw new Error(data?.error === "render_worker_unreachable"
-      ? "The render service is offline. Please try again shortly."
-      : "Could not start the render.");
-  }
-  return data.jobId;
+  return submitWorkerJob("submitRender", project, {
+    offlineCode: "render_worker_unreachable",
+    offlineMessage: "The render service is offline. Please try again shortly.",
+    genericMessage: "Could not start the render.",
+  });
 }
 
 /**
@@ -592,14 +639,11 @@ export async function getRenderStatus(jobId) {
  * for any other failure to start the job.
  */
 export async function submitLane1Video(project) {
-  const res = await base44.functions.invoke("submitLane1Video", project);
-  const data = res?.data ?? res;
-  if (!data?.jobId) {
-    throw new Error(data?.error === "render_worker_unreachable"
-      ? "The render service is offline. Please try again shortly."
-      : "Could not start video assembly.");
-  }
-  return data.jobId;
+  return submitWorkerJob("submitLane1Video", project, {
+    offlineCode: "render_worker_unreachable",
+    offlineMessage: "The render service is offline. Please try again shortly.",
+    genericMessage: "Could not start video assembly.",
+  });
 }
 
 /**
