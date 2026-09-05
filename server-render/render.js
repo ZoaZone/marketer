@@ -829,42 +829,58 @@ export async function renderProject(project, onProgress = () => {}) {
 
     let finalPath = concatPath;
     if (musicPath) {
-      const musicVolume = typeof project.musicVolume === "number" ? project.musicVolume : 0.18;
-      const filmSeconds = (await probeDuration(concatPath).catch(() => 0)) || totalSceneSeconds;
-      const musicNaturalSeconds = await probeDuration(musicPath).catch(() => 0);
+      // Non-fatal, same as the download above: by this point every scene
+      // and the narration have already rendered — a corrupt/unreadable
+      // music file (e.g. a provider error body saved as audio) or a failed
+      // crossfade/mix must not sink the whole film after all that work.
+      // Ship without the score rather than error the job; the user can
+      // regenerate or upload a track and re-assemble.
+      try {
+        const musicVolume = typeof project.musicVolume === "number" ? project.musicVolume : 0.18;
+        const filmSeconds = (await probeDuration(concatPath).catch(() => 0)) || totalSceneSeconds;
+        const musicNaturalSeconds = await probeDuration(musicPath).catch(() => 0);
+        if (musicNaturalSeconds <= 0) {
+          // ffprobe can read no duration at all — almost certainly a broken
+          // or non-audio file that would only fail later inside amix.
+          throw new Error("the downloaded music file has no readable audio stream");
+        }
 
-      let mixInputArgs;
-      if (MUSIC_MODE === "single" || musicNaturalSeconds <= 0 || musicNaturalSeconds >= filmSeconds) {
-        // Either explicitly configured for the old behavior, or the
-        // source is already long enough to cover the film and there's
-        // nothing to extend — -stream_loop is harmless (a no-op past the
-        // first iteration) when the source already reaches filmSeconds.
-        mixInputArgs = ["-stream_loop", "-1", "-i", musicPath];
-      } else {
-        // "varied" and the source is shorter than the film — build the
-        // extended, crossfaded track once up front instead of looping the
-        // raw file at mix time.
-        const variedTrackPath = await buildVariedMusicTrack(musicPath, musicNaturalSeconds, filmSeconds, workDir);
-        mixInputArgs = ["-i", variedTrackPath];
+        let mixInputArgs;
+        if (MUSIC_MODE === "single" || musicNaturalSeconds >= filmSeconds) {
+          // Either explicitly configured for the old behavior, or the
+          // source is already long enough to cover the film and there's
+          // nothing to extend — -stream_loop is harmless (a no-op past the
+          // first iteration) when the source already reaches filmSeconds.
+          mixInputArgs = ["-stream_loop", "-1", "-i", musicPath];
+        } else {
+          // "varied" and the source is shorter than the film — build the
+          // extended, crossfaded track once up front instead of looping the
+          // raw file at mix time.
+          const variedTrackPath = await buildVariedMusicTrack(musicPath, musicNaturalSeconds, filmSeconds, workDir);
+          mixInputArgs = ["-i", variedTrackPath];
+        }
+
+        const mixedPath = path.join(workDir, "mixed.mp4");
+        // Duck the (now already long-enough) music under the narration with
+        // volume=, then amix with duration=first so the mixed track is
+        // truncated to exactly the video's length regardless of how long
+        // the music track technically is — -shortest on the output is
+        // belt-and-suspenders for the same truncation.
+        await run("ffmpeg", [
+          "-y",
+          "-i", concatPath,
+          ...mixInputArgs,
+          "-filter_complex", `[1:a]volume=${musicVolume}[music];[0:a][music]amix=inputs=2:duration=first:dropout_transition=0[aout]`,
+          "-map", "0:v", "-map", "[aout]",
+          "-c:v", "copy", "-c:a", "aac",
+          "-shortest",
+          mixedPath,
+        ]);
+        finalPath = mixedPath;
+      } catch (e) {
+        console.error(`[render] music mix failed: ${e.message} — shipping the film without background music.`);
+        finalPath = concatPath;
       }
-
-      const mixedPath = path.join(workDir, "mixed.mp4");
-      // Duck the (now already long-enough) music under the narration with
-      // volume=, then amix with duration=first so the mixed track is
-      // truncated to exactly the video's length regardless of how long
-      // the music track technically is — -shortest on the output is
-      // belt-and-suspenders for the same truncation.
-      await run("ffmpeg", [
-        "-y",
-        "-i", concatPath,
-        ...mixInputArgs,
-        "-filter_complex", `[1:a]volume=${musicVolume}[music];[0:a][music]amix=inputs=2:duration=first:dropout_transition=0[aout]`,
-        "-map", "0:v", "-map", "[aout]",
-        "-c:v", "copy", "-c:a", "aac",
-        "-shortest",
-        mixedPath,
-      ]);
-      finalPath = mixedPath;
     }
     onProgress(0.9);
 

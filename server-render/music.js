@@ -33,6 +33,23 @@
 // Every branch resolves to { url, vocals } so the caller always learns
 // whether it actually got a sung track or an instrumental — see
 // getMusicStatus and aiClient.generateMusic.
+//
+// RUNTIME FALLBACK
+// ---------------
+// pickProvider (below) decides who goes FIRST, but a provider that is
+// configured can still fail mid-run — the exact case that motivated this:
+// ElevenLabs answering 401 "missing_permissions: music_generation" because
+// the platform key exists but lacks the Music permission, which used to
+// error the whole job even though a working Replicate token sat right next
+// to it. generateMusicJob therefore walks a capability-aware chain (see
+// fallbackChain): suno → elevenlabs → replicate for a vocals request,
+// elevenlabs → replicate for an instrumental (Suno is never an
+// instrumental fallback — it only sings). The job only errors when every
+// provider on the chain has failed. submitMusic/entry.ts still charges from
+// pickProvider's answer, which stays correct for the run KIND (a vocal run
+// degraded to MusicGen is reported vocals:false so the caller knows what
+// they got), and a BYOK run whose own key fails deliberately falls through
+// to the platform key — delivering the user's music beats a hard error.
 
 const REPLICATE_POLL_INTERVAL_MS = 2000;
 const REPLICATE_POLL_TIMEOUT_MS = 120_000; // ~120s — generous, since this isn't racing a function gateway timeout
@@ -478,12 +495,60 @@ export function pickProvider(spec = {}, env = process.env) {
  * produced — a vocals request that could only be served by MusicGen comes
  * back `vocals: false` rather than silently passing off an instrumental as
  * a song. `model_version` is Replicate-only.
+ *
+ * Providers are tried as a capability-aware RUNTIME FALLBACK chain (see
+ * fallbackChain), not a single take-it-or-leave-it pick — the job only
+ * errors when every provider on the chain has failed.
  */
+
+/**
+ * fallbackChain(spec, env) — the ordered list of providers this job will
+ * actually try at RUNTIME, starting with pickProvider's answer.
+ *
+ * pickProvider decides who goes first (and submitMusic/entry.ts charges the
+ * run's metering kind from that same answer), but a provider that is
+ * *configured* can still *fail* mid-run — e.g. ElevenLabs answering 401
+ * because the key lacks the music_generation permission. The chain is
+ * capability-aware, same rules as pickProvider:
+ *   - Suno is only ever tried for a VOCALS request — it is the vocals-only
+ *     path, so an instrumental run must not get a sung song as its
+ *     fallback.
+ *   - Replicate is last: MusicGen cannot sing, so it is the degraded answer
+ *     to a vocals request (reported vocals:false, never passed off as a
+ *     song).
+ *   - ElevenLabs covers instrumental and vocals alike, so it is the middle
+ *     of the chain either way when a key exists.
+ */
+export function fallbackChain(spec = {}, env = process.env) {
+  const primary = pickProvider(spec, env);
+  const wantsVocals = spec?.instrumental === false;
+  const capable = [];
+  if (wantsVocals && (spec?.byok?.sunoApiKey || env.SUNO_API_KEY)) capable.push("suno");
+  if (spec?.byok?.elevenLabsKey || env.ELEVENLABS_API_KEY) capable.push("elevenlabs");
+  if (spec?.byok?.replicateToken || env.REPLICATE_API_TOKEN) capable.push("replicate");
+  return [primary, ...capable.filter((p) => p !== primary)];
+}
+
 export async function generateMusicJob(spec, onProgress = () => {}) {
   onProgress(0);
 
-  const provider = pickProvider(spec);
-  if (provider === "suno") return generateSunoSongJob(spec, onProgress);
-  if (provider === "elevenlabs") return generateWithElevenLabs(spec, onProgress);
-  return generateWithReplicateMusicGen(spec, onProgress);
+  const runners = {
+    suno: generateSunoSongJob,
+    elevenlabs: generateWithElevenLabs,
+    replicate: generateWithReplicateMusicGen,
+  };
+
+  const failures = [];
+  for (const provider of fallbackChain(spec)) {
+    try {
+      return await runners[provider](spec, onProgress);
+    } catch (e) {
+      failures.push(`${provider}: ${e?.message || e}`);
+      console.error(`[music] provider ${provider} failed: ${e?.message || e} — trying the next provider on the chain.`);
+      // Reset the bar so the next attempt's own progress ticks start clean.
+      onProgress(0);
+    }
+  }
+
+  throw new Error(`Music generation failed on every available provider — ${failures.join(" | ")}`);
 }
