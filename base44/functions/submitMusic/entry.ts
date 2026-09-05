@@ -11,9 +11,17 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
  * base44.auth.me() auth guard, same { error } shape on failure.
  *
  * The request body IS the music spec as-is ({ prompt, durationSeconds,
- * model_version } — see server-render/music.js) — this function doesn't
- * interpret it, just forwards it to the worker with the shared secret it
- * needs to accept the job.
+ * model_version, instrumental, lyrics, genre, mood, title } — see
+ * server-render/music.js) — this function doesn't interpret it, just
+ * forwards it to the worker with the shared secret it needs to accept the
+ * job. The one exception is `byok`, which this function adds itself (see
+ * buildByok below) — a caller-supplied `byok` field is not trusted or
+ * forwarded.
+ *
+ * Provider selection (Suno real vocal song vs. Replicate/MusicGen
+ * instrumental) happens inside server-render/music.js, not here — this
+ * function only decides which metering `kind` to charge, based on the same
+ * "would a Suno key actually be used" check the worker makes.
  */
 
 const CORS = {
@@ -36,7 +44,7 @@ async function decryptSecret(stored: { ciphertext: string; iv: string }, keyB64:
   return new TextDecoder().decode(plainBuf);
 }
 
-async function buildByok(apiKeys: any, fields: Array<'replicate' | 'elevenlabs'>): Promise<Record<string, string>> {
+async function buildByok(apiKeys: any, fields: Array<'replicate' | 'elevenlabs' | 'suno'>): Promise<Record<string, string>> {
   const encryptionKey = Deno.env.get('BYOK_ENCRYPTION_KEY');
   const byok: Record<string, string> = {};
   if (!encryptionKey) return byok;
@@ -47,6 +55,7 @@ async function buildByok(apiKeys: any, fields: Array<'replicate' | 'elevenlabs'>
       const plain = await decryptSecret(record, encryptionKey);
       if (field === 'replicate') byok.replicateToken = plain;
       if (field === 'elevenlabs') byok.elevenLabsKey = plain;
+      if (field === 'suno') byok.sunoApiKey = plain;
     } catch (_) { /* ignore — fall back to platform key */ }
   }
   return byok;
@@ -99,6 +108,10 @@ const RAW = {
   voiceover: num(Deno.env.get('TTS_RATE_USD_PER_1K_CHARS'), 0.05) * 1.5,
   ai_video_scene: num(Deno.env.get('VIDEO_RATE_USD_PER_SCENE'), 0.35),
   music_track: num(Deno.env.get('MUSIC_RATE_USD_PER_RUN'), 0.10),
+  // Real vocal song generation (Suno) — no confirmed platform-owned API
+  // contract at time of writing, so this is a conservative estimate, not a
+  // verified price. See base44/PRICING_INTERNAL.md.
+  music_vocal_track: num(Deno.env.get('MUSIC_VOCAL_RATE_USD_PER_RUN'), 0.30),
   dubbing_minute: num(Deno.env.get('DUBBING_RATE_USD_PER_MINUTE'), 0.50),
   lipsync_minute: num(Deno.env.get('LIPSYNC_RATE_USD_PER_MINUTE'), 3.00),
 };
@@ -110,6 +123,7 @@ const WEIGHTS: Record<string, { rm: number; ac: number }> = {
   voiceover: { rm: 0, ac: 1 },
   ai_video_scene: { rm: 1, ac: 0 },
   music_track: { rm: 0.25, ac: 0 },
+  music_vocal_track: { rm: 1, ac: 0 },
   dubbing_minute: { rm: 1, ac: 0 },
   lipsync_minute: { rm: 6, ac: 0 },
 };
@@ -362,12 +376,29 @@ Deno.serve(async (req) => {
 
     const spec = await req.json().catch(() => ({}));
     const entitled = await isByokEntitled(base44, user);
-    const byok = entitled ? await buildByok(user.settings?.api_keys || {}, ['replicate']) : {};
+    const byok = entitled ? await buildByok(user.settings?.api_keys || {}, ['replicate', 'suno']) : {};
     if (Object.keys(byok).length) spec.byok = byok;
 
-    // SPEND CEILING. One MusicGen run per submission.
-    const overBudget = await meterUsage(base44, user, 'music_track', 1, {
-      usedOwnKey: !!byok.replicateKey, provider: 'replicate',
+    // Mirrors exactly the check server-render/music.js's generateMusicJob
+    // makes to decide which provider actually runs — a real Suno vocal song
+    // only happens when the caller asked for vocals AND a Suno key (the
+    // platform's, or the user's own BYOK key) is actually available.
+    // Otherwise the job silently falls back to the Replicate/MusicGen
+    // instrumental path, same as always. This determines which metering
+    // `kind` gets charged, so the two can never disagree about what ran.
+    const wantsVocals = spec?.instrumental === false;
+    const sunoAvailable = !!(byok.sunoApiKey || Deno.env.get('SUNO_API_KEY')?.trim());
+    const usingSuno = wantsVocals && sunoAvailable;
+
+    // SPEND CEILING. One generation run per submission — a real vocal song
+    // (Suno) or an instrumental MusicGen clip, whichever will actually run.
+    const overBudget = await meterUsage(base44, user, usingSuno ? 'music_vocal_track' : 'music_track', 1, {
+      // A BYOK key is only "used" if it's the one actually paying for this
+      // specific run — a BYOK Suno key does nothing for a plain
+      // instrumental job, and a BYOK Replicate key does nothing once Suno
+      // is the path taken.
+      usedOwnKey: usingSuno ? !!byok.sunoApiKey : !!byok.replicateToken,
+      provider: usingSuno ? 'suno' : 'replicate',
     });
     if (overBudget) return overBudget;
 

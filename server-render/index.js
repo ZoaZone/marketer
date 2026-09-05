@@ -212,11 +212,14 @@ async function processQueue() {
       // timeout) does both once the job actually finishes.
     } else {
       // Most job kinds resolve to a plain URL string; dubVideo resolves to
-      // { url, captionsUrl } since it may also produce a captions sidecar.
+      // { url, captionsUrl } since it may also produce a captions sidecar,
+      // and music resolves to { url, vocals } so the caller can tell a real
+      // Suno vocal song apart from an instrumental MusicGen fallback.
       const done = { status: "done", progress: 1 };
       if (result && typeof result === "object") {
         done.url = result.url;
         done.captionsUrl = result.captionsUrl ?? null;
+        if (typeof result.vocals === "boolean") done.vocals = result.vocals;
       } else {
         done.url = result;
       }

@@ -7,7 +7,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
  * key or the ciphertext — only a masked preview and a verified timestamp, so
  * even this function's own response can't leak the secret.
  *
- * Body: { provider: "replicate" | "elevenlabs" | "llm", apiKey: string,
+ * Body: { provider: "replicate" | "elevenlabs" | "llm" | "suno", apiKey: string,
  *         llmProvider?, llmModel?, llmBaseUrl? }
  * (llmProvider/llmModel/llmBaseUrl only apply when provider === "llm".)
  */
@@ -18,7 +18,7 @@ const CORS = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
-const PROVIDERS = ['replicate', 'elevenlabs', 'llm'];
+const PROVIDERS = ['replicate', 'elevenlabs', 'llm', 'suno'];
 
 async function encryptSecret(plaintext: string, keyB64: string): Promise<{ ciphertext: string; iv: string }> {
   const keyBytes = Uint8Array.from(atob(keyB64), (c) => c.charCodeAt(0));
@@ -42,6 +42,21 @@ async function validateKey(provider: string, apiKey: string, extra: { llmProvide
   if (provider === 'elevenlabs') {
     const res = await fetch('https://api.elevenlabs.io/v1/user', { headers: { 'xi-api-key': apiKey } });
     if (!res.ok) throw new Error('ElevenLabs rejected this key.');
+    return;
+  }
+  if (provider === 'suno') {
+    // Suno has no official public API, so "the provider" here is whatever
+    // third-party Suno API reseller SUNO_API_BASE_URL points at (defaults
+    // to the same de facto community-standard contract server-render/
+    // music.js's Suno branch targets — see its docstring). This calls that
+    // reseller's read-only credit-balance endpoint, which is the cheapest
+    // authenticated call most of them expose; if your chosen reseller uses
+    // a different endpoint for this, update the URL below to match.
+    const baseUrl = (Deno.env.get('SUNO_API_BASE_URL')?.trim() || 'https://api.sunoapi.org').replace(/\/+$/, '');
+    const res = await fetch(`${baseUrl}/api/v1/generate/credit`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    if (!res.ok) throw new Error('The Suno API provider rejected this key.');
     return;
   }
   if (provider === 'llm') {
@@ -80,7 +95,7 @@ Deno.serve(async (req) => {
     const provider = body?.provider;
     const apiKey = typeof body?.apiKey === 'string' ? body.apiKey.trim() : '';
     if (!PROVIDERS.includes(provider)) {
-      return Response.json({ error: 'provider must be one of: replicate, elevenlabs, llm.' }, { status: 400, headers: CORS });
+      return Response.json({ error: 'provider must be one of: replicate, elevenlabs, llm, suno.' }, { status: 400, headers: CORS });
     }
     if (!apiKey) {
       return Response.json({ error: 'apiKey is required.' }, { status: 400, headers: CORS });
