@@ -245,6 +245,14 @@ export default function MovieMaker() {
   const [voiceLoading, setVoiceLoading] = useState({});
   const [imgLoading, setImgLoading] = useState({});
   const [sceneVideoLoading, setSceneVideoLoading] = useState({});
+  // Per-scene clip progress: { [sceneId]: { status, elapsedMs, shot, shotCount } }.
+  // A clip takes two to three minutes on a worker that runs one job at a
+  // time, so a bare boolean spinner made a healthy generation look identical
+  // to a hang — this is what tells them apart on screen.
+  const [sceneVideoProgress, setSceneVideoProgress] = useState({});
+  // Which scene of the batch "Generate All Clips" is on, so a multi-scene
+  // run reads as "3 of 6" rather than an indefinite wait.
+  const [clipBatch, setClipBatch] = useState(null); // { index, total } | null
   const [uploadLoading, setUploadLoading] = useState({});
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
@@ -597,6 +605,10 @@ export default function MovieMaker() {
           prompt: `${getReferenceHint()}${toSpeakable(scene.text) || scene.text}`,
           imageUrl: scene.imageUrl,
           durationSeconds: clipSeconds,
+          onProgress: ({ status, elapsedMs }) => setSceneVideoProgress(p => ({
+            ...p,
+            [scene.id]: { status, elapsedMs, shot: shot + 1, shotCount },
+          })),
         });
         if (url) newClips.push({ videoUrl: url, duration: clipSeconds });
       } catch (e) {
@@ -624,6 +636,7 @@ export default function MovieMaker() {
       setWarnings(prev => prev.includes(msg) ? prev : [...prev, msg]);
     }
     setSceneVideoLoading(p => ({ ...p, [scene.id]: false }));
+    setSceneVideoProgress(p => { const { [scene.id]: _done, ...rest } = p; return rest; });
   };
 
   // Generates every eligible scene's video clip(s) one scene at a time
@@ -639,9 +652,11 @@ export default function MovieMaker() {
     setError("");
     const eligible = scenes.filter(s => (s.text.trim() || s.imageUrl) && !(s.clips && s.clips.length) && !s.videoUrl);
     for (let i = 0; i < eligible.length; i++) {
+      setClipBatch({ index: i + 1, total: eligible.length });
       await generateSceneVideoClip(eligible[i]);
       if (i < eligible.length - 1) await sleep(1500);
     }
+    setClipBatch(null);
   };
 
   // Rewrites a scene's raw text into natural spoken dialogue/narration only
@@ -1381,7 +1396,8 @@ export default function MovieMaker() {
                 </button>
                 <button onClick={generateAllVideoClips} disabled={Object.values(sceneVideoLoading).some(Boolean)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-500/10 border border-violet-500/20 text-violet-400 text-xs font-semibold hover:bg-violet-500/20 transition-colors disabled:opacity-50">
-                  <Play className="w-3.5 h-3.5" /> Generate All Clips
+                  {clipBatch ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                  {clipBatch ? `Generating clip ${clipBatch.index} of ${clipBatch.total}…` : "Generate All Clips"}
                 </button>
                 <button onClick={addScene} disabled={scenes.length >= MAX_SCENES}
                   title={scenes.length >= MAX_SCENES ? `Scene limit reached (max ${MAX_SCENES})` : undefined}
@@ -1486,6 +1502,22 @@ export default function MovieMaker() {
                       {scene.clips?.length ? "Regenerate clips" : "Generate video clip"}
                     </button>
                   </div>
+                  {/* Live status for a running clip. A generation takes two
+                      to three minutes and the worker runs one job at a time,
+                      so both facts matter: "queued" means it hasn't started
+                      yet, and the elapsed counter is the proof it is alive. */}
+                  {sceneVideoProgress[scene.id] && (
+                    <p className="text-[11px] text-violet-400/90 mt-1.5 flex items-center gap-1.5">
+                      <Loader2 className="w-3 h-3 animate-spin shrink-0" />
+                      {sceneVideoProgress[scene.id].status === "queued"
+                        ? "Queued — the render worker is busy with another job"
+                        : "Generating"}
+                      {sceneVideoProgress[scene.id].shotCount > 1 &&
+                        ` · shot ${sceneVideoProgress[scene.id].shot}/${sceneVideoProgress[scene.id].shotCount}`}
+                      {` · ${Math.round((sceneVideoProgress[scene.id].elapsedMs || 0) / 1000)}s elapsed`}
+                      <span className="text-muted-foreground">· usually 2-3 min per clip</span>
+                    </p>
+                  )}
                 </div>
 
                 {/* Scene preview — plays every chained shot in order,
