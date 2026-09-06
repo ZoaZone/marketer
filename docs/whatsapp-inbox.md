@@ -142,6 +142,65 @@ the contact/controls column joins them. The composer sits inside a dynamic
 -viewport shell so iOS Safari's collapsing URL bar cannot hide it, and inputs
 are 16px on mobile so focusing one does not zoom the page.
 
+## Master account vs tenant accounts
+
+Two kinds of account share this module.
+
+**The master account** is the platform's own number, configured in the
+environment and enabled by `WHATSAPP_MASTER_ACCOUNT=true`. It is what this app
+messages from on its own behalf.
+
+**Tenant accounts** are rows in `WhatsAppAccount`, each holding credentials a
+tenant connected through the WhatsApp settings page so they can message under
+their **own** business name. A tenant never borrows the platform's WABA — a
+shared number would put one business's outbound messages under another's
+verified name and quality rating, and would tie their quality scores together.
+
+Everything routes on `phone_number_id`, the id Meta puts in every delivery's
+`value.metadata`. There is deliberately no "if we cannot tell whose number this
+is, use the platform account" branch: an unrecognised number is refused with a
+404, because guessing is exactly how cross-tenant leakage happens.
+
+### What a tenant does
+
+1. Open the WhatsApp settings page and press **Connect a WhatsApp account**.
+2. Paste their **phone number ID** and **WABA ID** (Meta App Dashboard →
+   WhatsApp → API Setup), a **system user access token**, a **verify token**
+   they choose, and their **app secret**.
+3. Copy the **callback URL** shown on that page into Meta → WhatsApp →
+   Configuration, set the same verify token there, and subscribe to the
+   `messages` field.
+4. Press **Test connection** — this asks Graph to confirm the credentials and
+   shows the verified name and quality rating Meta has on file. A paste that
+   looks right and a paste that works are different things, and finding out at
+   send time means finding out in front of a customer.
+
+Credentials are write-only. They are stored under the service role and never
+returned to a browser, not even to the admin who typed them: reads get a
+four-character tail (`…kf9Q`), which is enough to tell one stored token from
+another and not enough to use it. Saving with a secret field left blank keeps
+the stored value rather than clearing it, so editing a label cannot silently
+wipe a token nobody can read back.
+
+### How isolation is enforced
+
+Every function reads through `asServiceRole`, because the inbox is shared team
+state and the webhook writes rows with no `created_by_id` — a row-level rule
+would hide threads from the very agents meant to work them. That makes the
+tenancy check explicit code rather than a database rule, so it is asserted in
+`tests/whatsapp/webhookContract.test.mjs` rather than assumed:
+
+- threads are keyed on `(wa_id, phone_number_id)`, so one person messaging two
+  tenants is two separate conversations;
+- the inbox filters every read to the numbers the caller's tenant connected;
+- a thread on someone else's number reads as **404, not 403** — whether it
+  exists is itself information the caller is not entitled to;
+- the live SSE stream applies the same filter before emitting anything, so it
+  cannot be used as a side channel around the check;
+- sending is restricted to numbers the caller's tenant connected, and the
+  sending number comes from the thread rather than from the caller;
+- attachments are fetched with the receiving account's own token.
+
 ## Operational notes
 
 - **The 24-hour window.** WhatsApp only allows free-form replies within 24

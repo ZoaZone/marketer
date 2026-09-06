@@ -1,0 +1,108 @@
+{
+  "name": "WhatsAppAccount",
+  "type": "object",
+  "properties": {
+    "tenant_id": {
+      "type": "string",
+      "description": "The tenant/client/organisation this WhatsApp number belongs to, in whatever id space this app already uses. Empty means app-wide."
+    },
+    "label": {
+      "type": "string",
+      "description": "Human name for the number, shown in the inbox switcher (e.g. 'Front desk', 'Bengaluru clinic')."
+    },
+    "phone_number_id": {
+      "type": "string",
+      "description": "Meta phone number id. The routing key: an inbound delivery names it in value.metadata.phone_number_id, and that is how a webhook shared by many tenants knows whose message it is. Must be unique across accounts."
+    },
+    "waba_id": {
+      "type": "string",
+      "description": "The tenant's own WhatsApp Business Account id, used to list their approved templates."
+    },
+    "display_number": {
+      "type": "string",
+      "description": "E.164 number as customers see it. Display only."
+    },
+    "access_token": {
+      "type": "string",
+      "description": "The tenant's own permanent system-user token. Written by whatsappAccounts under the service role and read only by the backend — never returned to a browser, not even to the admin who typed it. The API returns a four-character tail so an operator can tell which token is stored."
+    },
+    "verify_token": {
+      "type": "string",
+      "description": "Shared with Meta for this tenant's GET subscription handshake. Each tenant picks their own."
+    },
+    "app_secret": {
+      "type": "string",
+      "description": "App secret of the Meta app this number lives under, used to verify X-Hub-Signature-256 on that tenant's deliveries."
+    },
+    "relay_token": {
+      "type": "string",
+      "description": "Shared secret accepted from a trusted relay in place of a Meta signature, for tenants whose callback URL goes through one."
+    },
+    "is_master": {
+      "type": "boolean",
+      "default": false,
+      "description": "True only for the platform's own account. Tenant accounts are never master, and only a master deployment may fall back to the platform credentials in the environment."
+    },
+    "ai_function": {
+      "type": "string",
+      "description": "Name of a deployed function that returns a reply for this tenant's threads. Empty means no generated replies."
+    },
+    "auto_ack_template": {
+      "type": "string",
+      "description": "Approved template sent once per thread when auto-pilot is on and no ai_function is set. Empty means no automatic reply at all."
+    },
+    "auto_ack_language": {
+      "type": "string",
+      "default": "en_US"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "unconfigured",
+        "configured",
+        "verified",
+        "failed"
+      ],
+      "default": "unconfigured",
+      "description": "'configured' means credentials were saved; 'verified' means Graph accepted them on a live check."
+    },
+    "last_verified_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "last_error": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "phone_number_id"
+  ],
+  "permissions": {
+    "read": "user.role == 'admin'",
+    "create": "user.role == 'admin'",
+    "update": "user.role == 'admin'",
+    "delete": "user.role == 'admin'"
+  },
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

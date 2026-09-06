@@ -53,6 +53,7 @@ import OAuthConsent from './pages/OAuthConsent';
 import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
 import WhatsAppInbox from './pages/WhatsAppInbox';
+import WhatsAppSettings from './pages/WhatsAppSettings';
 
 
 const AuthenticatedApp = () => {
@@ -150,6 +151,7 @@ const AuthenticatedApp = () => {
         {/* bookmarked, shared and reopened from a home-screen shortcut. */}
         <Route path="/whatsapp-inbox" element={<WhatsAppInbox />} />
         <Route path="/whatsapp-inbox/:conversationId" element={<WhatsAppInbox />} />
+        <Route path="/whatsapp-settings" element={<WhatsAppSettings />} />
       </Route>
 
             <Route path="*" element={<PageNotFound />} />

@@ -12,7 +12,7 @@
     },
     "phone_number_id": {
       "type": "string",
-      "description": "Business number that received/sent the thread (902301109637859 for Hello Biz)."
+      "description": "Business number that received/sent the thread. The tenancy key \u2014 a thread is (wa_id, phone_number_id), so one person can hold separate conversations with two tenants."
     },
     "waba_id": {
       "type": "string"
@@ -81,6 +81,14 @@
       "type": "string",
       "format": "date-time",
       "description": "Set once the acknowledgement template has gone out, so a contact who sends five messages gets one auto-reply rather than five."
+    },
+    "tenant_id": {
+      "type": "string",
+      "description": "Denormalised from the WhatsAppAccount so a query can filter by tenant without a join."
+    },
+    "account_id": {
+      "type": "string",
+      "description": "WhatsAppAccount row that owns this thread."
     }
   },
   "required": [

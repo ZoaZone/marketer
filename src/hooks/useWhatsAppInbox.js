@@ -61,9 +61,11 @@ export function useWhatsAppInbox({ conversationId = '', search = '', status = ''
     retry: 1,
   });
 
+  // Templates belong to the account the thread runs on, so they are refetched
+  // per conversation rather than cached once for the whole app.
   const templatesQuery = useQuery({
-    queryKey: ['whatsapp', 'templates'],
-    queryFn: listTemplates,
+    queryKey: ['whatsapp', 'templates', conversationId],
+    queryFn: () => listTemplates({ conversationId }),
     staleTime: 5 * 60 * 1000,
     retry: 1,
   });
@@ -170,7 +172,7 @@ export function useWhatsAppInbox({ conversationId = '', search = '', status = ''
   }, [queryClient]);
 
   const sendTextMutation = useMutation({
-    mutationFn: ({ to, body }) => sendText(toWaId(to), body),
+    mutationFn: ({ to, body }) => sendText(toWaId(to), body, { conversationId: conversationIdRef.current }),
     onMutate: async ({ body }) => {
       // Optimistic bubble. mergeMessages keys on wamid once the real row
       // arrives over the stream, so this one is replaced, not duplicated.
@@ -200,17 +202,19 @@ export function useWhatsAppInbox({ conversationId = '', search = '', status = ''
   const sendTemplateMutation = useMutation({
     mutationFn: ({ to, name, language, values }) => sendTemplate(toWaId(to), {
       name, language, components: templateComponents(values || []),
+      conversationId: conversationIdRef.current,
     }),
     onSuccess: refreshThread,
   });
 
   const sendMediaMutation = useMutation({
     mutationFn: async ({ to, file, caption }) => {
-      const { media_id } = await uploadMedia(file);
+      const conversationId = conversationIdRef.current;
+      const { media_id } = await uploadMedia(file, { conversationId });
       if (!media_id) throw new Error('Upload succeeded but Meta returned no media id');
       const mediaType = mediaTypeFor(file.type);
       return sendMedia(toWaId(to), {
-        mediaType, mediaId: media_id, caption,
+        mediaType, mediaId: media_id, caption, conversationId,
         filename: mediaType === 'document' ? file.name : undefined,
       });
     },

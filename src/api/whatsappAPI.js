@@ -133,24 +133,72 @@ export function resolveMedia(mediaId) {
 
 // ── outbound ────────────────────────────────────────────────────────────────
 
-export function sendText(to, body) {
-  return call('whatsappSend', { action: 'text', to, body });
+// Every send names the thread it belongs to. The backend resolves the sending
+// number from that rather than trusting the caller, so a reply always leaves
+// from the number the customer actually wrote to.
+
+export function sendText(to, body, { conversationId, accountId } = {}) {
+  return call('whatsappSend', {
+    action: 'text', to, body, conversation_id: conversationId, account_id: accountId,
+  });
 }
 
-export function sendMedia(to, { mediaType, mediaId, link, caption, filename }) {
+export function sendMedia(to, { mediaType, mediaId, link, caption, filename, conversationId, accountId }) {
   return call('whatsappSend', {
     action: 'media', to, media_type: mediaType, media_id: mediaId, link, caption, filename,
+    conversation_id: conversationId, account_id: accountId,
   });
 }
 
-export function sendTemplate(to, { name, language, components }) {
+export function sendTemplate(to, { name, language, components, conversationId, accountId }) {
   return call('whatsappSend', {
     action: 'template', to, template_name: name, language, components,
+    conversation_id: conversationId, account_id: accountId,
   });
 }
 
-export function listTemplates() {
-  return call('whatsappTemplates', { action: 'list' });
+export function listTemplates({ accountId, conversationId } = {}) {
+  return call('whatsappTemplates', {
+    action: 'list', account_id: accountId, conversation_id: conversationId,
+  });
+}
+
+// ── connected accounts (BYOK) ───────────────────────────────────────────────
+//
+// Credentials go in and never come back: the backend returns a four-character
+// tail per secret so a form can show what is stored without being able to
+// reveal it. Nothing here ever holds a token in browser memory.
+
+/** Numbers the signed-in user may work in — the inbox's account switcher. */
+export function listInboxAccounts() {
+  return call('whatsappInbox', { action: 'accounts' });
+}
+
+export function listAccounts() {
+  return call('whatsappAccounts', { action: 'list' });
+}
+
+/**
+ * Creates or updates one account. Omitting a secret field keeps the stored
+ * value; passing an empty string clears it. That asymmetry is deliberate —
+ * a token cannot be read back, so a blank field must not mean "delete".
+ */
+export function saveAccount(account) {
+  return call('whatsappAccounts', { action: 'save', ...account });
+}
+
+/** Asks Graph to confirm the credentials before anyone depends on them. */
+export function testAccount(id) {
+  return call('whatsappAccounts', { action: 'test', id });
+}
+
+export function deleteAccount(id) {
+  return call('whatsappAccounts', { action: 'delete', id });
+}
+
+/** The callback URL and field subscription to paste into the Meta dashboard. */
+export function getWebhookUrl() {
+  return call('whatsappAccounts', { action: 'webhook_url' });
 }
 
 /** Reads a File into the base64 body whatsappSend's "upload" action expects. */
@@ -166,13 +214,15 @@ export function fileToBase64(file) {
   });
 }
 
-export async function uploadMedia(file) {
+export async function uploadMedia(file, { conversationId, accountId } = {}) {
   const media_base64 = await fileToBase64(file);
   return call('whatsappSend', {
     action: 'upload',
     media_base64,
     mime_type: file.type || 'application/octet-stream',
     filename: file.name || 'upload',
+    conversation_id: conversationId,
+    account_id: accountId,
   });
 }
 

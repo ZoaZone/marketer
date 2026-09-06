@@ -4,7 +4,7 @@
   "properties": {
     "wa_id": {
       "type": "string",
-      "description": "Meta's WhatsApp ID for the person \u2014 digits only, no '+' (e.g. 12566998899). Unique per contact."
+      "description": "Meta's WhatsApp ID for the person \u2014 digits only, no '+' (e.g. 12566998899). Unique per (wa_id, phone_number_id): the same person messaging two tenants is two contacts."
     },
     "phone_e164": {
       "type": "string",
@@ -35,6 +35,14 @@
     "last_message_at": {
       "type": "string",
       "format": "date-time"
+    },
+    "phone_number_id": {
+      "type": "string",
+      "description": "Business number this row belongs to. The tenancy key: rows are always scoped by it, so two tenants on one deployment never see each other's traffic."
+    },
+    "tenant_id": {
+      "type": "string",
+      "description": "Denormalised from the WhatsAppAccount so a query can filter by tenant without a join."
     }
   },
   "required": [

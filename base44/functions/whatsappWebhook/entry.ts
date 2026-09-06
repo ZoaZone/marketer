@@ -1,5 +1,5 @@
 /**
- * whatsappWebhook — Meta Cloud API webhook for the "Hello Biz" WABA.
+ * whatsappWebhook — Meta Cloud API webhook, multi-tenant.
  *
  * One function serves both halves of Meta's contract:
  *
@@ -43,27 +43,112 @@
  * message sits visibly in the inbox, whereas a wrong automated reply has
  * already been delivered to a customer by the time anyone notices.
  *
- * Env (Base44 secrets tab):
- *   WHATSAPP_WEBHOOK_VERIFY_TOKEN  required — GET handshake
- *   WHATSAPP_APP_SECRET            optional — X-Hub-Signature-256 verification
- *   WHATSAPP_RELAY_TOKEN           optional — shared secret with the PHP relay
- *   WHATSAPP_AI_FUNCTION           optional — see above
- *   WHATSAPP_AUTO_ACK_TEMPLATE     optional — see above
- *   WHATSAPP_PHONE_NUMBER_ID / WHATSAPP_WABA_ID / WHATSAPP_SYSTEM_USER_TOKEN /
- *   WHATSAPP_GRAPH_API_URL
+ * Env: only WHATSAPP_GRAPH_API_URL (the Graph base, defaulted) and
+ * WHATSAPP_MASTER_ACCOUNT. Credentials live per tenant in WhatsAppAccount.
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.38';
 
-const VERIFY_TOKEN = Deno.env.get('WHATSAPP_WEBHOOK_VERIFY_TOKEN') || '';
-const APP_SECRET = Deno.env.get('WHATSAPP_APP_SECRET') || '';
-const RELAY_TOKEN = Deno.env.get('WHATSAPP_RELAY_TOKEN') || '';
-const PHONE_NUMBER_ID = Deno.env.get('WHATSAPP_PHONE_NUMBER_ID') || '';
-const WABA_ID = Deno.env.get('WHATSAPP_WABA_ID') || '';
-const SYSTEM_USER_TOKEN = Deno.env.get('WHATSAPP_SYSTEM_USER_TOKEN') || '';
+/**
+ * Resolves which WhatsApp account a request belongs to.
+ *
+ * Two kinds of account share this code:
+ *
+ *   the master account   the platform's own number, configured in the
+ *                        environment and enabled by WHATSAPP_MASTER_ACCOUNT=
+ *                        true. This is what the app itself messages from.
+ *   tenant accounts      rows in WhatsAppAccount, each holding credentials a
+ *                        tenant connected through whatsappAccounts so they can
+ *                        message under their OWN business name.
+ *
+ * Everything routes on phone_number_id, the id Meta puts in every delivery's
+ * value.metadata, so the two kinds never mix: a tenant's traffic is signed with
+ * their app secret and answered with their token, and the platform's with its
+ * own. There is deliberately no "if we cannot tell, use the platform account"
+ * branch — that is how one business ends up messaging under another's verified
+ * name and quality rating.
+ *
+ * WHATSAPP_MASTER_ACCOUNT is off unless deliberately turned on, so a fork of
+ * this app cannot start messaging from the platform's number by inheriting a
+ * config file.
+ */
+const IS_MASTER = (Deno.env.get('WHATSAPP_MASTER_ACCOUNT') || '').toLowerCase() === 'true';
 const GRAPH_API_URL = Deno.env.get('WHATSAPP_GRAPH_API_URL') || 'https://graph.facebook.com/v20.0';
-const AI_FUNCTION = Deno.env.get('WHATSAPP_AI_FUNCTION') || '';
-const AUTO_ACK_TEMPLATE = Deno.env.get('WHATSAPP_AUTO_ACK_TEMPLATE') || '';
-const AUTO_ACK_LANGUAGE = Deno.env.get('WHATSAPP_AUTO_ACK_LANGUAGE') || 'en_US';
+
+interface WhatsAppAccount {
+  id?: string;
+  tenant_id?: string;
+  label?: string;
+  phone_number_id: string;
+  waba_id?: string;
+  access_token?: string;
+  verify_token?: string;
+  app_secret?: string;
+  relay_token?: string;
+  is_master?: boolean;
+  ai_function?: string;
+  auto_ack_template?: string;
+  auto_ack_language?: string;
+}
+
+/** The platform's own account, and only when this deployment is the platform. */
+function masterAccount(): WhatsAppAccount | null {
+  if (!IS_MASTER) return null;
+  const phoneNumberId = Deno.env.get('WHATSAPP_PHONE_NUMBER_ID') || '';
+  if (!phoneNumberId) return null;
+  return {
+    tenant_id: '',
+    label: 'Platform account',
+    phone_number_id: phoneNumberId,
+    waba_id: Deno.env.get('WHATSAPP_WABA_ID') || '',
+    access_token: Deno.env.get('WHATSAPP_SYSTEM_USER_TOKEN') || '',
+    verify_token: Deno.env.get('WHATSAPP_WEBHOOK_VERIFY_TOKEN') || '',
+    app_secret: Deno.env.get('WHATSAPP_APP_SECRET') || '',
+    relay_token: Deno.env.get('WHATSAPP_RELAY_TOKEN') || '',
+    is_master: true,
+    ai_function: Deno.env.get('WHATSAPP_AI_FUNCTION') || '',
+    auto_ack_template: Deno.env.get('WHATSAPP_AUTO_ACK_TEMPLATE') || '',
+    auto_ack_language: Deno.env.get('WHATSAPP_AUTO_ACK_LANGUAGE') || 'en_US',
+  };
+}
+
+/** Every connected account, tenants' rows first and the platform's last. */
+async function allAccounts(db: any): Promise<WhatsAppAccount[]> {
+  const rows = await db.entities.WhatsAppAccount.list().catch(() => []);
+  const master = masterAccount();
+  return master ? [...(rows || []), master] : (rows || []);
+}
+
+/**
+ * The account that owns a phone number id — the routing key Meta puts in
+ * every delivery's value.metadata. Returns null rather than a default: an
+ * unrecognised number is someone else's, and answering it with whatever
+ * credentials happen to be lying around is exactly the cross-tenant leak this
+ * function exists to prevent.
+ */
+async function accountByPhoneNumberId(db: any, phoneNumberId: string): Promise<WhatsAppAccount | null> {
+  if (!phoneNumberId) return null;
+  const rows = await db.entities.WhatsAppAccount
+    .filter({ phone_number_id: phoneNumberId }).catch(() => []);
+  if (rows?.length) return rows[0] as WhatsAppAccount;
+  const master = masterAccount();
+  return master && master.phone_number_id === phoneNumberId ? master : null;
+}
+
+/** The accounts a caller may act on: their tenant's, or all of them for an admin. */
+async function accountsForUser(db: any, user: any): Promise<WhatsAppAccount[]> {
+  const accounts = await allAccounts(db);
+  if (user?.role === 'admin') return accounts;
+  const tenantId = user?.tenant_id || user?.client_id || user?.organization_id || '';
+  // An account with no tenant_id is app-wide; one with a tenant_id belongs to
+  // exactly that tenant and is invisible to everyone else.
+  return accounts.filter((a) => !a.tenant_id || a.tenant_id === tenantId);
+}
+
+/** True when the account has enough to actually talk to Graph. */
+function isUsable(account: WhatsAppAccount | null): boolean {
+  return !!(account?.phone_number_id && account?.access_token);
+}
+
 
 /** Message types whose text lives somewhere other than `.text.body`. */
 const CAPTIONED_MEDIA = ['image', 'video', 'document', 'audio'];
@@ -153,11 +238,11 @@ function safeEqual(a: string, b: string): boolean {
 }
 
 /** Verifies Meta's X-Hub-Signature-256 (HMAC-SHA256 of the raw body). */
-async function verifyMetaSignature(rawBody: string, header: string): Promise<boolean> {
-  if (!APP_SECRET || !header) return false;
+async function verifyMetaSignature(rawBody: string, header: string, appSecret: string): Promise<boolean> {
+  if (!appSecret || !header) return false;
   const expectedHex = header.startsWith('sha256=') ? header.slice(7) : header;
   const key = await crypto.subtle.importKey(
-    'raw', new TextEncoder().encode(APP_SECRET),
+    'raw', new TextEncoder().encode(appSecret),
     { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
   );
   const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(rawBody));
@@ -168,8 +253,9 @@ async function verifyMetaSignature(rawBody: string, header: string): Promise<boo
 
 // ── persistence ─────────────────────────────────────────────────────────────
 
-async function upsertContact(db: any, waId: string, profileName: string) {
-  const existing = await db.entities.WhatsAppContact.filter({ wa_id: waId }).catch(() => []);
+async function upsertContact(db: any, waId: string, profileName: string, account: WhatsAppAccount) {
+  const existing = await db.entities.WhatsAppContact
+    .filter({ wa_id: waId, phone_number_id: account.phone_number_id }).catch(() => []);
   if (existing?.length) {
     const row = existing[0];
     // Only overwrite profile_name — display_name is the agent's own label.
@@ -182,19 +268,29 @@ async function upsertContact(db: any, waId: string, profileName: string) {
     wa_id: waId,
     phone_e164: toE164(waId),
     profile_name: profileName || '',
+    phone_number_id: account.phone_number_id,
+    tenant_id: account.tenant_id || '',
     tags: [],
     opted_out: false,
   });
 }
 
-async function upsertConversation(db: any, contact: any, waId: string) {
-  const existing = await db.entities.WhatsAppConversation.filter({ wa_id: waId }).catch(() => []);
+/**
+ * Threads are keyed on (wa_id, phone_number_id), not wa_id alone: the same
+ * person can hold separate conversations with two tenants on this platform,
+ * and merging them would show one tenant the other's messages.
+ */
+async function upsertConversation(db: any, contact: any, waId: string, account: WhatsAppAccount) {
+  const existing = await db.entities.WhatsAppConversation
+    .filter({ wa_id: waId, phone_number_id: account.phone_number_id }).catch(() => []);
   if (existing?.length) return existing[0];
   return await db.entities.WhatsAppConversation.create({
     contact_id: contact?.id || '',
     wa_id: waId,
-    phone_number_id: PHONE_NUMBER_ID,
-    waba_id: WABA_ID,
+    phone_number_id: account.phone_number_id,
+    waba_id: account.waba_id || '',
+    tenant_id: account.tenant_id || '',
+    account_id: account.id || '',
     status: 'open',
     handling_mode: 'ai_autopilot',
     unread_count: 0,
@@ -216,12 +312,12 @@ async function log(_db: unknown, action: string, status: string, detail: string)
 
 // ── automatic replies ───────────────────────────────────────────────────────
 
-/** POSTs one already-built payload to the Graph messages edge. */
-async function graphSend(payload: Record<string, unknown>) {
-  const res = await fetch(`${GRAPH_API_URL}/${PHONE_NUMBER_ID}/messages`, {
+/** POSTs one already-built payload from the account's own number and token. */
+async function graphSend(account: WhatsAppAccount, payload: Record<string, unknown>) {
+  const res = await fetch(`${GRAPH_API_URL}/${account.phone_number_id}/messages`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${SYSTEM_USER_TOKEN}`,
+      Authorization: `Bearer ${account.access_token}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ messaging_product: 'whatsapp', recipient_type: 'individual', ...payload }),
@@ -235,6 +331,8 @@ async function recordOutbound(db: any, conversation: any, contact: any, row: Rec
   await db.entities.WhatsAppMessage.create({
     conversation_id: conversation.id,
     wa_id: contact.wa_id,
+    phone_number_id: conversation.phone_number_id || '',
+    tenant_id: conversation.tenant_id || '',
     direction: 'outbound',
     wa_timestamp: now,
     ...row,
@@ -254,24 +352,27 @@ async function recordOutbound(db: any, conversation: any, contact: any, row: Rec
  * the safe failure mode — a wrong automated reply to a customer is worse than
  * a slow human one.
  */
-async function replyWithAI(db: any, conversation: any, contact: any, inbound: any): Promise<boolean> {
+async function replyWithAI(
+  db: any, account: WhatsAppAccount, conversation: any, contact: any, inbound: any,
+): Promise<boolean> {
   let replyText = '';
   try {
-    const res = await db.functions.invoke(AI_FUNCTION, {
+    const res = await db.functions.invoke(account.ai_function as string, {
       channel: 'whatsapp',
       conversation_id: conversation.id,
+      tenant_id: account.tenant_id || undefined,
       agent_id: conversation.agent_id || undefined,
       contact: { wa_id: contact?.wa_id, name: contact?.profile_name || '' },
       message: { type: inbound.message_type, text: inbound.body },
     });
     replyText = res?.data?.reply || res?.data?.text || res?.reply || '';
   } catch (err) {
-    await log(db, 'whatsapp_ai_reply', 'error', `${AI_FUNCTION}: ${(err as Error).message}`);
+    await log(db, 'whatsapp_ai_reply', 'error', `${account.ai_function}: ${(err as Error).message}`);
     return false;
   }
   if (!replyText || typeof replyText !== 'string') return false;
 
-  const { ok, json, wamid } = await graphSend({
+  const { ok, json, wamid } = await graphSend(account, {
     to: contact.wa_id, type: 'text', text: { preview_url: false, body: replyText },
   });
   await recordOutbound(db, conversation, contact, {
@@ -290,18 +391,20 @@ async function replyWithAI(db: any, conversation: any, contact: any, inbound: an
  * -reply rather than five. Stamped even on failure: retrying on every
  * subsequent inbound message would turn one Graph error into a flood.
  */
-async function sendAutoAck(db: any, conversation: any, contact: any) {
+async function sendAutoAck(db: any, account: WhatsAppAccount, conversation: any, contact: any) {
   if (conversation.auto_ack_sent_at) return;
 
-  const { ok, json, wamid } = await graphSend({
+  const templateName = String(account.auto_ack_template || '');
+  const language = String(account.auto_ack_language || 'en_US');
+  const { ok, json, wamid } = await graphSend(account, {
     to: contact.wa_id,
     type: 'template',
-    template: { name: AUTO_ACK_TEMPLATE, language: { code: AUTO_ACK_LANGUAGE } },
+    template: { name: templateName, language: { code: language } },
   });
   await recordOutbound(db, conversation, contact, {
     wamid, author: 'ai_agent', message_type: 'template',
-    template_name: AUTO_ACK_TEMPLATE, template_language: AUTO_ACK_LANGUAGE,
-    body: `Acknowledgement template: ${AUTO_ACK_TEMPLATE}`,
+    template_name: templateName, template_language: language,
+    body: `Acknowledgement template: ${templateName}`,
     status: ok ? 'sent' : 'failed',
     error_detail: ok ? '' : JSON.stringify(json?.error || {}).slice(0, 500),
   });
@@ -312,12 +415,16 @@ async function sendAutoAck(db: any, conversation: any, contact: any) {
     ok ? `acknowledged ${contact.wa_id}` : JSON.stringify(json?.error || {}));
 }
 
-/** Runs whichever automatic reply is configured; does nothing when none is. */
-async function runAutopilot(db: any, conversation: any, contact: any, inbound: any) {
-  if (!SYSTEM_USER_TOKEN || !PHONE_NUMBER_ID) return;
+/**
+ * Runs whichever automatic reply THIS tenant configured; does nothing when they
+ * configured none. Both settings live on the account row, so one tenant turning
+ * on a bot never speaks for another.
+ */
+async function runAutopilot(db: any, account: WhatsAppAccount, conversation: any, contact: any, inbound: any) {
+  if (!isUsable(account)) return;
   try {
-    if (AI_FUNCTION && await replyWithAI(db, conversation, contact, inbound)) return;
-    if (AUTO_ACK_TEMPLATE) await sendAutoAck(db, conversation, contact);
+    if (account.ai_function && await replyWithAI(db, account, conversation, contact, inbound)) return;
+    if (account.auto_ack_template) await sendAutoAck(db, account, conversation, contact);
   } catch (err) {
     await log(db, 'whatsapp_autopilot', 'error', (err as Error).message);
   }
@@ -325,7 +432,9 @@ async function runAutopilot(db: any, conversation: any, contact: any, inbound: a
 
 // ── change handlers ─────────────────────────────────────────────────────────
 
-async function handleInboundMessages(db: any, value: any, stats: Record<string, number>) {
+async function handleInboundMessages(
+  db: any, account: WhatsAppAccount, value: any, stats: Record<string, number>,
+) {
   const messages = Array.isArray(value?.messages) ? value.messages : [];
   const profileByWaId = new Map<string, string>();
   for (const c of value?.contacts || []) {
@@ -342,12 +451,14 @@ async function handleInboundMessages(db: any, value: any, stats: Record<string, 
     const dupes = await db.entities.WhatsAppMessage.filter({ wamid: norm.wamid }).catch(() => []);
     if (dupes?.length) { stats.duplicates++; continue; }
 
-    const contact = await upsertContact(db, waId, profileByWaId.get(waId) || '');
-    const conversation = await upsertConversation(db, contact, waId);
+    const contact = await upsertContact(db, waId, profileByWaId.get(waId) || '', account);
+    const conversation = await upsertConversation(db, contact, waId, account);
 
     await db.entities.WhatsAppMessage.create({
       conversation_id: conversation.id,
       wa_id: waId,
+      phone_number_id: account.phone_number_id,
+      tenant_id: account.tenant_id || '',
       wamid: norm.wamid,
       direction: 'inbound',
       author: 'contact',
@@ -379,7 +490,7 @@ async function handleInboundMessages(db: any, value: any, stats: Record<string, 
     // The claim check: a thread a human took over is never answered by the bot.
     const claimed = conversation.handling_mode === 'human';
     if (!claimed && !contact.opted_out) {
-      await runAutopilot(db, conversation, contact, norm);
+      await runAutopilot(db, account, conversation, contact, norm);
     }
   }
 }
@@ -408,17 +519,28 @@ Deno.serve(async (req) => {
   const url = new URL(req.url);
 
   // ── GET: subscription handshake ───────────────────────────────────────────
+  //
+  // Meta sends no phone number id on the handshake, so the verify token is what
+  // identifies the tenant: it is matched against every connected account. Each
+  // tenant therefore has to pick a token nobody else on this deployment uses —
+  // which is the same requirement Meta already places on it, since a guessable
+  // token lets anyone complete someone else's subscription.
   if (req.method === 'GET') {
     const mode = url.searchParams.get('hub.mode');
     const token = url.searchParams.get('hub.verify_token') || '';
     const challenge = url.searchParams.get('hub.challenge') || '';
 
-    if (mode === 'subscribe' && VERIFY_TOKEN && safeEqual(token, VERIFY_TOKEN)) {
-      // Meta wants the challenge as a bare body, not JSON.
-      return new Response(challenge, {
-        status: 200,
-        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-      });
+    if (mode === 'subscribe' && token) {
+      const base44 = createClientFromRequest(req);
+      const accounts = await allAccounts(base44.asServiceRole).catch(() => [] as WhatsAppAccount[]);
+      const matched = accounts.some((a) => a.verify_token && safeEqual(token, a.verify_token));
+      if (matched) {
+        // Meta wants the challenge as a bare body, not JSON.
+        return new Response(challenge, {
+          status: 200,
+          headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+        });
+      }
     }
     return new Response('Forbidden', { status: 403 });
   }
@@ -427,21 +549,17 @@ Deno.serve(async (req) => {
     return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'GET, POST' } });
   }
 
-  // ── POST: authenticate before parsing ─────────────────────────────────────
+  // ── POST: identify the tenant, then authenticate against their secrets ────
+  //
+  // The body has to be parsed before the signature can be checked, because the
+  // phone number id inside it is what selects the secret to check against. That
+  // ordering is safe: JSON.parse of an untrusted body is inert, and nothing is
+  // read from the parse beyond the routing key until the signature verifies —
+  // no entity is touched, no reply is sent, and an unverified delivery still
+  // leaves with a 401 having changed nothing.
   const rawBody = await req.text();
   const signature = req.headers.get('x-hub-signature-256') || '';
   const relayToken = req.headers.get('x-relay-token') || '';
-
-  const signatureOk = await verifyMetaSignature(rawBody, signature).catch(() => false);
-  const relayOk = !!RELAY_TOKEN && safeEqual(relayToken, RELAY_TOKEN);
-  if (!signatureOk && !relayOk) {
-    // Neither Meta's own signature nor the relay's shared secret checked out.
-    // If both secrets are unset the deployment is misconfigured, not open.
-    return Response.json(
-      { error: 'Unauthorized webhook delivery' },
-      { status: 401 },
-    );
-  }
 
   let payload: any;
   try {
@@ -452,6 +570,31 @@ Deno.serve(async (req) => {
 
   const base44 = createClientFromRequest(req);
   const db = base44.asServiceRole;
+
+  const phoneNumberId = String(
+    payload?.entry?.[0]?.changes?.[0]?.value?.metadata?.phone_number_id || '',
+  );
+  const account = await accountByPhoneNumberId(db, phoneNumberId);
+  if (!account) {
+    // Nobody on this deployment has connected that number. Refusing is the
+    // point: the alternative is processing another platform's traffic with
+    // whichever credentials happen to be lying around.
+    log('error', `delivery for unconnected phone_number_id ${phoneNumberId || '(absent)'}`);
+    return Response.json(
+      { error: 'No WhatsApp account is connected for this phone number id' },
+      { status: 404 },
+    );
+  }
+
+  const signatureOk = await verifyMetaSignature(rawBody, signature, account.app_secret || '')
+    .catch(() => false);
+  const relayOk = !!account.relay_token && safeEqual(relayToken, account.relay_token);
+  if (!signatureOk && !relayOk) {
+    // Neither Meta's signature nor this tenant's relay secret checked out. An
+    // account with neither secret stored is unauthenticated, not open.
+    return Response.json({ error: 'Unauthorized webhook delivery' }, { status: 401 });
+  }
+
   const stats: Record<string, number> = {
     messages: 0, statuses: 0, duplicates: 0, skipped: 0, orphan_statuses: 0,
   };
@@ -461,7 +604,14 @@ Deno.serve(async (req) => {
       for (const change of entry?.changes || []) {
         if (change?.field !== 'messages') continue;
         const value = change?.value || {};
-        await handleInboundMessages(db, value, stats);
+        // A single delivery only ever carries one number's traffic, but Meta
+        // does not promise it, so each change is re-checked against the
+        // account this request authenticated as.
+        if (String(value?.metadata?.phone_number_id || '') !== account.phone_number_id) {
+          stats.skipped++;
+          continue;
+        }
+        await handleInboundMessages(db, account, value, stats);
         await handleStatuses(db, value, stats);
       }
     }
