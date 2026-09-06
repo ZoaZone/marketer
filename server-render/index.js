@@ -8,10 +8,11 @@
 // POST /video, POST /dub-audio, or POST /dub-video enqueues and returns a
 // job id immediately, and the caller polls GET /jobs/:id for
 // status/progress/url(/captionsUrl). All job kinds share the same job store
-// and single-item queue (processQueue branches on kind) — only one job, of any
-// kind, runs at a time. Job records live in jobstore.js: Redis-backed and
-// restart-durable when REDIS_URL is set, in-memory otherwise (the boot log
-// says which). The queue itself is still in-process.
+// and scheduler; runJob branches on kind, and the scheduler dispatches by
+// LANE — FFmpeg jobs serially, provider-backed jobs concurrently (see
+// CPU_BOUND_KINDS below and scheduler.js). Job records live in jobstore.js:
+// Redis-backed and restart-durable when REDIS_URL is set, in-memory otherwise
+// (the boot log says which). The queue itself is still in-process.
 //
 // When PUBLIC_WORKER_URL is configured, dub-video's lip-sync step (the
 // slowest, most poll-flaky leg) is completed via a Replicate webhook
@@ -78,9 +79,26 @@ function requireSecret(req, res, next) {
 // work regardless. What survives is the *record* — and, for provider-backed
 // dubbing, the provider reference needed to reattach instead of re-paying.
 import * as jobs from "./jobstore.js";
+import { createScheduler } from "./scheduler.js";
 
-const queue = [];
-let processing = false;
+// ── Scheduling lanes ────────────────────────────────────────────────────
+//
+// FFmpeg work (render, lane1Video) stays strictly serial: an encode already
+// saturates this container's cores. The provider-backed kinds (video, music,
+// dubAudio, dubVideo) spend nearly all their wall-clock waiting on an HTTP
+// poll to Replicate or ElevenLabs, so they run in their own lane and overlap.
+// See scheduler.js for the full rationale and the cost of not doing this.
+//
+// PROVIDER_CONCURRENCY is the per-worker cap on in-flight provider jobs.
+// Three is deliberately modest: the ceiling that matters is the provider's
+// own rate limit (Replicate 429s under a burst — see isRetryableReplicateError),
+// not this process's capacity, and a batch that trips rate limiting is slower
+// than one that does not.
+export const CPU_BOUND_KINDS = new Set(["render", "lane1Video"]);
+const CPU_CONCURRENCY = 1;
+const PROVIDER_CONCURRENCY = Math.max(1, Number(process.env.PROVIDER_CONCURRENCY) || 3);
+
+export const laneOfKind = (kind) => (CPU_BOUND_KINDS.has(kind) ? "cpu" : "provider");
 
 // Job-record retention. This used to be a flat one hour, which quietly capped
 // how long a job could exist at all: dubbing a feature-length film runs well
@@ -148,12 +166,7 @@ function buildWebhookHooks(jobId) {
   };
 }
 
-async function processQueue() {
-  if (processing) return;
-  const next = queue.shift();
-  if (!next) return;
-
-  processing = true;
+async function runJob(next) {
   jobs.update(next.id, { status: "processing" });
 
   // Job lifecycle logging. Until this existed the worker was silent on the
@@ -246,12 +259,17 @@ async function processQueue() {
     console.error(`[job ${next.id}] ${next.kind} FAILED after ${elapsed()}: ${e?.message || e}`);
     jobs.update(next.id, { status: "error", error: String(e?.message || e) });
     scheduleCleanup(next.id);
-  } finally {
-    processing = false;
-    processQueue(); // pick up the next queued job, if any — a pending
-    // webhook job releases this immediately rather than blocking on it.
   }
+  // The scheduler releases this job's lane slot and starts whatever that
+  // now allows — a job handed off to a Replicate webhook releases its slot
+  // here rather than holding it for the provider's whole turnaround.
 }
+
+const scheduler = createScheduler({
+  laneOf: (job) => laneOfKind(job.kind),
+  limits: { cpu: CPU_CONCURRENCY, provider: PROVIDER_CONCURRENCY },
+  run: runJob,
+});
 
 app.get("/health", (_req, res) => {
   res.json({ ok: true });
@@ -292,10 +310,9 @@ app.post("/render", requireSecret, (req, res) => {
     error: null,
     createdAt: Date.now(),
   });
-  queue.push({ id, kind: "render", project });
+  scheduler.enqueue({ id, kind: "render", project });
 
   res.status(202).json({ jobId: id });
-  processQueue();
 });
 
 // Lane 1 (Base44-native short video — Quick Create, Campaign Studio, Demo
@@ -322,10 +339,9 @@ app.post("/lane1-video", requireSecret, (req, res) => {
     error: null,
     createdAt: Date.now(),
   });
-  queue.push({ id, kind: "lane1Video", project });
+  scheduler.enqueue({ id, kind: "lane1Video", project });
 
   res.status(202).json({ jobId: id });
-  processQueue();
 });
 
 app.post("/music", requireSecret, (req, res) => {
@@ -346,10 +362,9 @@ app.post("/music", requireSecret, (req, res) => {
     error: null,
     createdAt: Date.now(),
   });
-  queue.push({ id, kind: "music", spec });
+  scheduler.enqueue({ id, kind: "music", spec });
 
   res.status(202).json({ jobId: id });
-  processQueue();
 });
 
 app.post("/video", requireSecret, (req, res) => {
@@ -369,10 +384,9 @@ app.post("/video", requireSecret, (req, res) => {
     error: null,
     createdAt: Date.now(),
   });
-  queue.push({ id, kind: "video", payload });
+  scheduler.enqueue({ id, kind: "video", payload });
 
   res.status(202).json({ jobId: id });
-  processQueue();
 });
 
 function requireDubFields(req, res) {
@@ -399,10 +413,9 @@ app.post("/dub-audio", requireSecret, (req, res) => {
     error: null,
     createdAt: Date.now(),
   });
-  queue.push({ id, kind: "dubAudio", payload });
+  scheduler.enqueue({ id, kind: "dubAudio", payload });
 
   res.status(202).json({ jobId: id });
-  processQueue();
 });
 
 app.post("/dub-video", requireSecret, (req, res) => {
@@ -420,10 +433,9 @@ app.post("/dub-video", requireSecret, (req, res) => {
     error: null,
     createdAt: Date.now(),
   });
-  queue.push({ id, kind: "dubVideo", payload });
+  scheduler.enqueue({ id, kind: "dubVideo", payload });
 
   res.status(202).json({ jobId: id });
-  processQueue();
 });
 
 // Replicate calls this back directly, so it can't send x-render-secret —
@@ -527,4 +539,8 @@ if (orphans.length) {
 app.listen(PORT, () => {
   const mode = store.durable ? "redis, durable" : "in-memory, NOT durable";
   console.log(`studio-render-worker listening on :${PORT} (job store: ${mode})`);
+  // The scheduling shape is the first thing to check when a batch feels slow,
+  // so state it once at boot rather than leaving it to be inferred from
+  // timings.
+  console.log(`[boot] concurrency: ${CPU_CONCURRENCY} ffmpeg job, ${PROVIDER_CONCURRENCY} provider jobs`);
 });

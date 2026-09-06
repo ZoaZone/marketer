@@ -26,6 +26,7 @@ import {
   generateVoiceover,
   shortenCaption,
   splitScriptIntoScenes,
+  probeMediaDuration,
 } from "./aiClient.js";
 
 import {
@@ -44,6 +45,7 @@ export {
   generateVoiceover,
   shortenCaption,
   splitScriptIntoScenes,
+  probeMediaDuration,
   submitLane1Video,
   getLane1VideoStatus,
   assembleLane1Video,

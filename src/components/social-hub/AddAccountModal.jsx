@@ -1,16 +1,7 @@
-import { useState } from "react";
-import { X, Loader2, Eye, EyeOff, Plus, AlertCircle } from "lucide-react";
+import { useState, useEffect } from "react";
+import { X, Loader2, Eye, EyeOff, Plus, AlertCircle, ExternalLink, RefreshCw } from "lucide-react";
 import { base44 } from "@/api/base44Client";
-
-const TOKEN_HELP = {
-  instagram: { help: "Get from developers.facebook.com → Instagram Basic Display or Graph API → Access Token", ph: "IGQVJXxxxxxxxx" },
-  facebook:  { help: "Get a Page Access Token from developers.facebook.com → Graph API Explorer", ph: "EAAxxxxxxxx" },
-  linkedin:  { help: "Get from LinkedIn Developer Portal → OAuth 2.0 → Access Token", ph: "AQXxxxxxxxx" },
-  twitter_x: { help: "Bearer token from developer.twitter.com → Your App → Keys & Tokens", ph: "AAAAAxxxxxxxx" },
-  tiktok:    { help: "Access token from developers.tiktok.com → Content Posting API", ph: "act.xxxxxxxx" },
-  youtube:   { help: "OAuth access token from console.cloud.google.com → YouTube Data API v3", ph: "ya29.xxxxxxxx" },
-  pinterest: { help: "Access token from developers.pinterest.com → My Apps", ph: "pina_xxxxxxxx" },
-};
+import { connectGuide } from "@/config/socialConnect";
 
 const emptyForm = {
   platform: "instagram",
@@ -26,17 +17,47 @@ const emptyForm = {
  * immediately verified via testSocialConnection so the status badge
  * reflects reality from the moment it appears, instead of defaulting to
  * "active".
+ *
+ * Doubles as the RECONNECT form: pass `account` and it opens on that
+ * account's platform, pre-filled with its name and handle, and updates the
+ * existing record (saveSocialAccount takes an `id`) rather than creating a
+ * duplicate. An expired token previously had no path back other than
+ * deleting the account and adding it again.
+ *
+ * The per-platform guidance now comes from @/config/socialConnect, which
+ * carries the direct URL of the page that issues the credential plus the
+ * steps to follow on it — replacing a single line of prose naming a site
+ * you then had to find yourself.
  */
-export default function AddAccountModal({ open, onClose, platforms, onSaved }) {
+export default function AddAccountModal({ open, onClose, platforms, onSaved, account = null }) {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [showSecret, setShowSecret] = useState(false);
   const [error, setError] = useState("");
 
+  const reconnecting = !!account?.id;
+
+  // Load the account being reconnected. Keyed on the id so reopening the
+  // modal for a different account refills it; the token is never prefilled
+  // because it is never sent to the client.
+  useEffect(() => {
+    if (!open) return;
+    setError(""); setShowSecret(false);
+    setForm(account?.id
+      ? {
+          platform: account.platform || "instagram",
+          account_name: account.account_name || "",
+          username: account.username || "",
+          access_token: "",
+          connection_method: "api",
+        }
+      : emptyForm);
+  }, [open, account?.id]);
+
   if (!open) return null;
 
   const isDecorative = form.platform === "email" || form.platform === "whatsapp";
-  const tokenMeta = TOKEN_HELP[form.platform];
+  const guide = connectGuide(form.platform);
 
   const reset = () => { setForm(emptyForm); setError(""); setShowSecret(false); };
   const close = () => { reset(); onClose(); };
@@ -52,16 +73,18 @@ export default function AddAccountModal({ open, onClose, platforms, onSaved }) {
       // directly here would put a live posting credential in plaintext on a
       // client-readable record.
       const res = await base44.functions.invoke("saveSocialAccount", {
+        ...(reconnecting ? { id: account.id } : {}),
         platform: form.platform,
         account_name: form.account_name.trim(),
         username: form.username || "",
         access_token: form.access_token || "",
         connection_method: isDecorative ? "webhook" : "api",
       });
-      const created = res?.data?.account ?? res?.account;
-      if (!created?.id) throw new Error(res?.data?.error || res?.error || "Could not save the account.");
+      const saved = res?.data?.account ?? res?.account;
+      const savedId = saved?.id || (reconnecting ? account.id : null);
+      if (!savedId) throw new Error(res?.data?.error || res?.error || "Could not save the account.");
       try {
-        await base44.functions.invoke("testSocialConnection", { account_id: created.id });
+        await base44.functions.invoke("testSocialConnection", { account_id: savedId });
       } catch (_e) {
         // verification is best-effort — the account is still saved either way
       }
@@ -77,12 +100,17 @@ export default function AddAccountModal({ open, onClose, platforms, onSaved }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
       <div className="bg-card border border-border rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-5 border-b border-border">
-          <h3 className="font-bold text-foreground flex items-center gap-2"><Plus className="w-4 h-4 text-fuchsia-400" /> Add Social Account</h3>
+          <h3 className="font-bold text-foreground flex items-center gap-2">
+            {reconnecting
+              ? <><RefreshCw className="w-4 h-4 text-amber-400" /> Reconnect {account.account_name || guide?.label || account.platform}</>
+              : <><Plus className="w-4 h-4 text-fuchsia-400" /> Add Social Account</>}
+          </h3>
           <button onClick={close} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground"><X className="w-4 h-4" /></button>
         </div>
 
         <div className="p-5 space-y-4">
-          {/* Platform picker */}
+          {/* Platform picker — fixed when reconnecting an existing account. */}
+          {!reconnecting && (
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">Platform</label>
             <div className="grid grid-cols-4 gap-2">
@@ -96,6 +124,24 @@ export default function AddAccountModal({ open, onClose, platforms, onSaved }) {
               ))}
             </div>
           </div>
+          )}
+
+          {/* The direct route to the credential: one click to the exact page
+              that issues it, then the steps to follow once there. */}
+          {guide && (
+            <div className="p-3 rounded-xl bg-muted/30 border border-border space-y-2">
+              <a href={guide.url} target="_blank" rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-fuchsia-400 hover:text-fuchsia-300">
+                <ExternalLink className="w-3.5 h-3.5" /> {guide.urlLabel}
+              </a>
+              {guide.steps && (
+                <ol className="list-decimal list-inside space-y-0.5 text-[11px] text-muted-foreground">
+                  {guide.steps.map((s, i) => <li key={i}>{s}</li>)}
+                </ol>
+              )}
+              {guide.note && <p className="text-[11px] text-amber-300/90">{guide.note}</p>}
+            </div>
+          )}
 
           {/* Account name + username */}
           <div className="grid grid-cols-2 gap-3">
@@ -125,17 +171,19 @@ export default function AddAccountModal({ open, onClose, platforms, onSaved }) {
           ) : (
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">Access Token *</label>
-              {tokenMeta?.help && <p className="text-[10px] text-muted-foreground mb-1">{tokenMeta.help}</p>}
+              {reconnecting && <p className="text-[10px] text-muted-foreground mb-1">Paste a fresh token — the stored one is no longer accepted by {guide?.label || form.platform}.</p>}
               <div className="relative">
                 <input type={showSecret ? "text" : "password"} value={form.access_token}
                   onChange={e => setForm(f => ({ ...f, access_token: e.target.value }))}
-                  placeholder={tokenMeta?.ph || "Your access token"}
+                  placeholder={guide?.tokenPlaceholder || "Your access token"}
                   className="w-full px-3 py-2.5 pr-10 rounded-xl bg-background border border-border text-sm font-mono placeholder:text-muted-foreground/40 focus:outline-none focus:border-fuchsia-500/50" />
                 <button type="button" onClick={() => setShowSecret(s => !s)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                   {showSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-              <p className="text-[10px] text-muted-foreground">An API access token is required — none of these platforms accept a username/password for posting.</p>
+              <p className="text-[10px] text-muted-foreground">
+                An API access token is required. None of these platforms&apos; posting APIs accept a username and password — the token issued by the link above, while signed in to that account, is the equivalent.
+              </p>
             </div>
           )}
 
@@ -146,8 +194,8 @@ export default function AddAccountModal({ open, onClose, platforms, onSaved }) {
           <button onClick={close} className="flex-1 px-4 py-2.5 rounded-xl border border-border text-sm font-medium text-muted-foreground hover:text-foreground">Cancel</button>
           <button onClick={save} disabled={saving}
             className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white text-sm font-semibold disabled:opacity-50 hover:opacity-90">
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-            {saving ? "Connecting..." : "Save & Verify"}
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : reconnecting ? <RefreshCw className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+            {saving ? "Connecting..." : reconnecting ? "Reconnect & Verify" : "Save & Verify"}
           </button>
         </div>
       </div>

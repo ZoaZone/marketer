@@ -2,17 +2,18 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useOutletContext } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
-import { generateText, generateImage, generateVoiceover, uploadFile, splitScriptIntoScenes, assembleLane1Video } from "@/utils/lane1";
+import { generateText, generateImage, generateVoiceover, uploadFile, splitScriptIntoScenes, assembleLane1Video, probeMediaDuration } from "@/utils/lane1";
 // Tier-gated Lane 2 access — see the amended lane guard in eslint.config.js.
 // Entitlement is enforced server-side in base44/functions/submitVideo (403);
 // the client check below is UX, so an unentitled user gets an upgrade prompt
 // instead of a failed request.
-import { generateSceneVideo, generateMusic, submitRender, getRenderStatus } from "@/utils/lane2";
+import { generateSceneVideo, generateMusic, submitRender, getRenderStatus, MAX_MUSIC_SECONDS } from "@/utils/lane2";
 import { VIDEO_RATIOS } from "@/utils/videoAssembler";
 import {
   Wand2, Image as ImageIcon, Video, Loader2, Download, Save, CheckCircle2,
   AlertTriangle, Mic, Sparkles, Paperclip, X, Music, VolumeX, ChevronRight,
-  ChevronLeft, Check, Film, Lightbulb,
+  ChevronLeft, Check, Film, Lightbulb, MessageSquare, Clapperboard, Briefcase,
+  Lock, Upload,
 } from "lucide-react";
 
 // Quick Create uses Lane 1 for standard generation and assembly, plus
@@ -29,22 +30,49 @@ import {
 // "Next" stays disabled until that step's own artifact exists (script
 // written, storyboard images generated, audio resolved, video assembled).
 // The image path stays a single quick action — the stepper only applies to
-// video, which is the pipeline the mux/voiceover/publish steps describe.
+// video, which is the pipeline the mux/audio/publish steps describe.
+//
+// AUDIO. Speech and music are independent, and per-scene dialogue is the
+// default shape of speech. Both were previously a single three-way choice
+// (voiceover XOR music XOR silent), which produced two distinct faults from
+// one cause: a generated music track was silently discarded whenever a
+// voiceover was selected, and the only speech on offer was one continuous
+// narration track laid over the whole video — no lines, no timing, nothing
+// tied to a scene. See NARRATION_MODES and assembleStep.
 
 const STEPS = [
   { id: "idea", label: "Prompt/Idea", icon: Lightbulb },
   { id: "script", label: "Script", icon: Wand2 },
   { id: "storyboard", label: "Storyboard/Images", icon: ImageIcon },
   { id: "video", label: "Short Video", icon: Film },
-  { id: "voiceover", label: "Voiceover", icon: Mic },
+  { id: "audio", label: "Dialogue & Audio", icon: MessageSquare },
   { id: "mux", label: "FFmpeg Mux", icon: Sparkles },
   { id: "export", label: "Publish/Export", icon: Download },
 ];
 
-const AUDIO_MODES = [
-  { id: "voiceover", label: "Voiceover", icon: Mic },
-  { id: "music", label: "Music", icon: Music },
-  { id: "silent", label: "Silent", icon: VolumeX },
+// How the video speaks. This used to be a single AUDIO_MODES choice of
+// voiceover XOR music XOR silent, which caused both of the reported audio
+// faults at once: picking "Voiceover" silently discarded a music track that
+// had already been generated, and the only speech available was one
+// continuous narration over the whole video — "like a documentary", with
+// "no feeling of characters talking".
+//
+// Speech and music are now independent (music is its own toggle below), and
+// speech itself has two shapes. Dialogue is the default because it is what a
+// short video usually wants.
+const NARRATION_MODES = [
+  {
+    id: "dialogue", label: "Dialogue", icon: MessageSquare,
+    hint: "One spoken line per scene, cut to that scene. Characters speak; the scene waits for the line to finish.",
+  },
+  {
+    id: "narration", label: "Narration", icon: Mic,
+    hint: "A single voice reading over the whole video. Documentary style.",
+  },
+  {
+    id: "none", label: "No speech", icon: VolumeX,
+    hint: "Music only, or silent.",
+  },
 ];
 
 // Pixel-dimension hints passed to the image generator per aspect ratio.
@@ -56,10 +84,118 @@ const RATIO_DIMENSIONS = { "1:1": "1024x1024", "16:9": "1792x1024", "9:16": "102
 // the check that actually enforces it.
 const MOTION_MIN_TIER = 3;
 
+// Tier at which Movie Maker Pro itself unlocks. Mirrors the sidebar's own
+// /movie-maker entry (minTier 4).
+const MOVIE_MAKER_MIN_TIER = 4;
+
 // Per-scene clip length for real video. Kling bills per clip, so Quick Create
 // generates exactly one short clip per scene — Movie Maker is where multi-shot
 // scenes and longer durations live.
 const MOTION_CLIP_SECONDS = 5;
+
+
+/**
+ * Splits a model's dialogue answer into one line per scene.
+ *
+ * The model is asked for "1| line" per scene, but LLM output is not a
+ * protocol: numbering drifts between "1|", "1.", "1)" and "Scene 1:", lines
+ * wrap, and sometimes the numbering is dropped entirely. Anything that
+ * survives here is what the user sees in the editor, so it is worth being
+ * generous — an unparsed answer means the whole step silently produced
+ * nothing.
+ *
+ * Speaker labels are DELIBERATELY kept ("MAYA: we're not done yet"): they
+ * are what makes the lines read as characters talking in the editor.
+ * toSpokenLine strips them at the point of synthesis, so the voice does not
+ * read the name aloud.
+ */
+export function parseDialogueLines(raw, sceneCount) {
+  const lines = new Array(Math.max(0, sceneCount)).fill("");
+  if (!raw || !sceneCount) return lines;
+
+  const numbered = /^\s*(?:scene\s*)?(\d{1,2})\s*[|.):\-]\s*(.+)$/i;
+  let lastIndex = -1;
+
+  for (const rawLine of String(raw).split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    const match = line.match(numbered);
+    if (match) {
+      const index = Number(match[1]) - 1;
+      if (index >= 0 && index < sceneCount) {
+        lines[index] = cleanDialogueLine(match[2]);
+        lastIndex = index;
+      }
+      continue;
+    }
+    // A wrapped continuation of the line before it, not a new scene.
+    if (lastIndex >= 0) {
+      lines[lastIndex] = `${lines[lastIndex]} ${cleanDialogueLine(line)}`.trim();
+    }
+  }
+
+  // Unnumbered output: fall back to taking the lines in order.
+  if (!lines.some(Boolean)) {
+    const plain = String(raw).split(/\r?\n/).map(cleanDialogueLine).filter(Boolean);
+    for (let i = 0; i < sceneCount && i < plain.length; i++) lines[i] = plain[i];
+  }
+  return lines;
+}
+
+/** Markdown, stage directions and wrapping quotes — never spoken, never shown. */
+function cleanDialogueLine(text) {
+  return stripSpokenQuotes(
+    String(text || "")
+      .replace(/\*\*/g, "").replace(/\*/g, "")
+      .replace(/`[^`]*`/g, "")
+      .replace(/\([^)]*\)/g, "")            // (smiling warmly)
+      .replace(/\s{2,}/g, " ")
+      .trim()
+  );
+}
+
+/**
+ * Unwraps a quoted line, whether or not a speaker label sits in front of the
+ * opening quote — models return both `"we're not done yet."` and
+ * `MAYA: "we're not done yet."`, and a stray quote character is something a
+ * voice will happily pause around.
+ *
+ * The closing quote is only removed when an opening one was found, so an
+ * apostrophe that happens to end a line (a possessive, say) survives.
+ */
+function stripSpokenQuotes(text) {
+  const match = text.match(/^((?:[A-Za-z][A-Za-z0-9 .'\-]{0,24}:\s*)?)["\u201c\u2018']\s*([\s\S]*)$/);
+  if (!match) return text;
+  const [, speaker, body] = match;
+  return `${speaker}${body.replace(/["\u201d\u2019']\s*$/, "").trim()}`;
+}
+
+/**
+ * The text actually handed to text-to-speech.
+ *
+ * Strips a leading speaker label — "MAYA:", "Dr. Ellis:" — which the editor
+ * shows on purpose but which a voice would otherwise read out as part of the
+ * line ("emm ay wye ay, we're not done yet").
+ */
+export function toSpokenLine(text) {
+  return cleanDialogueLine(
+    String(text || "").replace(/^\s*[A-Za-z][A-Za-z0-9 .'\-]{0,24}:\s*/, "")
+  );
+}
+
+/**
+ * How long a scene will actually run once assembled.
+ *
+ * Both assemblers size a scene to max(visual, its own voice track) — see
+ * buildSceneClip in server-render/lane1.js and render.js — so a scene with a
+ * six-second line does not end after five seconds of picture. Every duration
+ * the page quotes or derives (the runtime estimate, the length of music it
+ * asks for) has to use the same rule or it will describe a different video
+ * from the one that gets rendered.
+ */
+export function sceneRuntimeSeconds(scene) {
+  return Math.max(Number(scene?.seconds) || 0, Number(scene?.voiceSeconds) || 0);
+}
 
 export default function QuickCreate() {
   const qc = useQueryClient();
@@ -67,12 +203,22 @@ export default function QuickCreate() {
   // usable if it is ever rendered outside that shell.
   const { userTier = 0, isAdmin = false } = useOutletContext() || {};
   const canMotion = isAdmin || userTier >= MOTION_MIN_TIER;
+  // Movie Maker Pro is a paid-tier page — same gate the sidebar applies to
+  // its own /movie-maker entry, admins exempt.
+  const canMovieMaker = isAdmin || userTier >= MOVIE_MAKER_MIN_TIER;
 
   // "motion" = real generative video (Kling, one clip per scene).
-  // "slideshow" = the original FFmpeg Ken Burns pan over stills.
-  // Entitled users default to motion, because that is what "Short Video"
-  // is understood to mean; everyone else gets the slideshow, labelled.
-  const [motionMode, setMotionMode] = useState(canMotion ? "motion" : "slideshow");
+  // "slideshow" = Studio visuals — the FFmpeg Ken Burns pan over stills
+  // generated on Base44 credits.
+  //
+  // Studio visuals are the DEFAULT for everyone, including entitled users.
+  // A real AI clip costs two to three minutes per scene on top of paid
+  // credits, so defaulting to it made the primary path in Quick Create both
+  // the slowest and the most expensive one — a three-scene short spent the
+  // better part of ten minutes generating before it could be assembled.
+  // Real AI video is one click away at the storyboard step and clearly
+  // labelled there; it is a choice rather than the toll on the front door.
+  const [motionMode, setMotionMode] = useState("slideshow");
   const useMotion = canMotion && motionMode === "motion";
   const [motionProgress, setMotionProgress] = useState(0);
   const [clipGenerating, setClipGenerating] = useState({});
@@ -103,10 +249,23 @@ export default function QuickCreate() {
   const [sceneCount, setSceneCount] = useState(3); // 2-4 scenes x 8s = a 16-32s short
   const [script, setScript] = useState("");
   const [generatingScript, setGeneratingScript] = useState(false);
-  const [scenes, setScenes] = useState([]); // [{ imageUrl, text, seconds }]
+  // [{ imageUrl, text, seconds, videoUrl?, dialogue?, voiceUrl?, voiceSeconds? }]
+  const [scenes, setScenes] = useState([]);
   const [generatingStoryboard, setGeneratingStoryboard] = useState(false);
   const [storyboardProgress, setStoryboardProgress] = useState(0);
-  const [audioMode, setAudioMode] = useState("voiceover"); // "voiceover" | "music" | "silent"
+  // Speech shape and music are independent — see NARRATION_MODES. The old
+  // single audioMode is gone; it is what made "Voiceover" mean "and throw
+  // the music away".
+  const [narrationMode, setNarrationMode] = useState("dialogue");
+  const [musicEnabled, setMusicEnabled] = useState(true);
+  // Optional reference the user pastes or uploads: their own dialogue,
+  // character names, a script fragment. Fed to the dialogue writer as the
+  // source of truth rather than merely as inspiration.
+  const [dialogueReference, setDialogueReference] = useState("");
+  const [dialogueReferenceName, setDialogueReferenceName] = useState("");
+  const [writingDialogue, setWritingDialogue] = useState(false);
+  const [voiceLoading, setVoiceLoading] = useState({}); // scene index -> bool
+  const [voiceBatch, setVoiceBatch] = useState(null);   // { done, total } | null
   const [voiceoverUrl, setVoiceoverUrl] = useState("");
   const [generatingVoiceover, setGeneratingVoiceover] = useState(false);
   const [musicUrl, setMusicUrl] = useState("");
@@ -121,6 +280,7 @@ export default function QuickCreate() {
   const resetVideoPipeline = () => {
     setStep(0); setScript(""); setScenes([]); setVoiceoverUrl("");
     setMusicUrl(""); setMusicName(""); setGeneratingMusic(false); setVideoResult(""); setVideoSaved(false);
+    setVoiceLoading({}); setVoiceBatch(null);
     setWarnings([]); setError("");
   };
 
@@ -278,7 +438,127 @@ export default function QuickCreate() {
     setGeneratingStoryboard(false);
   };
 
-  // ── Step 4 (Voiceover) ──
+  // ── Step 4 (Dialogue & Audio) ──
+
+  // Total runtime the assembler will actually produce. Not the sum of clip
+  // lengths: a scene stretches to fit its own dialogue line.
+  const totalRuntimeSeconds = () => scenes.reduce((sum, scene) => sum + sceneRuntimeSeconds(scene), 0);
+
+  const handleDialogueReferenceUpload = async (file) => {
+    if (!file) return;
+    setError("");
+    try {
+      // Read in the browser rather than uploading: this text is a prompt
+      // input, not an asset, and nothing downstream needs a URL for it.
+      const text = await file.text();
+      if (!text.trim()) throw new Error("That file is empty.");
+      setDialogueReference(text.slice(0, 20000));
+      setDialogueReferenceName(file.name);
+    } catch (e) {
+      setError(e?.message || "Could not read that file — plain text (.txt) works best.");
+    }
+  };
+
+  /**
+   * Writes one spoken line per scene.
+   *
+   * Runs on Base44's own AI credits (generateText -> InvokeLLM, with the
+   * platform's OpenAI fallback behind it), so this costs nothing extra on
+   * top of the plan.
+   *
+   * The scene text it is given describes what is on screen; the job here is
+   * to turn that into something a person in the shot would SAY. That
+   * distinction is the whole of the "no feeling of characters talking"
+   * complaint — the previous step fed the scene descriptions to
+   * text-to-speech more or less verbatim, which can only ever sound like
+   * narration about the picture.
+   */
+  const writeDialogue = async () => {
+    if (!scenes.length) { setError("Generate the storyboard first."); return; }
+    setError(""); setWritingDialogue(true);
+    try {
+      const numbered = scenes.map((scene, i) => `${i + 1}. ${scene.text || ""}`).join("\n");
+      const reference = dialogueReference.trim()
+        ? `\n\nThe user supplied their own dialogue reference. Treat it as the source of truth for the characters, their names, their voice, and any lines that fit — do not invent a different cast:\n"""\n${dialogueReference.trim().slice(0, 6000)}\n"""`
+        : "";
+      const result = await generateText({
+        type: "script",
+        prompt:
+          `Write the spoken DIALOGUE for a ${scenes.length}-scene short video about: ${prompt || script}.\n\n` +
+          `Speak AS the people on screen, in their own words. Do not describe them, do not narrate the picture, ` +
+          `and do not write in the third person. Exactly one line per scene, short enough to say aloud in about ` +
+          `${MOTION_CLIP_SECONDS} seconds. Where a character has a name, prefix their line with it, like "MAYA: ...". ` +
+          `Prefix every line with its scene number and a pipe: "1| MAYA: ...". ` +
+          `No scene labels, no stage directions, no parentheticals, no quotation marks around the line.\n\n` +
+          `Scenes (what is on screen):\n${numbered}${reference}`,
+        tone: "Conversational",
+      });
+      const lines = parseDialogueLines(result, scenes.length);
+      if (!lines.some(Boolean)) {
+        throw new Error("The dialogue came back empty. Try again, or type the lines in yourself.");
+      }
+      // A rewritten line invalidates the audio already generated for it.
+      setScenes(prev => prev.map((scene, i) => (
+        lines[i] ? { ...scene, dialogue: lines[i], voiceUrl: "", voiceSeconds: 0 } : scene
+      )));
+    } catch (e) {
+      setError(e?.message || "Dialogue generation failed.");
+      if (e?.upgradeRequired) setUpgradeRequired(true);
+    }
+    setWritingDialogue(false);
+  };
+
+  /**
+   * Speaks one scene's line and attaches it to that scene.
+   *
+   * The result is UPLOADED, not kept as an object URL: a `blob:` URL is
+   * valid only inside the tab that created it, and the render worker has to
+   * fetch this over the network. (A persisted blob: URL is exactly what used
+   * to make a Movie Maker render fail outright.)
+   */
+  const generateSceneVoice = async (index) => {
+    const scene = scenes[index];
+    const line = (scene?.dialogue || "").trim();
+    if (!line) { setError(`Scene ${index + 1} has no dialogue yet.`); return false; }
+    setVoiceLoading(prev => ({ ...prev, [index]: true }));
+    setError("");
+    let ok = false;
+    try {
+      const blob = await generateVoiceover(toSpokenLine(line));
+      if (!blob) throw new Error("No audio was produced for this line.");
+      const url = await uploadFile(new File([blob], `scene-${index + 1}-line.mp3`, { type: blob.type || "audio/mpeg" }));
+      if (!url) throw new Error("Uploading the line's audio failed.");
+      // Measure it while the audio is in hand — the runtime estimate and the
+      // length of music we ask for both depend on it.
+      const objectUrl = URL.createObjectURL(blob);
+      const voiceSeconds = (await probeMediaDuration(objectUrl, "audio")) || 0;
+      URL.revokeObjectURL(objectUrl);
+      setScenes(prev => prev.map((item, i) => i === index ? { ...item, voiceUrl: url, voiceSeconds } : item));
+      ok = true;
+    } catch (e) {
+      setError(e?.message || `Scene ${index + 1}: voice generation failed.`);
+      if (e?.upgradeRequired) setUpgradeRequired(true);
+    }
+    setVoiceLoading(prev => ({ ...prev, [index]: false }));
+    return ok;
+  };
+
+  // Sequential on purpose: text-to-speech returns in seconds, and one line
+  // at a time keeps the per-scene spinners meaningful.
+  const generateAllSceneVoices = async () => {
+    const pending = scenes
+      .map((scene, index) => ({ scene, index }))
+      .filter(({ scene }) => (scene.dialogue || "").trim() && !scene.voiceUrl);
+    if (!pending.length) return;
+    setVoiceBatch({ done: 0, total: pending.length });
+    for (let i = 0; i < pending.length; i++) {
+      const ok = await generateSceneVoice(pending[i].index);
+      setVoiceBatch({ done: i + 1, total: pending.length });
+      if (!ok) break; // a refusal (plan, allowance, consent) will refuse the rest identically
+    }
+    setVoiceBatch(null);
+  };
+
   const generateVoiceoverStep = async () => {
     if (!scenes.length) { setError("Generate the storyboard first."); return; }
     setError(""); setGeneratingVoiceover(true);
@@ -320,7 +600,16 @@ export default function QuickCreate() {
     }
     setGeneratingMusic(true); setError(""); setUpgradeRequired(false);
     try {
-      const durationSeconds = Math.max(10, scenes.reduce((sum, scene) => sum + (Number(scene.seconds) || 8), 0));
+      // Scored to the runtime the assembler will actually produce, which
+      // includes each scene's dialogue stretch — asking for the sum of clip
+      // lengths writes a track that runs out before the video does. Capped
+      // the same way Movie Maker caps it: a track shorter than the film is
+      // not a problem (the worker extends it with crossfaded repeats), but a
+      // request for minutes of audio in one run reliably times out.
+      const durationSeconds = Math.min(
+        MAX_MUSIC_SECONDS,
+        Math.max(10, Math.round(totalRuntimeSeconds()) || 30),
+      );
       const result = await generateMusic({
         prompt: `Cinematic background score matching this short video: ${prompt}`,
         durationSeconds,
@@ -383,9 +672,41 @@ export default function QuickCreate() {
     if (!scenes.length) { setError("Generate the storyboard first."); return; }
     setError(""); setWarnings([]); setAssembling(true); setMuxProgress(0); setVideoResult(""); setVideoSaved(false);
     try {
-      const effectiveAudioMode = (audioMode === "voiceover" && !voiceoverUrl) || (audioMode === "music" && !musicUrl) ? "silent" : audioMode;
-      if (audioMode === "voiceover" && !voiceoverUrl) setWarnings(prev => [...prev, "No voiceover was generated — shipping silent instead."]);
-      if (audioMode === "music" && !musicUrl) setWarnings(prev => [...prev, "No music track was generated or uploaded — shipping silent."]);
+      // Every audio source is independent, and every one that exists is
+      // sent. This is the fix for "the music was generated but the video came
+      // back with only the voiceover": the old single audioMode could name
+      // exactly one, and quietly dropped the other.
+      const wantsDialogue = narrationMode === "dialogue";
+      const wantsNarration = narrationMode === "narration";
+
+      // Only URLs the worker can actually fetch. A `blob:` URL is valid only
+      // in the tab that created it and would 404 on the worker.
+      const payloadScenes = scenes.map(scene => ({
+        ...scene,
+        voiceUrl: wantsDialogue && scene.voiceUrl && !/^blob:/i.test(scene.voiceUrl)
+          ? scene.voiceUrl
+          : undefined,
+      }));
+
+      const projectVoiceoverUrl = wantsNarration && voiceoverUrl && !/^blob:/i.test(voiceoverUrl)
+        ? voiceoverUrl
+        : undefined;
+      const projectMusicUrl = musicEnabled && musicUrl && !/^blob:/i.test(musicUrl) ? musicUrl : undefined;
+
+      const spokenScenes = payloadScenes.filter(scene => scene.voiceUrl).length;
+      const scenesWithDialogue = scenes.filter(scene => (scene.dialogue || "").trim()).length;
+
+      if (wantsDialogue && scenesWithDialogue && !spokenScenes) {
+        setWarnings(prev => [...prev, "Dialogue was written but none of it has been spoken yet — the video will render without speech. Use \u201cSpeak all lines\u201d first."]);
+      } else if (wantsDialogue && spokenScenes && spokenScenes < scenesWithDialogue) {
+        setWarnings(prev => [...prev, `${scenesWithDialogue - spokenScenes} scene(s) still have unspoken dialogue — those scenes will render silent.`]);
+      }
+      if (wantsNarration && !projectVoiceoverUrl) {
+        setWarnings(prev => [...prev, "No narration was generated — the video will render without it."]);
+      }
+      if (musicEnabled && !projectMusicUrl) {
+        setWarnings(prev => [...prev, "No music track was generated or uploaded — the video will render without music."]);
+      }
 
       // Two assemblers, picked by what the scenes actually contain. The Lane 2
       // render worker understands scene.videoUrl and stitches real clips;
@@ -393,14 +714,14 @@ export default function QuickCreate() {
       // scenes rather than on the toggle means a partial failure above (some
       // clips generated, some not) still assembles correctly — render.js
       // already falls back to the still for any scene lacking a videoUrl.
-      const hasClips = scenes.some(s => s.videoUrl);
+      const hasClips = payloadScenes.some(scene => scene.videoUrl);
       let url;
 
       if (hasClips) {
         const jobId = await submitRender({
-          scenes, ratio: videoRatio, resolution,
-          voiceoverUrl: effectiveAudioMode === "voiceover" ? voiceoverUrl : undefined,
-          musicUrl: effectiveAudioMode === "music" ? musicUrl : undefined,
+          scenes: payloadScenes, ratio: videoRatio, resolution,
+          voiceoverUrl: projectVoiceoverUrl,
+          musicUrl: projectMusicUrl,
         });
         const renderStartedAt = Date.now();
         for (;;) {
@@ -414,11 +735,13 @@ export default function QuickCreate() {
           if (job?.status === "error") throw new Error(job.error || "Video assembly failed.");
         }
       } else {
+        // No audioMode: that field is the legacy one-of-three gate, and
+        // omitting it is what lets narration, per-scene dialogue and music
+        // all reach the mix (see assembleLane1Video's docblock).
         url = await assembleLane1Video({
-          scenes, ratio: videoRatio, resolution,
-          audioMode: effectiveAudioMode,
-          voiceoverUrl: effectiveAudioMode === "voiceover" ? voiceoverUrl : undefined,
-          musicUrl: effectiveAudioMode === "music" ? musicUrl : undefined,
+          scenes: payloadScenes, ratio: videoRatio, resolution,
+          voiceoverUrl: projectVoiceoverUrl,
+          musicUrl: projectMusicUrl,
         }, { onProgress: setMuxProgress });
       }
 
@@ -458,7 +781,7 @@ export default function QuickCreate() {
     <div className="max-w-5xl mx-auto space-y-5">
       <div>
         <h1 className="text-2xl font-black text-foreground flex items-center gap-2"><Wand2 className="w-6 h-6 text-fuchsia-400" /> Quick Create</h1>
-        <p className="text-muted-foreground text-sm mt-0.5">Generate a standalone image (one click) or a short video (guided steps) — no brand, accounts, or script step required beyond what's built in.</p>
+        <p className="text-muted-foreground text-sm mt-0.5">Generate a standalone image (one click) or a short video (guided steps) — script, dialogue, visuals and voices on your plan&apos;s built-in AI credits.</p>
       </div>
 
       <div>
@@ -474,6 +797,70 @@ export default function QuickCreate() {
           </button>
         </div>
       </div>
+
+      {/* Which maker builds this video. Quick Create IS the Studio path —
+          Base44's own AI credits for script, dialogue, images and narration,
+          then FFmpeg assembly — and Movie Maker Pro is the premium route,
+          which is a separate page rather than a mode of this one. Naming both
+          here means the choice is visible at the point it's made instead of
+          being something you had to already know about. */}
+      {outputType === "video" && (
+        <div className="grid sm:grid-cols-2 gap-3">
+          <div className="p-4 rounded-2xl border-2 border-fuchsia-500/50 bg-fuchsia-500/5">
+            <div className="flex items-center gap-2">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-fuchsia-500 to-purple-600 flex items-center justify-center shrink-0">
+                <Briefcase className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-foreground">Create with Studio</p>
+                <p className="text-[10px] font-bold tracking-widest text-fuchsia-400 uppercase">You are here</p>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2.5 leading-relaxed">
+              Script, dialogue, images and voices on your plan&apos;s built-in AI credits, assembled here.
+              Fast, and the primary way to make a video. Real AI motion clips are an option at the storyboard step.
+            </p>
+          </div>
+
+          {canMovieMaker ? (
+            <Link to="/movie-maker"
+              className="group p-4 rounded-2xl border border-border bg-card hover:border-cyan-500/40 transition-all">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shrink-0">
+                  <Clapperboard className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-foreground flex items-center gap-1.5">
+                    Movie Maker Pro
+                    <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/60 group-hover:translate-x-0.5 transition-transform" />
+                  </p>
+                  <p className="text-[10px] font-bold tracking-widest text-cyan-400 uppercase">Premium</p>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2.5 leading-relaxed">
+                Multi-shot scenes, reference locking for character consistency, dubbing, lip-sync and captions.
+                For films rather than shorts.
+              </p>
+            </Link>
+          ) : (
+            <div className="p-4 rounded-2xl border border-border bg-card opacity-80">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center shrink-0">
+                  <Lock className="w-4 h-4 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-foreground">Movie Maker Pro</p>
+                  <p className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase">Paid tiers only</p>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2.5 leading-relaxed">
+                Multi-shot scenes, reference locking, dubbing, lip-sync and captions.{" "}
+                <Link to="/pricing" className="text-fuchsia-400 hover:underline font-semibold">See plans</Link>
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {error && !upgradeRequired && (
         <div className="flex items-start gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
@@ -627,10 +1014,12 @@ export default function QuickCreate() {
               <div className="space-y-3">
                 <h3 className="font-semibold text-foreground">Storyboard/Images</h3>
 
-                {/* Motion mode. Until now this step always produced stills that
+                {/* Motion mode. This step once always produced stills that
                     were later panned by FFmpeg, so "Short Video" returned what
-                    reads as a slideshow. Both options are now explicit, and the
-                    cost difference is stated rather than hidden. */}
+                    reads as a slideshow with no way to say otherwise. Both
+                    options are explicit, and both costs — credits AND minutes —
+                    are stated rather than discovered. Studio visuals are the
+                    default: see the motionMode initialiser. */}
                 <div className="rounded-xl border border-border p-3 space-y-2">
                   <label className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Output</label>
                   <div className="grid sm:grid-cols-2 gap-2">
@@ -644,7 +1033,7 @@ export default function QuickCreate() {
                         <Video className="w-3.5 h-3.5" /> Real AI video
                       </span>
                       <span className="block text-[11px] text-muted-foreground mt-1">
-                        Generates an actual moving clip per scene. Uses credits.
+                        A genuinely moving clip per scene. Costs premium credits and takes about 2-3 minutes per scene.
                         {!canMotion && " Available on Agency and Movie Maker Pro plans."}
                       </span>
                     </button>
@@ -655,17 +1044,17 @@ export default function QuickCreate() {
                       aria-pressed={!useMotion}
                       className={`text-left p-3 rounded-lg border transition-all ${!useMotion ? "bg-fuchsia-500/15 border-fuchsia-500/50" : "border-border hover:bg-muted/20"}`}>
                       <span className={`flex items-center gap-1.5 text-sm font-bold ${!useMotion ? "text-fuchsia-400" : "text-foreground"}`}>
-                        <ImageIcon className="w-3.5 h-3.5" /> Cinematic slideshow
+                        <ImageIcon className="w-3.5 h-3.5" /> Studio visuals
                       </span>
                       <span className="block text-[11px] text-muted-foreground mt-1">
-                        Still images with a slow pan and zoom. Fast, no credits.
+                        Generated stills with a slow cinematic pan and zoom, on your plan&apos;s AI credits. Ready in seconds. The default.
                       </span>
                     </button>
                   </div>
                   {!canMotion && (
                     <p className="text-[11px] text-muted-foreground">
                       <Link to="/pricing" className="text-fuchsia-400 hover:underline font-semibold">Upgrade</Link>
-                      {" "}to generate real motion video instead of a slideshow.
+                      {" "}to generate real motion clips instead of Studio visuals.
                     </p>
                   )}
                 </div>
@@ -784,47 +1173,160 @@ export default function QuickCreate() {
               </div>
             )}
 
-            {/* Step 4: Voiceover */}
+            {/* Step 4: Dialogue & Audio.
+                Speech and music are separate controls now. Previously this
+                step was a single three-way choice, so selecting a voiceover
+                threw away a music track the user had already generated —
+                which is exactly what "only voice over, no music" was. */}
             {step === 4 && (
-              <div className="space-y-4">
-                <h3 className="font-semibold text-foreground">Voiceover</h3>
-                <div className="flex gap-2 max-w-md">
-                  {AUDIO_MODES.map(m => (
-                    <button key={m.id} onClick={() => setAudioMode(m.id)}
-                      className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border text-xs font-bold transition-all ${audioMode === m.id ? "bg-fuchsia-500/15 border-fuchsia-500/50 text-fuchsia-400" : "border-border text-muted-foreground hover:bg-muted/20"}`}>
-                      <m.icon className="w-3.5 h-3.5" /> {m.label}
-                    </button>
-                  ))}
+              <div className="space-y-5">
+                <h3 className="font-semibold text-foreground">Dialogue &amp; Audio</h3>
+
+                {/* ── Speech ── */}
+                <div className="space-y-3">
+                  <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wide">Speech</label>
+                  <div className="grid sm:grid-cols-3 gap-2">
+                    {NARRATION_MODES.map(m => (
+                      <button key={m.id} type="button" onClick={() => setNarrationMode(m.id)}
+                        aria-pressed={narrationMode === m.id}
+                        className={`text-left p-3 rounded-lg border transition-all ${narrationMode === m.id ? "bg-fuchsia-500/15 border-fuchsia-500/50" : "border-border hover:bg-muted/20"}`}>
+                        <span className={`flex items-center gap-1.5 text-sm font-bold ${narrationMode === m.id ? "text-fuchsia-400" : "text-foreground"}`}>
+                          <m.icon className="w-3.5 h-3.5" /> {m.label}
+                        </span>
+                        <span className="block text-[11px] text-muted-foreground mt-1 leading-relaxed">{m.hint}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                {audioMode === "voiceover" && (
+
+                {narrationMode === "dialogue" && (
+                  <div className="space-y-3 rounded-xl border border-border p-3">
+                    {/* Reference script. Optional, and the point of it is
+                        that the user's own characters and lines win over
+                        anything the model would invent. */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <label className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Reference dialogue (optional)</label>
+                        <label className="flex items-center gap-1.5 text-[11px] font-semibold text-fuchsia-400 hover:text-fuchsia-300 cursor-pointer">
+                          <Upload className="w-3.5 h-3.5" /> Upload .txt
+                          <input type="file" accept=".txt,.md,text/plain,text/markdown" className="hidden"
+                            onChange={e => { handleDialogueReferenceUpload(e.target.files?.[0]); e.target.value = ""; }} />
+                        </label>
+                      </div>
+                      <textarea value={dialogueReference} onChange={e => { setDialogueReference(e.target.value); setDialogueReferenceName(""); }}
+                        rows={4} placeholder="Paste your own dialogue, character names, or a script fragment. Anything here is treated as the source of truth for who speaks and how."
+                        className="w-full rounded-xl border border-input bg-background text-sm p-3 focus:outline-none focus:ring-2 focus:ring-ring resize-none" />
+                      {dialogueReferenceName && (
+                        <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Loaded from {dialogueReferenceName}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" onClick={writeDialogue} disabled={writingDialogue || !scenes.length}
+                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-fuchsia-500/15 border border-fuchsia-500/50 text-fuchsia-400 text-sm font-semibold hover:bg-fuchsia-500/25 disabled:opacity-60">
+                        {writingDialogue ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageSquare className="w-4 h-4" />}
+                        {writingDialogue ? "Writing dialogue…" : scenes.some(sc => sc.dialogue) ? "Rewrite dialogue" : "Write dialogue"}
+                      </button>
+                      <button type="button" onClick={generateAllSceneVoices}
+                        disabled={!!voiceBatch || !scenes.some(sc => (sc.dialogue || "").trim() && !sc.voiceUrl)}
+                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border text-sm font-semibold text-foreground hover:bg-muted/20 disabled:opacity-40">
+                        {voiceBatch ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mic className="w-4 h-4" />}
+                        {voiceBatch ? `Speaking line ${voiceBatch.done + 1} of ${voiceBatch.total}…` : "Speak all lines"}
+                      </button>
+                    </div>
+
+                    {/* Per-scene lines. Editable, because a line the user
+                        writes themselves should be no harder than one the
+                        model wrote. */}
+                    <div className="space-y-2">
+                      {scenes.map((sc, i) => (
+                        <div key={i} className="flex gap-2 items-start">
+                          <img src={sc.imageUrl} alt="" className="w-16 aspect-video object-cover rounded-md border border-border shrink-0" />
+                          <div className="flex-1 min-w-0 space-y-1.5">
+                            <textarea
+                              value={sc.dialogue || ""}
+                              onChange={e => {
+                                const value = e.target.value;
+                                setScenes(prev => prev.map((item, idx) => idx === i ? { ...item, dialogue: value, voiceUrl: "", voiceSeconds: 0 } : item));
+                              }}
+                              rows={2}
+                              placeholder={`Scene ${i + 1} line — e.g. "MAYA: we're not done yet."`}
+                              className="w-full rounded-lg border border-input bg-background text-xs p-2 focus:outline-none focus:ring-2 focus:ring-ring resize-none" />
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <button type="button" onClick={() => generateSceneVoice(i)}
+                                disabled={voiceLoading[i] || !(sc.dialogue || "").trim()}
+                                className="flex items-center gap-1 px-2 py-1 rounded-md border border-fuchsia-500/30 text-[10px] font-semibold text-fuchsia-400 hover:bg-fuchsia-500/10 disabled:opacity-40">
+                                {voiceLoading[i] ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mic className="w-3 h-3" />}
+                                {voiceLoading[i] ? "Speaking…" : sc.voiceUrl ? "Re-speak" : "Speak line"}
+                              </button>
+                              {sc.voiceUrl && (
+                                <>
+                                  <audio src={sc.voiceUrl} controls className="h-7 max-w-[220px]" />
+                                  <span className="text-[10px] text-muted-foreground">
+                                    scene runs {Math.round(sceneRuntimeSeconds(sc))}s
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      Each line is cut to its own scene, and a scene is held open until its line finishes — that is what keeps speech in sync with the picture.
+                    </p>
+                  </div>
+                )}
+
+                {narrationMode === "narration" && (
                   <div className="space-y-2">
                     <button onClick={generateVoiceoverStep} disabled={generatingVoiceover}
                       className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-fuchsia-500/15 border border-fuchsia-500/50 text-fuchsia-400 text-sm font-semibold hover:bg-fuchsia-500/25 disabled:opacity-60">
                       {generatingVoiceover ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mic className="w-4 h-4" />}
-                      {voiceoverUrl ? "Regenerate Voiceover" : "Generate Voiceover"}
+                      {voiceoverUrl ? "Regenerate Narration" : "Generate Narration"}
                     </button>
                     {voiceoverUrl && <audio src={voiceoverUrl} controls className="w-full" />}
                   </div>
                 )}
-                {audioMode === "music" && (
-                  <div className="w-full max-w-md space-y-2">
-                    <button type="button" onClick={generateAiMusic} disabled={generatingMusic || !canMotion}
-                      className="w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-fuchsia-500/15 border border-fuchsia-500/50 text-fuchsia-400 text-sm font-semibold hover:bg-fuchsia-500/25 disabled:opacity-50">
-                      {generatingMusic ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                      {generatingMusic ? "Generating AI music…" : musicUrl ? "Regenerate AI Music" : "Generate AI Music"}
+
+                {/* ── Music — independent of everything above ── */}
+                <div className="space-y-3 border-t border-border pt-4">
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Background music</label>
+                    <button type="button" onClick={() => setMusicEnabled(v => !v)} aria-pressed={musicEnabled}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all ${musicEnabled ? "bg-fuchsia-500/15 border-fuchsia-500/50 text-fuchsia-400" : "border-border text-muted-foreground hover:bg-muted/20"}`}>
+                      {musicEnabled ? <Music className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+                      {musicEnabled ? "On" : "Off"}
                     </button>
-                    {!canMotion && <p className="text-[11px] text-muted-foreground">AI music is available on Agency and Movie Maker Pro plans. You can still upload your own track.</p>}
-                    <label className="w-full flex items-center gap-3 p-3 rounded-xl border border-border text-left cursor-pointer hover:bg-muted/20 transition-all">
-                      <Music className="w-4 h-4 shrink-0 text-muted-foreground" />
-                      <span className="flex-1 text-sm text-muted-foreground truncate">{uploadingMusic ? "Uploading…" : musicName || "Or upload a music track"}</span>
-                      {uploadingMusic ? <Loader2 className="w-4 h-4 animate-spin shrink-0" /> : musicUrl ? <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" /> : null}
-                      <input type="file" accept="audio/*" className="hidden" disabled={uploadingMusic}
-                        onChange={e => { handleMusicUpload(e.target.files?.[0]); e.target.value = ""; }} />
-                    </label>
-                    {musicUrl && <audio src={musicUrl} controls className="w-full" />}
                   </div>
-                )}
-                {audioMode === "silent" && <p className="text-sm text-muted-foreground">No audio — the short will render silent.</p>}
+                  {musicEnabled && (
+                    <div className="w-full max-w-md space-y-2">
+                      <button type="button" onClick={generateAiMusic} disabled={generatingMusic || !canMotion}
+                        className="w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-fuchsia-500/15 border border-fuchsia-500/50 text-fuchsia-400 text-sm font-semibold hover:bg-fuchsia-500/25 disabled:opacity-50">
+                        {generatingMusic ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                        {generatingMusic ? "Generating AI music…" : musicUrl ? "Regenerate AI Music" : "Generate AI Music"}
+                      </button>
+                      {!canMotion && <p className="text-[11px] text-muted-foreground">AI music is available on Agency and Movie Maker Pro plans. You can still upload your own track.</p>}
+                      <label className="w-full flex items-center gap-3 p-3 rounded-xl border border-border text-left cursor-pointer hover:bg-muted/20 transition-all">
+                        <Music className="w-4 h-4 shrink-0 text-muted-foreground" />
+                        <span className="flex-1 text-sm text-muted-foreground truncate">{uploadingMusic ? "Uploading…" : musicName || "Or upload a music track"}</span>
+                        {uploadingMusic ? <Loader2 className="w-4 h-4 animate-spin shrink-0" /> : musicUrl ? <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" /> : null}
+                        <input type="file" accept="audio/*" className="hidden" disabled={uploadingMusic}
+                          onChange={e => { handleMusicUpload(e.target.files?.[0]); e.target.value = ""; }} />
+                      </label>
+                      {musicUrl && <audio src={musicUrl} controls className="w-full" />}
+                      <p className="text-[11px] text-muted-foreground">
+                        Music plays underneath any speech, ducked so the words stay clear — it is no longer one or the other.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <p className="text-xs text-muted-foreground">
+                  Estimated runtime: ~{Math.round(totalRuntimeSeconds())}s
+                </p>
               </div>
             )}
 

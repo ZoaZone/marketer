@@ -49,9 +49,15 @@ function DarkToggle() {
 
 
 // The creative experience is primary: CREATE and LIBRARY come first.
-// Marketing/CRM tools are still fully available, just de-emphasized into a
-// collapsible, collapsed-by-default group further down. All routes/paths
-// are unchanged from before this reorg — only grouping/order/labels moved.
+//
+// The social/marketing group used to be labelled "MARKETING (optional)" and
+// started COLLAPSED, with its header drawn at text-muted-foreground/90 — the
+// combination made the whole group effectively undiscoverable ("unable to
+// find out" was the report). It is now "SOCIAL MEDIA HUB", expanded like
+// every other section, and the section headers are drawn at a contrast that
+// is actually readable rather than merely present.
+//
+// All routes/paths are unchanged — only grouping/order/labels moved.
 const NAV_SECTIONS = [
   {
     label: "OVERVIEW",
@@ -80,11 +86,11 @@ const NAV_SECTIONS = [
     ],
   },
   {
-    label: "MARKETING (optional)",
+    label: "SOCIAL MEDIA HUB",
     items: [
       { to: "/campaigns",       icon: Megaphone, label: "Campaigns" },
       { to: "/brands",          icon: Building2, label: "Brand Manager" },
-      { to: "/social-hub",      icon: Share2,    label: "Social Hub" },
+      { to: "/social-hub",      icon: Share2,    label: "Accounts & Scheduling" },
       { to: "/campaign-studio", icon: Sparkles,  label: "Campaign Studio", badge: "NEW" },
       { to: "/website-scanner", icon: Search,    label: "Website Scanner", minTier: 2 },
       { to: "/funnel-builder",  icon: GitBranch, label: "Funnel Builder" },
@@ -108,9 +114,9 @@ const NAV_SECTIONS = [
 export default function Sidebar({ userTier = 0, isAdmin = false, user = null, subscription = null }) {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
-  // Marketing tools are de-emphasized: collapsed by default (everything
-  // else starts expanded, matching prior behavior).
-  const [collapsed, setCollapsed] = useState({ "MARKETING (optional)": true });
+  // Every section starts expanded. The social/marketing group was the one
+  // exception and the one users could not find.
+  const [collapsed, setCollapsed] = useState({});
 
   const toggle = (label) => setCollapsed(p => ({ ...p, [label]: !p[label] }));
 
@@ -165,11 +171,14 @@ export default function Sidebar({ userTier = 0, isAdmin = false, user = null, su
       <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
         {NAV_SECTIONS.map(section => (
           <div key={section.label} className="mb-3">
-            {/* 9px uppercase was below the legible floor; 10.5px with wider
-                tracking and more contrast keeps the labels quiet but readable. */}
+            {/* 9px uppercase was below the legible floor. 10.5px at
+                muted-foreground/90 was still only ~3.4:1 on the sidebar —
+                enough to see, not enough to scan past. 11px at
+                foreground/75 clears 7:1 while staying quieter than the
+                nav items themselves. */}
             <button onClick={() => toggle(section.label)}
               aria-expanded={!collapsed[section.label]}
-              className="flex items-center justify-between w-full px-3 py-2 text-[10.5px] font-bold tracking-[0.13em] text-muted-foreground/90 uppercase hover:text-foreground transition-colors rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500/40">
+              className="flex items-center justify-between w-full px-3 py-2 text-[11px] font-bold tracking-[0.13em] text-foreground/75 uppercase hover:text-foreground transition-colors rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500/40">
               {section.label}
               <ChevronDown className={`w-3.5 h-3.5 transition-transform ${collapsed[section.label] ? "-rotate-90" : ""}`} />
             </button>
