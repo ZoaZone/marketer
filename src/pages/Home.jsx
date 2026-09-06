@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { WhatsAppFloatingButton, WhatsAppNavButton } from "@/components/whatsapp/WhatsAppContactButton";
 import {
   Sparkles, Megaphone, Share2, GitBranch, UserPlus, Globe,
   BarChart3, Zap, ArrowRight, Check, PlayCircle, Bot, Monitor,
@@ -268,6 +269,11 @@ export default function Home() {
               Start Free Trial
             </Link>
           </div>
+          <WhatsAppNavButton
+            appName="Digital Studio"
+            service="the AI Movie, Music & Dubbing Studio"
+            className="h-9 w-9"
+          />
           <button className="md:hidden p-2 text-white/70 hover:text-white" onClick={() => setMobileOpen(!mobileOpen)}>
             {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
@@ -578,6 +584,17 @@ export default function Home() {
       </div>
     </div>
     <SreeFloatBot accentColor="#d946ef" />
+    {/*
+      6rem clears the SreeFloatBot launcher below it (3.5rem tall at 1.5rem
+      off the bottom). Its open chat panel does reach this height, but that
+      panel sits at a far higher z-index, so it covers this button while open
+      rather than being covered by it.
+    */}
+    <WhatsAppFloatingButton
+      appName="Digital Studio"
+      service="the AI Movie, Music & Dubbing Studio"
+      bottomOffset="6rem"
+    />
     </>);
 
 }
