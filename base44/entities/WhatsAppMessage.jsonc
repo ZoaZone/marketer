@@ -1,0 +1,141 @@
+{
+  "name": "WhatsAppMessage",
+  "type": "object",
+  "properties": {
+    "conversation_id": {
+      "type": "string"
+    },
+    "wa_id": {
+      "type": "string",
+      "description": "Counterparty WhatsApp ID, denormalised so a thread can be rebuilt without the conversation row."
+    },
+    "wamid": {
+      "type": "string",
+      "description": "Meta's message id (wamid.*). The idempotency key \u2014 an inbound delivery whose wamid already exists is dropped, because Meta retries."
+    },
+    "direction": {
+      "type": "string",
+      "enum": [
+        "inbound",
+        "outbound"
+      ]
+    },
+    "author": {
+      "type": "string",
+      "enum": [
+        "contact",
+        "human_agent",
+        "ai_agent",
+        "system"
+      ],
+      "description": "Distinguishes a human reply from an AEVOICE bot reply from a voice-call transcript entry."
+    },
+    "author_email": {
+      "type": "string"
+    },
+    "message_type": {
+      "type": "string",
+      "enum": [
+        "text",
+        "image",
+        "audio",
+        "video",
+        "document",
+        "sticker",
+        "location",
+        "contacts",
+        "button",
+        "interactive",
+        "template",
+        "reaction",
+        "system",
+        "unsupported"
+      ],
+      "default": "text"
+    },
+    "body": {
+      "type": "string",
+      "description": "Text body, media caption, or the rendered transcript."
+    },
+    "media_id": {
+      "type": "string"
+    },
+    "media_mime": {
+      "type": "string"
+    },
+    "media_filename": {
+      "type": "string"
+    },
+    "media_url": {
+      "type": "string",
+      "description": "Resolved download URL. Meta's media URLs expire, so this is refetched on demand rather than trusted."
+    },
+    "template_name": {
+      "type": "string"
+    },
+    "template_language": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "queued",
+        "sent",
+        "delivered",
+        "read",
+        "failed"
+      ],
+      "default": "queued"
+    },
+    "error_code": {
+      "type": "string"
+    },
+    "error_detail": {
+      "type": "string"
+    },
+    "wa_timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Meta's own timestamp (Unix seconds in the payload), converted to ISO. Used for ordering."
+    },
+    "raw": {
+      "type": "string",
+      "description": "The original message object as JSON, kept for replay and for message types the UI does not render yet."
+    },
+    "phone_number_id": {
+      "type": "string",
+      "description": "Business number that received/sent the thread. The tenancy key \u2014 a thread is (wa_id, phone_number_id), so one person can hold separate conversations with two tenants."
+    },
+    "tenant_id": {
+      "type": "string",
+      "description": "Denormalised from the WhatsAppAccount so a query can filter by tenant without a join."
+    }
+  },
+  "required": [
+    "direction"
+  ],
+  "permissions": {
+    "read": "true",
+    "create": "user.role == 'admin'",
+    "update": "user.role == 'admin'",
+    "delete": "user.role == 'admin'"
+  },
+  "rls": {
+    "read": true,
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
