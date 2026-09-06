@@ -127,10 +127,19 @@ Deno.serve(async (req) => {
       if (!resolved) {
         // A stored-but-undecryptable token is a distinct failure from no token
         // at all, and says something different about what to do next.
+        // `CORS`, not `corsHeaders` — the latter is not defined in this
+        // module, so this branch threw a ReferenceError that the outer catch
+        // turned into a generic 500. An account whose token can't be
+        // decrypted is exactly the case that most needs its real reason
+        // shown, and it was the one case that never reached the user.
+        //
+        // This early return also skipped the status write below, so the
+        // badge kept whatever it said before. Persist it here instead.
+        await base44.entities.SocialAccount.update(account_id, { status: 'expired' });
         return Response.json({
           status: 'expired',
           message: 'The stored credential for this account could not be decrypted — the encryption key may have been rotated. Reconnect the account to store it again.',
-        }, { headers: corsHeaders });
+        }, { headers: CORS });
       }
       const result = await checkToken(account.platform, resolved);
       status = result.ok ? 'active' : 'expired';

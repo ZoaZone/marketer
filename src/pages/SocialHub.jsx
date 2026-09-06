@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import AddAccountModal from "@/components/social-hub/AddAccountModal";
 import { connectionBadge, verifyAccounts } from "@/utils/socialAccountStatus";
+import { needsReconnect } from "@/config/socialConnect";
 
 // ── Platform config ──────────────────────────────────────────────────────────
 const PLATFORMS = [
@@ -124,6 +125,10 @@ export default function SocialHub() {
   const [publishingId, setPublishingId] = useState(null);
   const [publishError, setPublishError] = useState({});
   const [showAddAccount, setShowAddAccount] = useState(false);
+  // Non-null while reconnecting a specific account — the same modal, opened
+  // on that account's platform and updating its record instead of creating
+  // a second one.
+  const [reconnectAccount, setReconnectAccount] = useState(null);
   const [testingId, setTestingId] = useState(null);
 
   // Email/WA blast state
@@ -439,15 +444,27 @@ HASHTAGS:
               <div className="flex flex-wrap gap-2">
                 {accounts.map(acc => {
                   const plt = PLATFORMS.find(p => p.id === acc.platform);
-                  const st = connectionBadge(verifiedStatus[acc.id]?.status || acc.status);
+                  const liveStatus = verifiedStatus[acc.id]?.status || acc.status;
+                  const st = connectionBadge(liveStatus);
                   const isTesting = testingId === acc.id;
+                  // An expired or unauthorized account needs a new credential,
+                  // not another test of the one that already failed. Re-testing
+                  // was previously the only action offered, which is why an
+                  // expired badge read as a dead end.
+                  const canReconnect = needsReconnect(liveStatus) && acc.platform !== "email" && acc.platform !== "whatsapp";
                   return (
-                    <div key={acc.id} title={acc.description || st.label} className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold ${plt?.bg || "bg-muted border-border text-foreground"}`}>
+                    <div key={acc.id} title={verifiedStatus[acc.id]?.message || acc.description || st.label} className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold ${plt?.bg || "bg-muted border-border text-foreground"}`}>
                       <span className="font-black">{plt?.short || "?"}</span>
                       {acc.account_name || acc.platform}
                       <span className={`flex items-center gap-1 ${st.text}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} /> {st.label}
                       </span>
+                      {canReconnect && (
+                        <button onClick={() => { setReconnectAccount(acc); setShowAddAccount(true); }}
+                          className="px-1.5 py-0.5 rounded-md bg-amber-500/20 border border-amber-400/40 text-amber-300 text-[10px] font-bold hover:bg-amber-500/30">
+                          Reconnect
+                        </button>
+                      )}
                       <button onClick={() => testConnection(acc.id)} disabled={isTesting} title="Test connection"
                         className="hover:opacity-70 disabled:opacity-50">
                         {isTesting ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
@@ -1014,8 +1031,20 @@ HASHTAGS:
         </div>
       )}
 
-      <AddAccountModal open={showAddAccount} onClose={() => setShowAddAccount(false)} platforms={PLATFORMS}
-        onSaved={() => qc.invalidateQueries(["social_accounts"])} />
+      <AddAccountModal open={showAddAccount} account={reconnectAccount} platforms={PLATFORMS}
+        onClose={() => { setShowAddAccount(false); setReconnectAccount(null); }}
+        onSaved={() => {
+          // Drop the cached verification for the account just saved so its
+          // badge re-checks instead of showing the pre-reconnect state.
+          if (reconnectAccount?.id) {
+            setVerifiedStatus(prev => {
+              const next = { ...prev };
+              delete next[reconnectAccount.id];
+              return next;
+            });
+          }
+          qc.invalidateQueries(["social_accounts"]);
+        }} />
     </div>
   );
 }

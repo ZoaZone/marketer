@@ -252,7 +252,7 @@ export default function MovieMaker() {
   const [sceneVideoProgress, setSceneVideoProgress] = useState({});
   // Which scene of the batch "Generate All Clips" is on, so a multi-scene
   // run reads as "3 of 6" rather than an indefinite wait.
-  const [clipBatch, setClipBatch] = useState(null); // { index, total } | null
+  const [clipBatch, setClipBatch] = useState(null); // { done, total, active } | null
   const [uploadLoading, setUploadLoading] = useState({});
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
@@ -639,23 +639,55 @@ export default function MovieMaker() {
     setSceneVideoProgress(p => { const { [scene.id]: _done, ...rest } = p; return rest; });
   };
 
-  // Generates every eligible scene's video clip(s) one scene at a time
-  // (never in parallel) — the render worker fans each request out to
-  // Replicate, and firing all of them at once risks tripping Replicate's
-  // rate limits across an entire batch simultaneously. A short pause
-  // between scenes gives the API room to breathe on top of that. Per-scene
-  // progress is already visible via sceneVideoLoading, which
-  // generateSceneVideoClip sets/clears itself — awaiting each call in turn
-  // naturally lights up one scene's spinner at a time instead of all of
-  // them at once.
+  // How many scenes are generated at once. Matches the render worker's own
+  // provider lane (PROVIDER_CONCURRENCY, default 3 — see server-render/index.js):
+  // submitting more than the worker will run concurrently just moves the
+  // queue from here to there, and submitting fewer leaves its slots idle.
+  const CLIP_BATCH_CONCURRENCY = 3;
+
+  // Generates every eligible scene's video clip(s).
+  //
+  // This used to run strictly one scene at a time, because the worker did
+  // too — a single global slot meant a parallel client only built a longer
+  // server-side queue, and firing a whole batch at Replicate at once risks
+  // 429s. The worker now schedules provider-backed jobs in their own lane,
+  // so the honest limit is CLIP_BATCH_CONCURRENCY rather than one: a
+  // six-scene film that took six sequential two-to-three-minute clips now
+  // takes two rounds of three. Per-scene progress is unchanged —
+  // generateSceneVideoClip sets and clears its own scene's spinner, so
+  // several now light up together, which is exactly what is happening.
   const generateAllVideoClips = async () => {
     setError("");
     const eligible = scenes.filter(s => (s.text.trim() || s.imageUrl) && !(s.clips && s.clips.length) && !s.videoUrl);
-    for (let i = 0; i < eligible.length; i++) {
-      setClipBatch({ index: i + 1, total: eligible.length });
-      await generateSceneVideoClip(eligible[i]);
-      if (i < eligible.length - 1) await sleep(1500);
-    }
+    if (!eligible.length) return;
+
+    let done = 0;
+    let next = 0;
+    setClipBatch({ done: 0, total: eligible.length, active: Math.min(CLIP_BATCH_CONCURRENCY, eligible.length) });
+
+    // A fixed pool of workers pulling from a shared cursor, rather than
+    // fixed-size rounds: a scene that finishes early starts the next one
+    // immediately instead of waiting for the slowest scene in its round.
+    const runner = async () => {
+      for (;;) {
+        const i = next++;
+        if (i >= eligible.length) return;
+        // Stagger submissions slightly so a batch arrives as a short ramp
+        // rather than a simultaneous burst.
+        if (i > 0) await sleep(600);
+        await generateSceneVideoClip(eligible[i]);
+        done += 1;
+        setClipBatch({
+          done,
+          total: eligible.length,
+          active: Math.min(CLIP_BATCH_CONCURRENCY, eligible.length - done),
+        });
+      }
+    };
+
+    await Promise.all(
+      Array.from({ length: Math.min(CLIP_BATCH_CONCURRENCY, eligible.length) }, runner)
+    );
     setClipBatch(null);
   };
 
@@ -1397,7 +1429,7 @@ export default function MovieMaker() {
                 <button onClick={generateAllVideoClips} disabled={Object.values(sceneVideoLoading).some(Boolean)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-500/10 border border-violet-500/20 text-violet-400 text-xs font-semibold hover:bg-violet-500/20 transition-colors disabled:opacity-50">
                   {clipBatch ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-                  {clipBatch ? `Generating clip ${clipBatch.index} of ${clipBatch.total}…` : "Generate All Clips"}
+                  {clipBatch ? `Generating ${clipBatch.active} at a time — ${clipBatch.done} of ${clipBatch.total} done…` : "Generate All Clips"}
                 </button>
                 <button onClick={addScene} disabled={scenes.length >= MAX_SCENES}
                   title={scenes.length >= MAX_SCENES ? `Scene limit reached (max ${MAX_SCENES})` : undefined}
