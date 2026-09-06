@@ -52,6 +52,7 @@ import DubbingStudio from './pages/DubbingStudio';
 import OAuthConsent from './pages/OAuthConsent';
 import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
+import WhatsAppInbox from './pages/WhatsAppInbox';
 
 
 const AuthenticatedApp = () => {
@@ -145,6 +146,10 @@ const AuthenticatedApp = () => {
         <Route path="/affiliate" element={<AffiliatePortal />} />
         <Route path="/agency" element={<AgencyPortal />} />
         <Route path="/admin" element={<AdminDashboard />} />
+        {/* WhatsApp CRM inbox — the open thread is in the URL so it can be */}
+        {/* bookmarked, shared and reopened from a home-screen shortcut. */}
+        <Route path="/whatsapp-inbox" element={<WhatsAppInbox />} />
+        <Route path="/whatsapp-inbox/:conversationId" element={<WhatsAppInbox />} />
       </Route>
 
             <Route path="*" element={<PageNotFound />} />

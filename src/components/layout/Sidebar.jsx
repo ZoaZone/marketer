@@ -6,8 +6,7 @@ import {
   Search, GitBranch, UserPlus, MailCheck, Image, Globe,
   BarChart3, Settings, CreditCard, ChevronDown, LogOut, Menu, X,
   Lock, Bell, HelpCircle, ShieldCheck, Building2, Share,
-  Sun, Moon, Wand2, Monitor, Film, Music, Sliders, Plug, Languages,
-} from "lucide-react";
+  Sun, Moon, Wand2, Monitor, Film, Music, Sliders, Plug, Languages, MessageSquare } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { BRAND } from "@/lib/brand";
 
@@ -97,6 +96,7 @@ const NAV_SECTIONS = [
       { to: "/lead-capture",    icon: UserPlus,  label: "Lead Capture" },
       { to: "/follow-up",       icon: MailCheck, label: "Follow-Up" },
       { to: "/contacts",        icon: Users,     label: "Contacts" },
+      { to: "/whatsapp-inbox",  icon: MessageSquare, label: "WhatsApp Inbox" },
     ],
   },
   {

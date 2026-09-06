@@ -1,0 +1,113 @@
+{
+  "name": "WhatsAppConversation",
+  "type": "object",
+  "properties": {
+    "contact_id": {
+      "type": "string",
+      "description": "WhatsAppContact.id this thread belongs to."
+    },
+    "wa_id": {
+      "type": "string",
+      "description": "Denormalised from the contact so the inbox list needs one query, not two."
+    },
+    "phone_number_id": {
+      "type": "string",
+      "description": "Business number that received/sent the thread (902301109637859 for Hello Biz)."
+    },
+    "waba_id": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "open",
+        "closed"
+      ],
+      "default": "open"
+    },
+    "handling_mode": {
+      "type": "string",
+      "enum": [
+        "ai_autopilot",
+        "human"
+      ],
+      "default": "ai_autopilot",
+      "description": "Who answers next. 'human' means an agent claimed the thread and the AEVOICE bot must stay silent."
+    },
+    "claimed_by_id": {
+      "type": "string"
+    },
+    "claimed_by_email": {
+      "type": "string"
+    },
+    "claimed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "agent_id": {
+      "type": "string",
+      "description": "Assistant that answers this thread while in ai_autopilot, passed through to WHATSAPP_AI_FUNCTION."
+    },
+    "unread_count": {
+      "type": "number",
+      "default": 0
+    },
+    "last_message_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "last_message_preview": {
+      "type": "string"
+    },
+    "last_message_direction": {
+      "type": "string",
+      "enum": [
+        "inbound",
+        "outbound"
+      ]
+    },
+    "last_inbound_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Drives the 24-hour customer service window: outside it only approved templates may be sent."
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "auto_ack_sent_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Set once the acknowledgement template has gone out, so a contact who sends five messages gets one auto-reply rather than five."
+    }
+  },
+  "required": [
+    "wa_id"
+  ],
+  "permissions": {
+    "read": "true",
+    "create": "user.role == 'admin'",
+    "update": "user.role == 'admin'",
+    "delete": "user.role == 'admin'"
+  },
+  "rls": {
+    "read": true,
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
