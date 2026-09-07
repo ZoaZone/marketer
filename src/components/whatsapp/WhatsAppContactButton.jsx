@@ -59,24 +59,38 @@ export function WhatsAppNavButton({ appName, service, text, className = '' }) {
 }
 
 /**
- * Floating action button.
+ * WhatsApp button that attaches to the app's own chat launcher rather than
+ * competing with it.
  *
- * `bottomOffset` exists because most of these apps already pin a chat or
- * quick-action widget to the bottom-right corner. Rather than let two circles
- * overlap, each app passes the distance that stacks this one clear of whatever
- * it already has there.
+ * The first version of this was a full-size floating action button of its own.
+ * That was wrong: every app here already pins a chat launcher to the
+ * bottom-right, so the page ended up with two equal-weight circles in the same
+ * corner and no way to tell which one was the app's own support channel. Worse,
+ * where the app's launcher was missing the WhatsApp button was the *only* thing
+ * in the corner, which read as "this product's chat is WhatsApp".
  *
- * That offset is *added* to env(safe-area-inset-bottom) rather than replacing
- * it, so the button clears the iPhone home indicator in portrait and the notch
- * in landscape whatever the stacking distance. env() carries a 0px fallback,
- * so browsers that do not know the function get the plain offset.
+ * So it is deliberately secondary: smaller than the launcher (44px against
+ * 56px), and sitting directly above it in the same column so the two read as
+ * one control with a second option, not as two rival buttons.
+ *
+ * Two ways to place it:
+ *
+ * - Inside the app's launcher stack (the usual case). The chat component
+ *   already renders a `flex flex-col items-end` container; drop this in above
+ *   its button and the existing gap does the spacing.
+ * - `fixedAbove` for the apps whose chat launcher is a lone fixed button with
+ *   no stack to join. Pass the distance that puts this one just above it.
+ *   Still additive to env(safe-area-inset-bottom), so it clears the iPhone
+ *   home indicator either way.
+ *
+ * The z-index sits below a chat panel on purpose: when someone opens the chat,
+ * the panel should cover this, not fight it.
  */
-export function WhatsAppFloatingButton({
+export function WhatsAppDockButton({
   appName,
   service,
   text,
-  label = 'Chat with us',
-  bottomOffset = '1.5rem',
+  fixedAbove,
 }) {
   const accessibleLabel = `Message ${appName} on WhatsApp`;
   return (
@@ -86,15 +100,19 @@ export function WhatsAppFloatingButton({
       rel="noopener noreferrer"
       aria-label={accessibleLabel}
       title={accessibleLabel}
-      style={{
-        right: 'calc(env(safe-area-inset-right, 0px) + 1.5rem)',
-        bottom: `calc(env(safe-area-inset-bottom, 0px) + ${bottomOffset})`,
-      }}
+      style={
+        fixedAbove
+          ? {
+              right: 'calc(env(safe-area-inset-right, 0px) + 1.5rem)',
+              bottom: `calc(env(safe-area-inset-bottom, 0px) + ${fixedAbove})`,
+            }
+          : undefined
+      }
       className={
-        'group fixed z-40 flex items-center gap-0 sm:hover:gap-2 ' +
-        // 56px: comfortably past the 44px minimum touch target on both
-        // platforms, and the size a thumb expects a FAB to be.
-        'h-14 min-w-[3.5rem] rounded-full px-4 ' +
+        (fixedAbove ? 'fixed z-40 ' : '') +
+        // 44px: the platform minimum touch target, and clearly subordinate to
+        // the 56px launcher it sits above.
+        'inline-flex items-center justify-center h-11 w-11 rounded-full shrink-0 ' +
         'text-white bg-[#25D366] hover:bg-[#1FB855] ' +
         'shadow-lg shadow-black/20 hover:shadow-xl ' +
         'transition-[background-color,box-shadow,transform] duration-200 ' +
@@ -103,25 +121,9 @@ export function WhatsAppFloatingButton({
         'motion-reduce:transition-none motion-reduce:hover:scale-100'
       }
     >
-      <WhatsAppGlyph className="w-7 h-7 shrink-0" />
-      {/*
-        The wordmark expands on hover on pointer devices only. On a phone the
-        button stays a circle: there is no hover there, so an always-open pill
-        would just cover more of the page it is floating over.
-      */}
-      <span
-        className={
-          'hidden sm:inline-block overflow-hidden whitespace-nowrap ' +
-          'max-w-0 opacity-0 group-hover:max-w-[10rem] group-hover:opacity-100 ' +
-          'font-semibold text-sm ' +
-          'transition-[max-width,opacity] duration-300 ' +
-          'motion-reduce:transition-none'
-        }
-      >
-        {label}
-      </span>
+      <WhatsAppGlyph className="w-6 h-6" />
     </a>
   );
 }
 
-export default WhatsAppFloatingButton;
+export default WhatsAppDockButton;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { WhatsAppFloatingButton, WhatsAppNavButton } from "@/components/whatsapp/WhatsAppContactButton";
+import { WhatsAppDockButton, WhatsAppNavButton } from "@/components/whatsapp/WhatsAppContactButton";
 import {
   Sparkles, Megaphone, Share2, GitBranch, UserPlus, Globe,
   BarChart3, Zap, ArrowRight, Check, PlayCircle, Bot, Monitor,
@@ -585,15 +585,16 @@ export default function Home() {
     </div>
     <SreeFloatBot accentColor="#d946ef" />
     {/*
-      6rem clears the SreeFloatBot launcher below it (3.5rem tall at 1.5rem
-      off the bottom). Its open chat panel does reach this height, but that
-      panel sits at a far higher z-index, so it covers this button while open
-      rather than being covered by it.
+      WhatsApp is docked just above the SreeFloatBot launcher rather than
+      floating as a second full-size button. Two equal circles in one
+      corner gave no clue which one was this app's own support channel;
+      this one is smaller and sits above it, so it reads as the second
+      way to reach us rather than a rival to the first.
     */}
-    <WhatsAppFloatingButton
+    <WhatsAppDockButton
       appName="Digital Studio"
       service="the AI Movie, Music & Dubbing Studio"
-      bottomOffset="6rem"
+      fixedAbove="5.5rem"
     />
     </>);
 
