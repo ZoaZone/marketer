@@ -219,6 +219,49 @@ tenancy check explicit code rather than a database rule, so it is asserted in
   entity store behind an SSE facade. If a broker is introduced later, only the
   body of `tail()` changes — the client contract stays as it is.
 
+## Public contact button
+
+Two entry points let a visitor start a conversation from the marketing side of
+the app, both of them plain links to `wa.me`:
+
+- a floating action button pinned to the bottom-right of the viewport, and
+- an icon button in the header, beside the sign-in and call-to-action buttons.
+
+The link carries a greeting already written into the visitor's compose box,
+naming the app and the service so a reply has something to work with — one
+number answers every app in the portfolio, and "tell me more" on its own does
+not say which one it came from.
+
+```
+https://wa.me/12566998899?text=Hi%20AEVOICE%20team%2C%20I%27d%20like%20to%20learn%20more%20about%20Soft%20Engine.
+```
+
+`src/lib/whatsapp/contactLink.js` builds that URL and is covered by
+`tests/whatsapp/contactLink.test.mjs`, which pins the encoding character for
+character. It encodes the apostrophe that `encodeURIComponent` leaves bare,
+because "I'd" appears in every one of these greetings and a raw quote breaks
+the URL wherever it gets pasted into an attribute or a shell.
+
+Notes on placement and behaviour:
+
+- **These are links, not scripted buttons.** The browser hands off to the
+  installed WhatsApp app on iOS and Android rather than opening a web tab, and
+  a long-press offers "copy link" like any other link.
+- **The floating button stacks above whatever already sits in that corner.**
+  Most of these apps ship a chat or quick-action launcher at the bottom-right;
+  each app passes `bottomOffset` to clear it rather than overlapping it.
+- **The offset is added to `env(safe-area-inset-bottom)`**, so the button
+  clears the iPhone home indicator in portrait and the notch in landscape.
+- **The wordmark expands on hover on pointer devices only.** A phone has no
+  hover, so the button stays a 56px circle there instead of covering more of
+  the page it floats over.
+- `#25D366` is WhatsApp's green and is written literally rather than through a
+  theme token, because it has to stay that green in light and dark alike.
+
+Changing the number or the wording for one app is a change to the props passed
+in that app's layout; changing it for all of them is a change to
+`WHATSAPP_CONTACT_NUMBER` in `contactLink.js`.
+
 ## Files
 
 | Path | Role |
@@ -234,4 +277,6 @@ tenancy check explicit code rather than a database rule, so it is asserted in
 | `src/hooks/useWhatsAppInbox.js` | Queries, SSE with polling fallback, mutations |
 | `src/api/whatsappAPI.js` | Function calls + the hand-rolled SSE reader |
 | `src/lib/whatsapp/payload.js` | Pure helpers shared by UI and tests |
+| `src/lib/whatsapp/contactLink.js` | Builds the public `wa.me` contact link |
+| `src/components/whatsapp/WhatsAppContactButton.jsx` | Floating + header contact buttons |
 | `tests/whatsapp/` | Unit tests + function contract tests |

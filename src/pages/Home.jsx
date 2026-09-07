@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { WhatsAppDockButton, WhatsAppNavButton } from "@/components/whatsapp/WhatsAppContactButton";
 import {
   Sparkles, Megaphone, Share2, GitBranch, UserPlus, Globe,
   BarChart3, Zap, ArrowRight, Check, PlayCircle, Bot, Monitor,
@@ -268,6 +269,11 @@ export default function Home() {
               Start Free Trial
             </Link>
           </div>
+          <WhatsAppNavButton
+            appName="Digital Studio"
+            service="the AI Movie, Music & Dubbing Studio"
+            className="h-9 w-9"
+          />
           <button className="md:hidden p-2 text-white/70 hover:text-white" onClick={() => setMobileOpen(!mobileOpen)}>
             {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
@@ -578,6 +584,18 @@ export default function Home() {
       </div>
     </div>
     <SreeFloatBot accentColor="#d946ef" />
+    {/*
+      WhatsApp is docked just above the SreeFloatBot launcher rather than
+      floating as a second full-size button. Two equal circles in one
+      corner gave no clue which one was this app's own support channel;
+      this one is smaller and sits above it, so it reads as the second
+      way to reach us rather than a rival to the first.
+    */}
+    <WhatsAppDockButton
+      appName="Digital Studio"
+      service="the AI Movie, Music & Dubbing Studio"
+      fixedAbove="5.5rem"
+    />
     </>);
 
 }
