@@ -11,6 +11,60 @@ const OTP_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const RESEND_COOLDOWN_MS = 45 * 1000; // minimum gap between codes for one email
 const MAX_VERIFY_ATTEMPTS = 5;        // wrong guesses before the code is burned
 
+// Copied from base44/_shared/rateLimit.block.ts — keep in sync by hand.
+// The per-email RESEND_COOLDOWN_MS above only throttles hammering ONE
+// address; without an IP-based limit too, an unauthenticated caller can
+// still loop this endpoint across many different target emails and
+// mail-bomb arbitrary third parties / burn the email-provider quota.
+// ── BEGIN RATE LIMIT BLOCK ──────────────────────────────────────────────
+function getClientIp(req: Request): string {
+  const h = req.headers;
+  return (
+    h.get('cf-connecting-ip') ||
+    h.get('x-real-ip') ||
+    (h.get('x-forwarded-for') || '').split(',')[0].trim() ||
+    'unknown'
+  );
+}
+
+async function checkRateLimit(base44: any, bucket: string, limit: number, windowMs: number): Promise<boolean> {
+  const windowIndex = Math.floor(Date.now() / windowMs);
+  const key = `${bucket}:${windowIndex}`;
+  try {
+    const rows = await base44.asServiceRole.entities.RateLimitCounter.filter({ key });
+    const row = rows?.[0];
+    if (!row) {
+      await base44.asServiceRole.entities.RateLimitCounter.create({ key, count: 1 });
+      return true;
+    }
+    if (row.count >= limit) return false;
+    await base44.asServiceRole.entities.RateLimitCounter.update(row.id, { count: row.count + 1 });
+    return true;
+  } catch (e) {
+    console.warn('checkRateLimit: entity read/write failed, allowing request:', (e as Error).message);
+    return true;
+  }
+}
+
+async function verifyTurnstile(token: string | undefined | null, remoteIp: string): Promise<boolean> {
+  const secret = Deno.env.get('TURNSTILE_SECRET_KEY');
+  if (!secret) return true; // not configured — no-op by design
+  if (!token) return false;
+  try {
+    const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ secret, response: token, remoteip: remoteIp }),
+    });
+    const data = await res.json();
+    return !!data.success;
+  } catch (e) {
+    console.warn('verifyTurnstile: siteverify request failed, rejecting:', (e as Error).message);
+    return false;
+  }
+}
+// ── END RATE LIMIT BLOCK ────────────────────────────────────────────────
+
 function generateOTP() {
   // crypto.getRandomValues, not Math.random: Math.random is not a CSPRNG, and
   // this value is a login credential. 100000-999999 keeps the 6-digit shape.
@@ -123,8 +177,9 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const payload = await req.json().catch(() => ({}));
-    const { action, email: rawEmail, otp: submittedOTP, purpose = 'login' } = payload;
+    const { action, email: rawEmail, otp: submittedOTP, purpose = 'login', turnstile_token } = payload;
     const email = String(rawEmail || '').trim().toLowerCase();
+    const ip = getClientIp(req);
 
     if (!email) {
       return Response.json({ error: 'email is required' }, { status: 400, headers });
@@ -132,6 +187,22 @@ Deno.serve(async (req) => {
 
     // ── SEND OTP ──────────────────────────────────────────────────────────────
     if (action === 'send') {
+      // Bot-abuse guard: this endpoint is unauthenticated by necessity (it's
+      // how a visitor signs in/up in the first place). The per-email cooldown
+      // below only slows hammering ONE address; these IP limits stop looping
+      // across many different target emails to mail-bomb third parties or
+      // burn the provider quota. Turnstile is a no-op until
+      // TURNSTILE_SECRET_KEY is set.
+      if (!(await verifyTurnstile(turnstile_token, ip))) {
+        return Response.json({ error: 'Verification failed. Please try again.' }, { status: 403, headers });
+      }
+      if (!(await checkRateLimit(base44, `otp_send_min:${ip}`, 5, 60 * 1000))) {
+        return Response.json({ error: 'Too many requests. Please wait a moment and try again.' }, { status: 429, headers });
+      }
+      if (!(await checkRateLimit(base44, `otp_send_day:${ip}`, 20, 24 * 60 * 60 * 1000))) {
+        return Response.json({ error: 'Daily code-send limit reached from this address. Please try again tomorrow.' }, { status: 429, headers });
+      }
+
       const all = await base44.asServiceRole.entities.BetaRequest.filter({ email });
       const records = Array.isArray(all) ? all : [];
 
@@ -263,6 +334,13 @@ Deno.serve(async (req) => {
     if (action === 'verify') {
       if (!submittedOTP) {
         return Response.json({ error: 'otp is required' }, { status: 400, headers });
+      }
+
+      // Per-email MAX_VERIFY_ATTEMPTS already burns one code after 5 wrong
+      // guesses; this IP limit additionally caps how many DIFFERENT emails
+      // one source can try verify against per minute.
+      if (!(await checkRateLimit(base44, `otp_verify_min:${ip}`, 20, 60 * 1000))) {
+        return Response.json({ error: 'Too many requests. Please wait a moment and try again.' }, { status: 429, headers });
       }
 
       const all = await base44.asServiceRole.entities.BetaRequest.filter({ email });

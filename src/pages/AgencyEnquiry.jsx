@@ -6,6 +6,7 @@ import {
   Sparkles, BarChart3, Shield, Headphones, Zap, Star
 } from "lucide-react";
 import { useSeo, SEO } from "@/lib/seo";
+import TurnstileWidget from "@/components/TurnstileWidget";
 
 const AGENCY_FEATURES = [
   { icon: Users, title: "Unlimited Client Seats", desc: "Manage all your clients from a single dashboard." },
@@ -22,6 +23,7 @@ export default function AgencyEnquiry() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -39,6 +41,7 @@ export default function AgencyEnquiry() {
         company: form.agency_name || "",
         use_case: `AGENCY ENQUIRY | Phone: ${form.phone} | Clients: ${form.client_count} | Tools: ${form.current_tools} | Requirements: ${form.requirements}`,
         note: "Agency partnership enquiry",
+        turnstile_token: turnstileToken,
       });
       const data = res?.data ?? res;
       if (data?.error) throw new Error(data.error);
@@ -198,6 +201,7 @@ export default function AgencyEnquiry() {
                     rows={3} placeholder="e.g. Custom integrations, bulk messaging, etc."
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-fuchsia-500/50 placeholder:text-white/20 resize-none" />
                 </div>
+                <TurnstileWidget onToken={setTurnstileToken} className="mb-1" />
                 <button type="submit" disabled={loading}
                   className="w-full py-4 bg-gradient-to-r from-fuchsia-600 to-purple-600 hover:from-fuchsia-500 hover:to-purple-500 disabled:opacity-60 text-white rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-fuchsia-500/20">
                   {loading ? <><Loader2 className="w-4 h-4 animate-spin" />Submitting…</> : <>Submit Enquiry <ArrowRight className="w-4 h-4" /></>}

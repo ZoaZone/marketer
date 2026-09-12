@@ -4,6 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { ArrowLeft, Eye, EyeOff, Mail, Lock, User, Loader2, CheckCircle2, RefreshCw, Shield } from "lucide-react";
 import { useSeo, SEO } from "@/lib/seo";
 import GoogleLoginButton from "@/components/GoogleLoginButton";
+import TurnstileWidget from "@/components/TurnstileWidget";
 
 // Vertical lockup (icon over wordmark) — the right shape for a centred auth card.
 const LOGO = "/brand/lockup-v.png";
@@ -98,6 +99,7 @@ export default function Auth() {
   const [resent, setResent] = useState(false);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState(null);
 
   // Already logged in — skip to dashboard
   useEffect(() => {
@@ -139,7 +141,7 @@ export default function Auth() {
         setInfo("We emailed a password reset link/token to " + email.trim().toLowerCase() + ". Paste the reset token below and choose a new password.");
         setFlow("password");
       } else {
-        await base44.functions.invoke("sendAuthOTP", { action: "send", email: email.trim().toLowerCase(), purpose: mode });
+        await base44.functions.invoke("sendAuthOTP", { action: "send", email: email.trim().toLowerCase(), purpose: mode, turnstile_token: turnstileToken });
         setFlow("otp");
       }
     } catch (err) {
@@ -150,7 +152,7 @@ export default function Auth() {
   const resendOTP = async () => {
     setResending(true); setError(""); setResent(false); setOtp("");
     try {
-      await base44.functions.invoke("sendAuthOTP", { action: "send", email: email.trim().toLowerCase(), purpose: mode });
+      await base44.functions.invoke("sendAuthOTP", { action: "send", email: email.trim().toLowerCase(), purpose: mode, turnstile_token: turnstileToken });
       setResent(true);
       setTimeout(() => setResent(false), 6000);
     } catch (err) { setError("Failed to resend. Please try again."); }
@@ -377,6 +379,7 @@ export default function Auth() {
                     className="w-full pl-10 pr-3 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:border-violet-500 placeholder-slate-500 transition-colors" />
                 </div>
               </div>
+              <TurnstileWidget onToken={setTurnstileToken} />
               <button type="submit" disabled={otpSending || !email}
                 className="w-full py-3 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 text-white text-sm font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2 hover:opacity-90 shadow-lg shadow-violet-500/20">
                 {otpSending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
