@@ -102,6 +102,10 @@ Deno.serve(async (req) => {
       source: data.source || 'website',
       utm_source: data.utm_source || '',
       utm_campaign: data.utm_campaign || '',
+      // The schema's own message field — populated so a free-text note (the
+      // contact/chat widget's "message" box, say) is actually readable on the
+      // record instead of only surviving inside the form_data JSON blob below.
+      description: String(data.description || data.message || '').slice(0, 1000),
       form_data: JSON.stringify(data),
       captured_at: new Date().toISOString(),
     });
