@@ -14,8 +14,12 @@ import { whatsappContactUrl } from '@/lib/whatsapp/contactLink';
  * not this app's, and it must stay that green in every theme these apps ship.
  */
 
-/** WhatsApp's glyph, inlined so the button paints with the first frame. */
-function WhatsAppGlyph({ className = 'w-6 h-6' }) {
+/**
+ * WhatsApp's glyph, inlined so the button paints with the first frame.
+ * Exported so the unified contact widget (src/components/support/ContactWidget)
+ * can label its WhatsApp tab with the same mark instead of a second copy.
+ */
+export function WhatsAppGlyph({ className = 'w-6 h-6' }) {
   return (
     <svg
       viewBox="0 0 24 24"

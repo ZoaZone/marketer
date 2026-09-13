@@ -82,6 +82,13 @@
       "default": true,
       "description": "When false, jobs are rejected at submit once the allowance is exhausted instead of billing overage. Enterprise contracts that cap spend set this false."
     },
+    "credited_stripe_sessions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Stripe Checkout session IDs already applied to credits_balance by buyCredits' \"confirm\" action. There is no webhook receiver in this app, so a client-side redirect is the only signal a one-time credit purchase completed; this list is what makes replaying that same session_id (a refresh, a double-fired effect, revisiting the URL from history) a no-op instead of double-crediting."
+    },
     "description": {
       "type": "string",
       "maxLength": 1000

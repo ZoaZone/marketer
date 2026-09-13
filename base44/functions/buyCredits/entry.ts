@@ -34,7 +34,77 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401, headers: CORS });
 
-    const { amount_usd, client_id } = await req.json();
+    const body = await req.json();
+
+    // Stripe Checkout has no webhook receiver in this codebase (see
+    // stripeCheckoutCREAM's "confirm" action for the subscription side of
+    // this same gap). Before this action existed, a real (non-demo) credit
+    // purchase redirected back to /billing?credits_purchased=N with NO
+    // server-side step that ever actually credited the ledger — customers
+    // paid Stripe and got nothing added to their balance. This mirrors
+    // stripeCheckoutCREAM's confirm flow: verify the session with Stripe
+    // directly (never trust the redirect alone), then apply it exactly once.
+    if (body?.action === 'confirm') {
+      const sessionId = body?.session_id;
+      if (!sessionId) return Response.json({ error: 'session_id is required.' }, { status: 400, headers: CORS });
+      if (!STRIPE_KEY) return Response.json({ error: 'Stripe is not configured.' }, { status: 500, headers: CORS });
+
+      const sessionRes = await fetch(`https://api.stripe.com/v1/checkout/sessions/${sessionId}`, {
+        headers: { Authorization: `Bearer ${STRIPE_KEY}` },
+      });
+      const session = await sessionRes.json();
+      if (!sessionRes.ok) return Response.json({ error: session?.error?.message || 'Could not verify session.' }, { status: 400, headers: CORS });
+      if (session.payment_status !== 'paid') {
+        return Response.json({ success: true, confirmed: false }, { headers: CORS });
+      }
+      if (session.metadata?.type !== 'credits') {
+        return Response.json({ error: 'Not a credits checkout session.' }, { status: 400, headers: CORS });
+      }
+      if (session.metadata?.user_email && session.metadata.user_email !== user.email) {
+        return Response.json({ error: 'Session does not belong to this user.' }, { status: 403, headers: CORS });
+      }
+
+      const creditsToApply = parseInt(session.metadata?.credits || '0', 10);
+      if (!creditsToApply) {
+        return Response.json({ error: 'No credits recorded on this session.' }, { status: 400, headers: CORS });
+      }
+
+      const existingForConfirm = await base44.asServiceRole.entities.Subscription.filter({ owner_email: user.email });
+      const subForConfirm = existingForConfirm?.[0];
+
+      // Idempotency: a session already recorded here is never credited
+      // twice — covers a page refresh, a double-fired effect, or the user
+      // revisiting the success URL from browser history.
+      const appliedSessions: string[] = subForConfirm?.credited_stripe_sessions || [];
+      if (appliedSessions.includes(sessionId)) {
+        return Response.json({ success: true, confirmed: false, already_applied: true }, { headers: CORS });
+      }
+
+      let confirmedBalance: number;
+      if (subForConfirm) {
+        confirmedBalance = (subForConfirm.credits_balance || 0) + creditsToApply;
+        await base44.asServiceRole.entities.Subscription.update(subForConfirm.id, {
+          credits_balance: confirmedBalance,
+          credited_stripe_sessions: [...appliedSessions, sessionId],
+        });
+      } else {
+        confirmedBalance = creditsToApply;
+        await base44.asServiceRole.entities.Subscription.create({
+          owner_email: user.email,
+          plan_name: 'Free',
+          plan_tier: 'free',
+          status: 'active',
+          credits_balance: confirmedBalance,
+          credited_stripe_sessions: [sessionId],
+        });
+      }
+
+      return Response.json({
+        success: true, confirmed: true, credits_added: creditsToApply, credits_balance: confirmedBalance,
+      }, { headers: CORS });
+    }
+
+    const { amount_usd, client_id } = body;
     const amount = Math.round(Number(amount_usd) * 100) / 100;
     if (!amount || amount < MIN_PURCHASE_USD) {
       return Response.json({ error: `Minimum credit purchase is $${MIN_PURCHASE_USD}` }, { status: 400, headers: CORS });
@@ -79,7 +149,7 @@ Deno.serve(async (req) => {
       'line_items[0][quantity]': '1',
       mode: 'payment',
       customer_email: user.email,
-      success_url: `${APP_URL}/billing?credits_purchased=${credits}`,
+      success_url: `${APP_URL}/billing?session_id={CHECKOUT_SESSION_ID}&type=credits&credits_purchased=${credits}`,
       cancel_url: `${APP_URL}/billing`,
       'metadata[type]': 'credits',
       'metadata[credits]': String(credits),

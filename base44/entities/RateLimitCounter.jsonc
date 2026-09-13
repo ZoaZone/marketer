@@ -1,0 +1,40 @@
+{
+  "name": "RateLimitCounter",
+  "type": "object",
+  "description": "Internal bookkeeping for the fixed-window rate limiters used by public/abuse-prone functions (signup, OTP send, lead capture, bulk-message trigger) — see base44/_shared/rateLimit.block.ts. Never read or written except by service-role code inside base44/functions/*/entry.ts. Not user-visible data; rows are disposable and may be garbage-collected once their window has passed.",
+  "properties": {
+    "key": {
+      "type": "string",
+      "description": "Bucket identity: '<action>:<ip-or-email-or-user>:<window-index>'. Exact-match lookup only — the window is baked into the key rather than relying on a created_date range filter."
+    },
+    "count": {
+      "type": "number",
+      "default": 0
+    }
+  },
+  "required": [
+    "key"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

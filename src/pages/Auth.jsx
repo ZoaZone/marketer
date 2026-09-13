@@ -4,6 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { ArrowLeft, Eye, EyeOff, Mail, Lock, User, Loader2, CheckCircle2, RefreshCw, Shield } from "lucide-react";
 import { useSeo, SEO } from "@/lib/seo";
 import GoogleLoginButton from "@/components/GoogleLoginButton";
+import TurnstileWidget from "@/components/TurnstileWidget";
 
 // Vertical lockup (icon over wordmark) — the right shape for a centred auth card.
 const LOGO = "/brand/lockup-v.png";
@@ -98,6 +99,7 @@ export default function Auth() {
   const [resent, setResent] = useState(false);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState(null);
 
   // Already logged in — skip to dashboard
   useEffect(() => {
@@ -113,19 +115,15 @@ export default function Auth() {
   };
 
   // ── Step 1: Send OTP ─────────────────────────────────────────────────────
-  // ── Google OAuth via our own GSI client (GoogleLoginButton uses
-  // VITE_GOOGLE_CLIENT_ID, so Google's consent screen reflects
-  // digitalstudios.app's branding instead of Base44's platform client). The
-  // component stores the session token before calling onSuccess, so a hard
-  // navigation re-initializes app-params/base44Client against the new token
-  // (same reason submitLogin uses window.location.href).
-  const handleGoogleSuccess = () => {
-    const safeFrom = (from && !/\/(login|auth|\/)/i.test(from)) ? from : DASHBOARD;
-    window.location.href = safeFrom;
-  };
-  const handleGoogleError = (err) => {
-    setError(err?.message || "Google sign-in failed. Please try again.");
-  };
+  // Google OAuth via the Base44 platform's own redirect flow (see
+  // src/components/GoogleLoginButton.jsx and
+  // docs/google-oauth-investigation.md for why the previous custom
+  // Google-Identity-Services + token-exchange approach was disabled, and
+  // why this redirect-based one is the one that actually works). Base44
+  // sends the user to Google and back with `?access_token=...` on
+  // `googleFromUrl`, which app-params.js already picks up on load — same
+  // path the "Already logged in" check above then routes to DASHBOARD.
+  const googleFromUrl = (from && !/\/(login|auth|\/)/i.test(from)) ? from : DASHBOARD;
 
   const sendOTP = async (e) => {
     e?.preventDefault();
@@ -139,7 +137,7 @@ export default function Auth() {
         setInfo("We emailed a password reset link/token to " + email.trim().toLowerCase() + ". Paste the reset token below and choose a new password.");
         setFlow("password");
       } else {
-        await base44.functions.invoke("sendAuthOTP", { action: "send", email: email.trim().toLowerCase(), purpose: mode });
+        await base44.functions.invoke("sendAuthOTP", { action: "send", email: email.trim().toLowerCase(), purpose: mode, turnstile_token: turnstileToken });
         setFlow("otp");
       }
     } catch (err) {
@@ -150,7 +148,7 @@ export default function Auth() {
   const resendOTP = async () => {
     setResending(true); setError(""); setResent(false); setOtp("");
     try {
-      await base44.functions.invoke("sendAuthOTP", { action: "send", email: email.trim().toLowerCase(), purpose: mode });
+      await base44.functions.invoke("sendAuthOTP", { action: "send", email: email.trim().toLowerCase(), purpose: mode, turnstile_token: turnstileToken });
       setResent(true);
       setTimeout(() => setResent(false), 6000);
     } catch (err) { setError("Failed to resend. Please try again."); }
@@ -350,11 +348,11 @@ export default function Auth() {
                 {loading ? "Signing in..." : "Sign In"}
               </button>
 
-              {/* The "or" divider is removed along with the button. While
-                  GoogleLoginButton renders null (see GOOGLE_LOGIN_ENABLED in
-                  that component) a standalone divider strands an "or" under the
-                  Sign In button with nothing after it. Restore both together. */}
-              <GoogleLoginButton base44={base44} onSuccess={handleGoogleSuccess} onError={handleGoogleError} theme="filled_black" text="signin_with" />
+              <div className="relative py-1">
+                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-800" /></div>
+                <div className="relative flex justify-center text-[10px] uppercase tracking-wider"><span className="bg-slate-900 px-3 text-slate-500">or</span></div>
+              </div>
+              <GoogleLoginButton fromUrl={googleFromUrl} theme="filled_black" />
 
               <button type="button" onClick={() => resetFlow("reset")}
                 className="w-full text-center text-xs text-slate-500 hover:text-violet-400 transition-colors py-1">
@@ -377,6 +375,7 @@ export default function Auth() {
                     className="w-full pl-10 pr-3 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:border-violet-500 placeholder-slate-500 transition-colors" />
                 </div>
               </div>
+              <TurnstileWidget onToken={setTurnstileToken} />
               <button type="submit" disabled={otpSending || !email}
                 className="w-full py-3 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 text-white text-sm font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2 hover:opacity-90 shadow-lg shadow-violet-500/20">
                 {otpSending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
@@ -384,8 +383,11 @@ export default function Auth() {
               </button>
               {mode === "signup" && (
                 <>
-                  {/* Divider removed with the button — see the sign-in branch above. */}
-                  <GoogleLoginButton base44={base44} onSuccess={handleGoogleSuccess} onError={handleGoogleError} theme="filled_black" text="signin_with" />
+                  <div className="relative py-1">
+                    <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-800" /></div>
+                    <div className="relative flex justify-center text-[10px] uppercase tracking-wider"><span className="bg-slate-900 px-3 text-slate-500">or</span></div>
+                  </div>
+                  <GoogleLoginButton fromUrl={googleFromUrl} theme="filled_black" />
                 </>
               )}
             </form>

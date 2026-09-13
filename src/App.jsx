@@ -54,6 +54,7 @@ import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
 import WhatsAppInbox from './pages/WhatsAppInbox';
 import WhatsAppSettings from './pages/WhatsAppSettings';
+import ContactWidget from '@/components/support/ContactWidget';
 
 
 const AuthenticatedApp = () => {
@@ -171,6 +172,15 @@ function App() {
         <Router>
           <AuthenticatedApp />
         </Router>
+        {/*
+          One contact control for the whole app: a single launcher with a Chat
+          tab and a WhatsApp tab, mounted here rather than on a page. Anything
+          route-scoped only renders on some routes, which is how this ended up
+          missing on the pages people actually land on -- and, where a header
+          button existed too, duplicated on the ones they did reach. Beside
+          <Toaster/> nothing gates it.
+        */}
+        <ContactWidget />
         <Toaster />
       </AuthProvider>
     </QueryClientProvider>

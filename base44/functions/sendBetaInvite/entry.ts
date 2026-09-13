@@ -40,7 +40,7 @@ const buildHtml = (url: string, note: string, name: string) => `
       <p style="color:#555;font-size:10px;margin:0 0 4px;text-transform:uppercase;letter-spacing:0.5px;">Your invite link</p>
       <p style="color:#a855f7;font-size:12px;margin:0;word-break:break-all;">${url}</p>
     </div>
-    <p style="color:#555;font-size:12px;margin:0;">Expires in 30 days · <a href="mailto:care@aevoice.ai" style="color:#a855f7;">care@aevoice.ai</a></p>
+    <p style="color:#555;font-size:12px;margin:0;">Expires in 30 days · <a href="mailto:care@digitalstudios.app" style="color:#a855f7;">care@digitalstudios.app</a></p>
   </td></tr>
   <tr><td style="background:#0d0d14;padding:16px 36px;border-top:1px solid #1f1f2e;text-align:center;">
     <p style="color:#444;font-size:11px;margin:0;">© 2026 AEVOICE · <a href="https://digitalstudios.app" style="color:#555;text-decoration:none;">digitalstudios.app</a></p>
@@ -78,7 +78,7 @@ const buildFreeTrialHtml = (url: string, note: string, name: string) => `
       <p style="color:#555;font-size:10px;margin:0 0 4px;text-transform:uppercase;letter-spacing:0.5px;">Your invite link</p>
       <p style="color:#a855f7;font-size:12px;margin:0;word-break:break-all;">${url}</p>
     </div>
-    <p style="color:#555;font-size:12px;margin:0;">Expires in 30 days · <a href="mailto:care@aevoice.ai" style="color:#a855f7;">care@aevoice.ai</a></p>
+    <p style="color:#555;font-size:12px;margin:0;">Expires in 30 days · <a href="mailto:care@digitalstudios.app" style="color:#a855f7;">care@digitalstudios.app</a></p>
   </td></tr>
   <tr><td style="background:#0d0d14;padding:16px 36px;border-top:1px solid #1f1f2e;text-align:center;">
     <p style="color:#444;font-size:11px;margin:0;">© 2026 AEVOICE · <a href="https://digitalstudios.app" style="color:#555;text-decoration:none;">digitalstudios.app</a></p>

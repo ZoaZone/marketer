@@ -3,6 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { Sparkles, Send, CheckCircle2, Loader2 } from "lucide-react";
 import { BRAND } from "@/lib/brand";
 import { useSeo, SEO } from "@/lib/seo";
+import TurnstileWidget from "@/components/TurnstileWidget";
 
 export default function BetaSignup() {
   useSeo(SEO.beta);
@@ -11,6 +12,7 @@ export default function BetaSignup() {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -19,10 +21,10 @@ export default function BetaSignup() {
     setError("");
     try {
       // Use the public backend function — no auth required
-      await base44.functions.invoke("submitBetaRequest", { ...form });
+      await base44.functions.invoke("submitBetaRequest", { ...form, turnstile_token: turnstileToken });
       setDone(true);
     } catch (err) {
-      setError("Something went wrong. Please try again.");
+      setError(err?.response?.data?.error || "Something went wrong. Please try again.");
     }
     setSubmitting(false);
   };
@@ -105,6 +107,8 @@ export default function BetaSignup() {
                   className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none"
                 />
               </div>
+
+              <TurnstileWidget onToken={setTurnstileToken} />
 
               {error && <p className="text-xs text-red-400">{error}</p>}
 

@@ -62,19 +62,28 @@ export default function Billing() {
   // Stripe Checkout has no webhook receiver in this app — the redirect back
   // here with ?session_id= is the only signal a real (non-demo) purchase
   // completed, so this confirms it with Stripe and activates the
-  // subscription (see stripeCheckoutCREAM's "confirm" action).
+  // subscription (see stripeCheckoutCREAM's "confirm" action) or, for a
+  // one-time credit top-up (?type=credits), applies it via buyCredits'
+  // own "confirm" action instead.
   const confirmedRef = useRef(false);
   useEffect(() => {
-    const sessionId = new URLSearchParams(window.location.search).get("session_id");
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get("session_id");
+    const sessionType = params.get("type");
     if (!sessionId || confirmedRef.current) return;
     confirmedRef.current = true;
     (async () => {
       try {
-        const res = await base44.functions.invoke("stripeCheckoutCREAM", { action: "confirm", session_id: sessionId });
-        const data = res?.data ?? res;
-        if (data?.confirmed && data?.subscription_id) {
-          await recordCommissionFor(data.subscription_id);
+        if (sessionType === "credits") {
+          await base44.functions.invoke("buyCredits", { action: "confirm", session_id: sessionId });
           qc.invalidateQueries({ queryKey: ["subscription"] });
+        } else {
+          const res = await base44.functions.invoke("stripeCheckoutCREAM", { action: "confirm", session_id: sessionId });
+          const data = res?.data ?? res;
+          if (data?.confirmed && data?.subscription_id) {
+            await recordCommissionFor(data.subscription_id);
+            qc.invalidateQueries({ queryKey: ["subscription"] });
+          }
         }
       } catch (_) { /* best-effort — the plan page still shows current status either way */ }
       window.history.replaceState({}, "", window.location.pathname);

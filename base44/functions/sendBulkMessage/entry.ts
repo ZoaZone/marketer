@@ -1,5 +1,72 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
+// Copied from base44/_shared/rateLimit.block.ts — keep in sync by hand.
+// This endpoint requires auth, but it is the actual bulk-send TRIGGER —
+// a compromised or abused account (or a runaway retry loop in a client
+// integration) could otherwise blast unlimited email/SMS/WhatsApp through
+// the platform's own paid provider keys with no ceiling at all. Note: the
+// plan catalog (src/config/plans.js) already defines a monthly
+// `bulk_messages` allowance per tier, but nothing in this file enforces it
+// today — that is a separate metering gap from the flat safety cap below,
+// which exists purely to bound abuse regardless of plan.
+// ── BEGIN RATE LIMIT BLOCK ──────────────────────────────────────────────
+function getClientIp(req: Request): string {
+  const h = req.headers;
+  return (
+    h.get('cf-connecting-ip') ||
+    h.get('x-real-ip') ||
+    (h.get('x-forwarded-for') || '').split(',')[0].trim() ||
+    'unknown'
+  );
+}
+
+async function checkRateLimit(base44: any, bucket: string, limit: number, windowMs: number): Promise<boolean> {
+  const windowIndex = Math.floor(Date.now() / windowMs);
+  const key = `${bucket}:${windowIndex}`;
+  try {
+    const rows = await base44.asServiceRole.entities.RateLimitCounter.filter({ key });
+    const row = rows?.[0];
+    if (!row) {
+      await base44.asServiceRole.entities.RateLimitCounter.create({ key, count: 1 });
+      return true;
+    }
+    if (row.count >= limit) return false;
+    await base44.asServiceRole.entities.RateLimitCounter.update(row.id, { count: row.count + 1 });
+    return true;
+  } catch (e) {
+    console.warn('checkRateLimit: entity read/write failed, allowing request:', (e as Error).message);
+    return true;
+  }
+}
+
+// Same fixed-window counter as checkRateLimit, but returns the resulting
+// count instead of a boolean pass/fail — bulk sends are capped by RECIPIENT
+// VOLUME per day, not by call count, so the caller needs to know how much
+// headroom is left in today's bucket before it starts sending.
+async function addAndGetWindowCount(base44: any, bucket: string, amount: number, windowMs: number): Promise<number> {
+  const windowIndex = Math.floor(Date.now() / windowMs);
+  const key = `${bucket}:${windowIndex}`;
+  try {
+    const rows = await base44.asServiceRole.entities.RateLimitCounter.filter({ key });
+    const row = rows?.[0];
+    if (!row) {
+      await base44.asServiceRole.entities.RateLimitCounter.create({ key, count: amount });
+      return amount;
+    }
+    const next = row.count + amount;
+    await base44.asServiceRole.entities.RateLimitCounter.update(row.id, { count: next });
+    return next;
+  } catch (e) {
+    console.warn('addAndGetWindowCount: entity read/write failed, allowing request:', (e as Error).message);
+    return 0;
+  }
+}
+// ── END RATE LIMIT BLOCK ────────────────────────────────────────────────
+
+// Flat daily safety ceiling on bulk-send recipient volume, per user,
+// independent of plan tier — a last-resort backstop against runaway abuse.
+const DAILY_RECIPIENT_SAFETY_CAP = 2000;
+
 /**
  * Platform-managed email sending — used when the user hasn't configured
  * their own SendGrid key. Chain: Base44 built-in -> Resend -> SendGrid
@@ -7,9 +74,15 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
  * platform's "managed sending" rate (provider cost + 30% usage margin) once
  * the account's plan-included quota is used up.
  */
+// Platform brand — shared by every send path below (platform-managed Resend/
+// SendGrid, and the BYO SendGrid fallback further down) so a customer's
+// campaign email never shows a from-name/domain other than this app's own.
+const PLATFORM_FROM_NAME = 'digitalstudios.app';
+const PLATFORM_FROM_EMAIL = Deno.env.get('RESEND_FROM_EMAIL') || 'noreply@digitalstudios.app';
+
 async function sendPlatformEmail(base44: any, { to, subject, html, text }: any): Promise<{ ok: boolean; error?: string }> {
-  const fromName = 'digitalstudios.app';
-  const fromEmail = Deno.env.get('RESEND_FROM_EMAIL') || 'noreply@digitalstudios.app';
+  const fromName = PLATFORM_FROM_NAME;
+  const fromEmail = PLATFORM_FROM_EMAIL;
   const plainText = text || '';
   const htmlContent = html || '<pre style="font-family:sans-serif;white-space:pre-wrap">' + plainText + '</pre>';
 
@@ -33,7 +106,7 @@ async function sendPlatformEmail(base44: any, { to, subject, html, text }: any):
   // TERTIARY: SendGrid (platform/admin key)
   const sendgridKey = Deno.env.get('SENDGRID_API_KEY');
   if (sendgridKey) {
-    const sgFromEmail = Deno.env.get('SENDGRID_FROM_EMAIL') || 'noreply@aevoice.ai';
+    const sgFromEmail = Deno.env.get('SENDGRID_FROM_EMAIL') || 'noreply@digitalstudios.app';
     const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + sendgridKey, 'Content-Type': 'application/json' },
@@ -57,6 +130,14 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
+    const ip = getClientIp(req);
+    // Bot-abuse guard: caps how often this trigger can be invoked at all,
+    // regardless of account — a scripted/looping caller hitting it from one
+    // source IP is stopped here before it ever reaches the send loop below.
+    if (!(await checkRateLimit(base44, `bulk_send_min:${ip}`, 5, 60 * 1000))) {
+      return Response.json({ error: 'Too many requests. Please wait a moment and try again.' }, { status: 429 });
+    }
+
     const { campaign_id, client_id } = await req.json();
     if (!campaign_id) return Response.json({ error: 'campaign_id is required' }, { status: 400 });
 
@@ -75,6 +156,20 @@ Deno.serve(async (req) => {
     };
     const filter = channelFilter[campaign.type] || channelFilter.email;
     const eligible = contacts.filter(filter);
+
+    // Per-user/per-day send-volume safety cap. This is a flat abuse ceiling
+    // (see DAILY_RECIPIENT_SAFETY_CAP above), not the plan's own monthly
+    // bulk_messages allowance — a compromised or runaway account still gets
+    // stopped even on a plan that would otherwise allow it. Reserve the
+    // volume for today's window BEFORE sending anything.
+    const todaysRecipientCount = await addAndGetWindowCount(
+      base44, `bulk_send_day:${user.email}`, eligible.length, 24 * 60 * 60 * 1000,
+    );
+    if (todaysRecipientCount > DAILY_RECIPIENT_SAFETY_CAP) {
+      return Response.json({
+        error: `Daily bulk-send limit reached (${DAILY_RECIPIENT_SAFETY_CAP} recipients/day). Please try again tomorrow or contact support to raise this limit.`,
+      }, { status: 429 });
+    }
 
     // Retrieve "bring your own" keys from user settings — when present, the
     // user's own credentials/billing are used (no platform margin). When
@@ -109,7 +204,15 @@ Deno.serve(async (req) => {
               headers: { Authorization: `Bearer ${sendgridKey}`, 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 personalizations: [{ to: [{ email: contact.email, name: contact.full_name || '' }] }],
-                from: { email: 'noreply@agentmarketer.ai', name: 'Agent Marketer' },
+                // Was hardcoded to 'noreply@agentmarketer.ai' / "Agent Marketer" —
+                // a stale brand/domain from before this app was renamed to Digital
+                // Studio, unrelated to the customer's own verified SendGrid sender
+                // identity either way. Using the platform's own consistent brand
+                // here at least stops advertising a dead, unrelated product name;
+                // a customer sending on their OWN SendGrid key ideally supplies
+                // their own from-address (no such setting exists yet — see the
+                // hardening-pass report for this as a follow-up).
+                from: { email: PLATFORM_FROM_EMAIL, name: PLATFORM_FROM_NAME },
                 subject: campaign.subject || campaign.name,
                 content: [{ type: 'text/html', value: campaign.body || campaign.subject || '' }],
               }),
