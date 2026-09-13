@@ -1,5 +1,5 @@
 /**
- * WhatsAppInbox — the CRM inbox for the "Hello Biz" WABA (+1 256 699-8899).
+ * WhatsAppInbox — the CRM inbox for the "Hello Biz" WABA (+1 646 912-6066).
  *
  * Layout is one responsive rule applied twice:
  *
@@ -22,7 +22,7 @@ import ConversationPanel from '@/components/whatsapp/ConversationPanel';
 import ContactPanel from '@/components/whatsapp/ContactPanel';
 import TemplatePicker from '@/components/whatsapp/TemplatePicker';
 
-const BUSINESS_NUMBER = '+1 (256) 699-8899';
+const BUSINESS_NUMBER = '+1 (646) 912-6066';
 
 export default function WhatsAppInbox() {
   const navigate = useNavigate();

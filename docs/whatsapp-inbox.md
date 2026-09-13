@@ -9,6 +9,18 @@ and the shared cPanel webhook relay live in
 [`ZoaZone/os-aevoice`](https://github.com/ZoaZone/os-aevoice)
 (`deploy/zoazoneservices/`).
 
+> **Two different numbers, two different jobs.** The "Display number" below
+> (+1 256 699 8899) is the shared "Hello Biz" WABA this CRM inbox reads from —
+> the number Meta's Cloud API delivers *inbound* messages for, across every
+> app in the ZoaZone portfolio. The public "message us on WhatsApp" button
+> rendered on marketing pages (`src/lib/whatsapp/contactLink.js`) targets a
+> different, app-specific number, +1 646 912 6066, as its wa.me link target.
+> If that number is not yet provisioned as a WABA of its own in Meta Business
+> Manager with a webhook pointed at the same relay, outbound taps on that
+> button will open a chat that nobody is listening on — that provisioning is
+> outside this repo and needs to happen on the Meta/WABA side for the button
+> to actually deliver messages here.
+
 ## Assets
 
 | Thing | Value |
@@ -233,7 +245,7 @@ number answers every app in the portfolio, and "tell me more" on its own does
 not say which one it came from.
 
 ```
-https://wa.me/12566998899?text=Hi%20AEVOICE%20team%2C%20I%27d%20like%20to%20learn%20more%20about%20Soft%20Engine.
+https://wa.me/16469126066?text=Hi%20AEVOICE%20team%2C%20I%27d%20like%20to%20learn%20more%20about%20Soft%20Engine.
 ```
 
 `src/lib/whatsapp/contactLink.js` builds that URL and is covered by

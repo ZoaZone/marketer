@@ -115,19 +115,15 @@ export default function Auth() {
   };
 
   // ── Step 1: Send OTP ─────────────────────────────────────────────────────
-  // ── Google OAuth via our own GSI client (GoogleLoginButton uses
-  // VITE_GOOGLE_CLIENT_ID, so Google's consent screen reflects
-  // digitalstudios.app's branding instead of Base44's platform client). The
-  // component stores the session token before calling onSuccess, so a hard
-  // navigation re-initializes app-params/base44Client against the new token
-  // (same reason submitLogin uses window.location.href).
-  const handleGoogleSuccess = () => {
-    const safeFrom = (from && !/\/(login|auth|\/)/i.test(from)) ? from : DASHBOARD;
-    window.location.href = safeFrom;
-  };
-  const handleGoogleError = (err) => {
-    setError(err?.message || "Google sign-in failed. Please try again.");
-  };
+  // Google OAuth via the Base44 platform's own redirect flow (see
+  // src/components/GoogleLoginButton.jsx and
+  // docs/google-oauth-investigation.md for why the previous custom
+  // Google-Identity-Services + token-exchange approach was disabled, and
+  // why this redirect-based one is the one that actually works). Base44
+  // sends the user to Google and back with `?access_token=...` on
+  // `googleFromUrl`, which app-params.js already picks up on load — same
+  // path the "Already logged in" check above then routes to DASHBOARD.
+  const googleFromUrl = (from && !/\/(login|auth|\/)/i.test(from)) ? from : DASHBOARD;
 
   const sendOTP = async (e) => {
     e?.preventDefault();
@@ -352,11 +348,11 @@ export default function Auth() {
                 {loading ? "Signing in..." : "Sign In"}
               </button>
 
-              {/* The "or" divider is removed along with the button. While
-                  GoogleLoginButton renders null (see GOOGLE_LOGIN_ENABLED in
-                  that component) a standalone divider strands an "or" under the
-                  Sign In button with nothing after it. Restore both together. */}
-              <GoogleLoginButton base44={base44} onSuccess={handleGoogleSuccess} onError={handleGoogleError} theme="filled_black" text="signin_with" />
+              <div className="relative py-1">
+                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-800" /></div>
+                <div className="relative flex justify-center text-[10px] uppercase tracking-wider"><span className="bg-slate-900 px-3 text-slate-500">or</span></div>
+              </div>
+              <GoogleLoginButton fromUrl={googleFromUrl} theme="filled_black" />
 
               <button type="button" onClick={() => resetFlow("reset")}
                 className="w-full text-center text-xs text-slate-500 hover:text-violet-400 transition-colors py-1">
@@ -387,8 +383,11 @@ export default function Auth() {
               </button>
               {mode === "signup" && (
                 <>
-                  {/* Divider removed with the button — see the sign-in branch above. */}
-                  <GoogleLoginButton base44={base44} onSuccess={handleGoogleSuccess} onError={handleGoogleError} theme="filled_black" text="signin_with" />
+                  <div className="relative py-1">
+                    <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-800" /></div>
+                    <div className="relative flex justify-center text-[10px] uppercase tracking-wider"><span className="bg-slate-900 px-3 text-slate-500">or</span></div>
+                  </div>
+                  <GoogleLoginButton fromUrl={googleFromUrl} theme="filled_black" />
                 </>
               )}
             </form>
