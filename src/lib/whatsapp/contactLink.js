@@ -13,16 +13,12 @@
  * The public WhatsApp Business number, in the digits-only form wa.me wants —
  * no '+', no spaces, no punctuation.
  *
- * This is the WABA (WhatsApp Business Account) number a visitor messages —
- * +1 646 912 6066, the platform's dedicated WhatsApp line, distinct from the
- * +1 256 699 8899 voice/support number shown elsewhere. It is deliberately a
- * plain constant and not an environment variable: it is used to build a
- * link, so hiding it buys nothing, and a missing env var would silently ship
- * a dead link. The number itself should never be printed on screen though —
- * buttons should read as a branded action ("Chat with us", "Continue on
- * WhatsApp"), not the raw digits.
+ * This is the number a visitor messages. It is deliberately a plain constant
+ * and not an environment variable: it is public information printed on a
+ * button, so hiding it buys nothing, and a missing env var would silently ship
+ * a dead link.
  */
-export const WHATSAPP_CONTACT_NUMBER = '16469126066';
+export const WHATSAPP_CONTACT_NUMBER = '12566998899';
 
 /**
  * Percent-encode message text for a wa.me query string.
