@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { MessageCircle, X, Send, Loader2, CheckCircle2, ExternalLink } from 'lucide-react';
+import { MessageCircle, X, Send, Loader2, CheckCircle2, ExternalLink, Sparkles } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { BRAND } from '@/lib/brand';
 import { whatsappContactUrl } from '@/lib/whatsapp/contactLink';
 import { WhatsAppGlyph } from '@/components/whatsapp/WhatsAppContactButton';
 import TurnstileWidget from '@/components/TurnstileWidget';
+import SreeChat from '@/components/support/SreeChat';
 
 /**
  * The single "talk to us" surface for the whole app.
@@ -25,12 +26,18 @@ import TurnstileWidget from '@/components/TurnstileWidget';
  *   at /whatsapp-inbox, which is a paid-tier product feature for this app's
  *   own customers, not a support channel for this app's own visitors.
  *
+ * - Ask Sree: the site's AI assistant. It used to float its own launcher from
+ *   inside Home.jsx at `fixed bottom-6 right-6 z-[9999]`, directly over this
+ *   widget's launcher, so the landing page showed two round chat buttons in
+ *   one corner. It is a tab here now (SreeChat, in `embedded` mode so it
+ *   contributes only its body).
+ *
  * No "Call" tab: there is no telephony number or infra behind this app to
  * point one at.
  */
 export default function ContactWidget() {
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState('chat');
+  const [tab, setTab] = useState('sree');
 
   return (
     <>
@@ -66,12 +73,13 @@ export default function ContactWidget() {
             </div>
 
             <div className="flex border-b border-border shrink-0">
-              <TabButton active={tab === 'chat'} onClick={() => setTab('chat')} icon={<MessageCircle className="w-4 h-4" />} label="Chat" />
+              <TabButton active={tab === 'sree'} onClick={() => setTab('sree')} icon={<Sparkles className="w-4 h-4" />} label="Ask Sree" />
+              <TabButton active={tab === 'chat'} onClick={() => setTab('chat')} icon={<MessageCircle className="w-4 h-4" />} label="Message" />
               <TabButton active={tab === 'whatsapp'} onClick={() => setTab('whatsapp')} icon={<WhatsAppGlyph className="w-4 h-4" />} label="WhatsApp" />
             </div>
 
             <div className="flex-1 overflow-y-auto">
-              {tab === 'chat' ? <ChatTab /> : <WhatsAppTab />}
+              {tab === 'sree' ? <SreeChat embedded /> : tab === 'chat' ? <ChatTab /> : <WhatsAppTab />}
             </div>
           </motion.div>
         )}
