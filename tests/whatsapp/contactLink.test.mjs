@@ -14,7 +14,7 @@ describe('the wa.me link', () => {
     // Pinned character for character. The button is only ever as correct as
     // this string, and a "harmless" encoding change here reaches every app.
     expect(whatsappContactUrl({ appName: 'AEVOICE', service: 'Soft Engine' })).toBe(
-      'https://wa.me/12566998899?text=Hi%20AEVOICE%20team%2C%20I%27d%20like%20to' +
+      'https://wa.me/16469126066?text=Hi%20AEVOICE%20team%2C%20I%27d%20like%20to' +
         '%20learn%20more%20about%20Soft%20Engine.',
     );
   });
@@ -22,13 +22,13 @@ describe('the wa.me link', () => {
   test('addresses the public business number in the digits-only form wa.me wants', () => {
     // A '+' or a space here produces a link that opens WhatsApp on a blank
     // chat, which looks like the button working and is not.
-    expect(WHATSAPP_CONTACT_NUMBER).toBe('12566998899');
+    expect(WHATSAPP_CONTACT_NUMBER).toBe('16469126066');
     expect(WHATSAPP_CONTACT_NUMBER).toMatch(/^[0-9]+$/);
   });
 
   test('sends the visitor to a chat with a message already written', () => {
     const url = whatsappContactUrl({ appName: 'FlowSync', service: 'Workflow Automation' });
-    expect(url.startsWith('https://wa.me/12566998899?text=')).toBe(true);
+    expect(url.startsWith('https://wa.me/16469126066?text=')).toBe(true);
     expect(decodeURIComponent(url.split('?text=')[1])).toBe(
       "Hi FlowSync team, I'd like to learn more about Workflow Automation.",
     );
