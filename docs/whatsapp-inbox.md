@@ -233,8 +233,13 @@ number answers every app in the portfolio, and "tell me more" on its own does
 not say which one it came from.
 
 ```
-https://wa.me/12566998899?text=Hi%20AEVOICE%20team%2C%20I%27d%20like%20to%20learn%20more%20about%20Soft%20Engine.
+https://wa.me/16469126066?text=Hi%20AEVOICE%20team%2C%20I%27d%20like%20to%20learn%20more%20about%20Soft%20Engine.
 ```
+
+`+16469126066` is a plain, non-priority-tier WABA number with no paid Meta
+Cloud API behind it — a free `wa.me` click-to-chat link, not the flagship
+`+12566998899` Cloud API account reserved for the four apps (Aevoice, health,
+HelloBiz, vetnpethospital) that need real API actions of their own.
 
 `src/lib/whatsapp/contactLink.js` builds that URL and is covered by
 `tests/whatsapp/contactLink.test.mjs`, which pins the encoding character for

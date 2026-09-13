@@ -17,8 +17,15 @@
  * and not an environment variable: it is public information printed on a
  * button, so hiding it buys nothing, and a missing env var would silently ship
  * a dead link.
+ *
+ * +16469126066 is this app's own general "contact us" target: a plain,
+ * non-priority-tier WABA number with no paid Meta Cloud API behind it, used
+ * only as a free wa.me click-to-chat deep link. It is deliberately not
+ * +12566998899 — that number is a different, priority-tier Cloud API account
+ * reserved for the four flagship apps that need real API actions (Aevoice,
+ * health, HelloBiz, vetnpethospital), and this app is not one of them.
  */
-export const WHATSAPP_CONTACT_NUMBER = '12566998899';
+export const WHATSAPP_CONTACT_NUMBER = '16469126066';
 
 /**
  * Percent-encode message text for a wa.me query string.
