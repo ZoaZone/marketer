@@ -77,7 +77,7 @@ export default function Pricing() {
   useSeo(SEO.pricing);
 
   const [billing, setBilling] = useState("monthly");
-  const isIndia = typeof Intl !== "undefined" && Intl.DateTimeFormat().resolvedOptions().timeZone.startsWith("Asia/");
+  const isIndia = typeof Intl !== "undefined" && Intl.DateTimeFormat().resolvedOptions().timeZone === "Asia/Kolkata";
   const [loadingPlan, setLoadingPlan] = useState(null);
 
   const { data: user } = useQuery({ queryKey: ["me"], queryFn: () => base44.auth.me().catch(() => null) });
@@ -122,11 +122,11 @@ export default function Pricing() {
         <p className="text-white/40 text-xs mb-1 mt-1">{plan.desc}</p>
         <h3 className="text-lg font-black text-white mb-2">{plan.name}</h3>
         <div className="mb-1">
-          <span className="text-3xl font-black text-white">${perMonth}{plan.contactSales ? "+" : ""}</span>
+          <span className="text-3xl font-black text-white">{isIndia ? `₹${(perMonth * 85).toLocaleString('en-IN')}` : `$${perMonth}`}{plan.contactSales ? "+" : ""}</span>
           <span className="text-white/40 text-xs">/mo</span>
-        </div>
-        <p className="text-[11px] text-white/30 mb-1">+ applicable taxes</p>
-        {billing === "yearly" && plan.price_yearly && <p className="text-xs text-fuchsia-400 mb-3">Billed ${price}/year · save {savings(plan)}%</p>}
+          </div>
+          <p className="text-[11px] text-white/30 mb-1">{isIndia ? `Indicative conversion at ₹85/USD · excludes GST · USD $${perMonth}/mo` : '+ applicable taxes'}</p>
+        {billing === "yearly" && plan.price_yearly && <p className="text-xs text-fuchsia-400 mb-3">Billed {isIndia ? `approximately ₹${(price * 85).toLocaleString('en-IN')}` : `$${price}`}/year · save {savings(plan)}%</p>}
         {(billing === "monthly" || !plan.price_yearly) && <div className="mb-3" />}
         {plan.credits && (
           <div className="mb-4 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white/70 font-medium">{plan.credits}</div>
@@ -194,7 +194,7 @@ export default function Pricing() {
               Yearly <span className="text-xs px-1.5 py-0.5 bg-fuchsia-500/20 text-fuchsia-300 rounded-full font-medium">Save 20%</span>
             </button>
           </div>
-          <p className="text-[11px] text-white/25 mt-3">All prices shown + applicable taxes, calculated at checkout based on your billing address.</p>
+          <p className="text-[11px] text-white/25 mt-3">{isIndia ? 'India: indicative INR prices converted from USD at ₹85/USD; GST is extra. Final payable amount and taxes are shown at checkout.' : 'All prices shown + applicable taxes, calculated at checkout based on your billing address.'}</p>
         </div>
 
         {/* Pay-as-you-go Credits callout */}
@@ -203,13 +203,13 @@ export default function Pricing() {
             <Sparkles className="w-6 h-6 text-fuchsia-400 shrink-0 mt-0.5" />
             <div>
               <h3 className="text-base font-black text-white mb-0.5">Pay-as-you-go AI Credits</h3>
-              <p className="text-sm text-white/50">No subscription, or need to top up this month&rsquo;s AI credits? Buy anytime. 1 credit = 1 AI image or short video scene = ${PRICE_PER_CREDIT.toFixed(2)} + applicable taxes. Credits never expire.</p>
+              <p className="text-sm text-white/50">No subscription, or need to top up this month&rsquo;s AI credits? Buy anytime. 1 credit = 1 AI image or short video scene = {isIndia ? `approximately ₹${(PRICE_PER_CREDIT * 85).toFixed(2)} (excludes GST)` : `$${PRICE_PER_CREDIT.toFixed(2)} + applicable taxes`}. Credits never expire.</p>
             </div>
           </div>
           <div className="flex gap-2 flex-wrap shrink-0">
             {CREDIT_PACKS.map(amt => (
               <div key={amt} className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-center min-w-[64px]">
-                <div className="text-lg font-black text-white">${amt}</div>
+                <div className="text-lg font-black text-white">{isIndia ? `₹${(amt * 85).toLocaleString('en-IN')}` : `$${amt}`}</div>
                 <div className="text-[10px] text-white/40">{Math.floor(amt / PRICE_PER_CREDIT).toLocaleString()} cr</div>
               </div>
             ))}
@@ -305,18 +305,13 @@ export default function Pricing() {
           </div>
         </div>
 
-        {/* Legal note. This previously read "All sales are final", which
-            contradicted the Terms — §7 makes fees non-refundable EXCEPT where
-            law requires otherwise, because an absolute bar is unenforceable
-            against consumers in several markets and a court can strike the whole
-            clause. Checkout copy and the Terms have to say the same thing, or
-            the stricter-sounding one gets read against us. */}
+        {/* Public cancellation and refund summary. */}
         <p className="text-center text-xs text-white/25">
           All prices shown exclude applicable taxes, calculated and applied at checkout.
           Subscriptions auto-renew; cancel anytime before renewal to avoid charges.
-          Fees are non-refundable except where required by law — see our{" "}
-          <Link to="/terms" className="underline hover:text-white/40">Terms of Service</Link>.
-          For billing questions: care@digitalstudios.app
+          Eligible refunds and duplicate payments are handled under our{" "}
+          <Link to="/refund-policy" className="underline hover:text-white/40">Refund & Cancellation Policy</Link>.
+          For billing questions: care@zoazoneservices.com
         </p>
       </div>
     </div>

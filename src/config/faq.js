@@ -53,7 +53,7 @@ export const PRICING_FAQ = [
   },
   {
     q: "Can I change plans or cancel?",
-    a: "Any time, from the Billing page. Upgrades take effect immediately; cancellation stops the next renewal. Fees already paid are non-refundable except where the law requires otherwise, and AI, render and dubbing usage that has already been consumed is never refundable — the provider cost for it has been incurred and cannot be recovered.",
+    a: "Any time, from account settings under Billing. Cancellation stops the next renewal and takes effect at the end of your billing cycle. Eligible refunds are processed to the original payment method within 5–7 business days after approval; failed or duplicate debits are refunded after confirmation. Contact care@zoazoneservices.com with your transaction reference. Consumed AI, render and dubbing usage is generally not refundable except where law requires otherwise.",
   },
   {
     q: "Do I own what I make, and can I sell it?",

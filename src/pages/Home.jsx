@@ -332,27 +332,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* FOOTER */}
-      <footer className="border-t border-white/10 py-12 px-6 bg-neutral-950">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center">
-            <img src="/brand/wordmark.png" alt={BRAND.name} className="h-8 w-auto object-contain" onError={(e) => e.target.style.display = "none"} />
-          </div>
-          {/* These pointed at care@digitalstudios.app / aevoice.ai — a different
-              company's contact details, on this company's marketing page.
-              Privacy and Terms are linked here because Google's OAuth
-              verification checks both are reachable from the site. */}
-          <div className="flex flex-wrap gap-6 text-sm font-medium items-center justify-center">
-            <a href="mailto:care@digitalstudios.app" className="text-neutral-400 hover:text-white transition-colors">care@digitalstudios.app</a>
-            <Link to="/privacy" className="text-neutral-400 hover:text-white transition-colors">Privacy</Link>
-            <Link to="/terms" className="text-neutral-400 hover:text-white transition-colors">Terms</Link>
-            <Link to="/agent-program" className="text-fuchsia-400 hover:text-fuchsia-300 transition-colors">🤝 Agent Program</Link>
-          </div>
-        </div>
-        <div className="max-w-7xl mx-auto mt-8 text-center md:text-left text-neutral-600 text-xs font-medium border-t border-white/5 pt-8">
-          © 2026 ZoaZone Services LLC. {BRAND.name} — {BRAND.tagline}.
-        </div>
-      </footer>
+
 
       {/* CINEMATIC WATCH DEMO MODAL */}
       {showDemo &&

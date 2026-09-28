@@ -55,6 +55,11 @@ import Terms from './pages/Terms';
 import WhatsAppInbox from './pages/WhatsAppInbox';
 import WhatsAppSettings from './pages/WhatsAppSettings';
 import ContactWidget from '@/components/support/ContactWidget';
+import PublicFooter from '@/components/PublicFooter';
+import About from './pages/About';
+import Contact from './pages/Contact';
+import RefundPolicy from './pages/RefundPolicy';
+import ShippingPolicy from './pages/ShippingPolicy';
 
 
 const AuthenticatedApp = () => {
@@ -79,15 +84,18 @@ const AuthenticatedApp = () => {
 
   if (authError) {
     if (authError.type === 'user_not_registered') {
-      return <UserNotRegisteredError />;
+      const publicPaths = new Set(['/', '/Home', '/home', '/pricing', '/Pricing', '/auth', '/login', '/privacy', '/terms', '/about', '/contact', '/refund-policy', '/shipping-policy']);
+      if (!publicPaths.has(window.location.pathname)) return <UserNotRegisteredError />;
     } else if (authError.type === 'auth_required') {
-      const publicPaths = new Set(["/", "/Home", "/home", "/pricing", "/Pricing", "/WidgetHost", "/PromoSignup", "/login", "/auth", "/privacy", "/terms"]);
-      if (!publicPaths.has(window.location.pathname)) { navigateToLogin(); }
-      return null;
+      const publicPaths = new Set(["/", "/Home", "/home", "/pricing", "/Pricing", "/WidgetHost", "/PromoSignup", "/login", "/auth", "/privacy", "/terms", "/about", "/contact", "/refund-policy", "/shipping-policy"]);
+      if (!publicPaths.has(window.location.pathname)) { navigateToLogin(); return null; }
     }
   }
 
+  const publicPages = new Set(['/', '/Home', '/home', '/pricing', '/Pricing', '/auth', '/login', '/privacy', '/terms', '/about', '/contact', '/refund-policy', '/shipping-policy', '/beta', '/free-trial', '/agent-program', '/agency-enquiry', '/lead-capture', '/admin/login', '/onboarding']);
+  const showFooter = publicPages.has(window.location.pathname) || window.location.pathname.startsWith('/invite');
   return (
+    <>
     <Routes>
       <Route path="/WidgetHost" element={<WidgetHost />} />
       <Route path="/" element={<Home />} />
@@ -107,6 +115,10 @@ const AuthenticatedApp = () => {
           of service URL, each reachable without signing in, for an external
           production app. */}
       <Route path="/terms" element={<Terms />} />
+      <Route path="/about" element={<About />} />
+      <Route path="/contact" element={<Contact />} />
+      <Route path="/refund-policy" element={<RefundPolicy />} />
+      <Route path="/shipping-policy" element={<ShippingPolicy />} />
       <Route path="/onboarding" element={<PostPaymentOnboarding />} />
       <Route path="/lead-capture" element={<LeadCapturePage />} />
       <Route path="/beta" element={<BetaSignup />} />
@@ -157,6 +169,8 @@ const AuthenticatedApp = () => {
 
             <Route path="*" element={<PageNotFound />} />
     </Routes>
+    {showFooter && <PublicFooter />}
+    </>
   );
 };
 

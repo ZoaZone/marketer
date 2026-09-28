@@ -504,12 +504,12 @@ export default function Auth() {
               normal way to evidence acceptance. */}
           <p className="text-xs text-slate-600">
             By continuing you agree to our{" "}
-            <a href="/terms" className="text-slate-400 hover:text-slate-200 underline underline-offset-2">Terms of Service</a>
+            <a href="/terms" className="text-slate-400 hover:text-slate-200 underline underline-offset-2">Terms &amp; Conditions</a>
             {" "}and{" "}
             <a href="/privacy" className="text-slate-400 hover:text-slate-200 underline underline-offset-2">Privacy Policy</a>.
           </p>
           <p className="text-xs text-slate-700">
-            © 2026 ZoaZone Services LLC · {BRAND}
+            DigitalStudios.app · A product of Zoa Zone Services Pvt Ltd (India) and Zoa Zone Services LLC (USA)
           </p>
         </div>
       </div>

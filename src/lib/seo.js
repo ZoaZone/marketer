@@ -119,8 +119,8 @@ export const SEO = {
   },
   terms: {
     path: "/terms",
-    title: "Terms of Service",
-    description: `The terms governing your use of ${BRAND.name}, operated by ZoaZone Services LLC — accounts, plans and billing, acceptable use, AI-generated content, and rights in what you upload.`,
+    title: "Terms & Conditions",
+    description: `The terms governing DigitalStudios.app, operated in India by Zoa Zone Services Pvt Ltd and outside India by Zoa Zone Services LLC.`, 
   },
   freeTrial: {
     path: "/free-trial",
@@ -191,17 +191,17 @@ export function injectStructuredData() {
     },
     publisher: {
       "@type": "Organization",
-      name: "ZoaZone Services LLC",
+      name: "Zoa Zone Services Pvt Ltd",
       url: SITE_URL,
       logo: `${SITE_URL}/brand/lockup-h.png`,
-      email: "care@digitalstudios.app",
+      email: "care@zoazoneservices.com",
       address: {
         "@type": "PostalAddress",
-        streetAddress: "1770 Grand Concourse 12A",
-        addressLocality: "Bronx",
-        addressRegion: "NY",
-        postalCode: "10457",
-        addressCountry: "US",
+        streetAddress: "376, G3, Road No 82, Film Nagar, Jubilee Hills",
+        addressLocality: "Hyderabad",
+        addressRegion: "Telangana",
+        postalCode: "500096",
+        addressCountry: "IN",
       },
     },
     featureList: [

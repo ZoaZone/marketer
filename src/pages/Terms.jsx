@@ -3,68 +3,21 @@ import { Link } from "react-router-dom";
 import { useSeo, SEO } from "@/lib/seo";
 import { FileText, ChevronRight } from "lucide-react";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TERMS OF SERVICE — DRAFT FOR LEGAL REVIEW BEFORE RELIANCE
-//
-// Written to the owner's instructions (ZoaZone Services LLC and affiliates own
-// the apps; payments flow to ZoaZone, affiliates, official partners or platform
-// admins; personal and commercial use permitted, illegal use prohibited) and
-// filled out with the clauses a SaaS platform of this shape normally carries.
-//
-// STATUS: reviewed and confirmed by the owner (counsel review complete) on
-// 30 Aug 2026. The positions below are settled decisions, not open questions.
-// The rationale is kept because it explains WHY each clause is worded as it is —
-// do not "simplify" them back without re-reading this.
-//
-//   1. REFUNDS (§7) — SETTLED. Non-refundable EXCEPT where law requires
-//      otherwise, plus a hard carve-out for already-consumed AI/render/dubbing
-//      usage. An absolute bar is unenforceable against consumers in several
-//      markets (UK/EU cancellation rights, various US state rules, India's
-//      consumer protection regime) and cuts across card-scheme and
-//      Stripe/PayPal rules; a court can strike an absolute clause out entirely
-//      and leave nothing. This wording survives where that one would not.
-//      Pricing.jsx's checkout copy is deliberately worded to match — keep them
-//      in step, or the stricter one gets read against us.
-//
-//   2. VOICE CLONING AND DUBBING (§6) — SETTLED. Written releases from
-//      performers are required, and MANDATORY for celebrities, recording
-//      artists and other widely recognisable people. Confirmed by the owner:
-//      mandatory, not optional. Do not weaken this — unauthorised celebrity
-//      voice cloning is the most likely source of a real claim against us, and
-//      a clause of our own saying consent was optional there would be quoted
-//      back at us. §6 allocates risk to the user; it does not remove ours.
-//
-//   3. GOVERNING LAW. New York, confirmed by the owner — New York courts decide,
-//      litigation not arbitration. Settled; §18 stands as written.
-//
-//   4. LIABILITY CAP (§15). Confirmed by the owner: capped at fees actually paid
-//      in the preceding 12 months, never more than the plan's maximum annual
-//      value. Note the consequence — for a free-tier user that computes to zero.
-//      Some jurisdictions will not enforce a zero cap, which is what the
-//      "nothing here excludes liability that cannot lawfully be limited"
-//      sentence in §14 is doing.
-//
-// Privacy Policy §14 is the counterpart to §6 and explains the data handling
-// behind it (providers, transfers, retention, performers' rights). The two
-// cross-reference each other and must be changed together.
-//
-// All positions confirmed by the owner. No open items.
-// ─────────────────────────────────────────────────────────────────────────────
+// Public terms for DigitalStudios.app. India and non-India customers contract
+// with the respective entities named in section 2.
 
 const CO = {
-  legalName: "ZoaZone Services LLC",
-  product: "Digital Studio",
+  legalName: "Zoa Zone Services Pvt Ltd (India) / Zoa Zone Services LLC (USA)",
+  product: "DigitalStudios.app",
   domain: "digitalstudios.app",
-  // Both addresses are live customer-service mailboxes. Kept as two so the
-  // parent-company address works across every ZoaZone app while the
-  // product-specific one routes Digital Studio enquiries.
-  supportEmail: "care@digitalstudios.app",
+  supportEmail: "care@zoazoneservices.com",
   parentEmail: "care@zoazoneservices.com",
   legalEmail: "care@zoazoneservices.com",
   phone: "+1 256 699 8899",
   state: "New York",
-  address: "1770 Grand Concourse 12A, Bronx, NY 10457, United States",
-  effective: "August 30, 2026",
+  address: "1770 Grand Concourse 12A, Bronx, NY 10457, USA",
+  indiaAddress: "376, G3, Road No 82, Film Nagar, Jubilee Hills, Hyderabad, Telangana 500096, India",
+  effective: "28 September 2026",
 };
 
 const SECTIONS = [
@@ -114,10 +67,10 @@ export default function Terms() {
             <FileText className="w-3.5 h-3.5" /> Legal
           </div>
           <h1 className="text-3xl md:text-4xl font-black text-foreground tracking-tight mb-3">
-            Terms of Service
+            Terms & Conditions
           </h1>
           <p className="text-sm text-muted-foreground">
-            {CO.product} — operated by {CO.legalName}. Effective {CO.effective}.
+            {CO.product} — operated by {CO.legalName}. Last updated {CO.effective}.
           </p>
           <Link to="/privacy" className="inline-flex items-center gap-1 text-sm text-fuchsia-400 hover:underline mt-3">
             Privacy Policy <ChevronRight className="w-3.5 h-3.5" />
@@ -147,8 +100,8 @@ export default function Terms() {
         <article>
           <H id="acceptance" n="1">Acceptance of these terms</H>
           <P>
-            These Terms of Service (the <Strong>&ldquo;Terms&rdquo;</Strong>) form a binding agreement between you
-            and {CO.legalName} governing your use of {CO.product} at {CO.domain}, together with any
+            These Terms & Conditions (the <Strong>&ldquo;Terms&rdquo;</Strong>) form a binding agreement between you
+            and the contracting entity identified in §2 governing your use of {CO.product} at {CO.domain}, together with any
             related applications, APIs, workers and services we operate (the <Strong>&ldquo;Service&rdquo;</Strong>).
           </P>
           <P>
@@ -160,8 +113,7 @@ export default function Terms() {
 
           <H id="who-we-are" n="2">Who we are</H>
           <P>
-            The Service is owned and operated by {CO.legalName}, a limited liability company formed
-            in {CO.state}, of {CO.address} (<Strong>&ldquo;we&rdquo;</Strong>, <Strong>&ldquo;us&rdquo;</Strong>, <Strong>&ldquo;our&rdquo;</Strong>).
+            For customers in India, your contracting entity is <Strong>Zoa Zone Services Pvt Ltd</Strong>, of {CO.indiaAddress}. For customers outside India, your contracting entity is <Strong>Zoa Zone Services LLC</Strong>, of {CO.address}. The applicable entity is referred to as &ldquo;we&rdquo;, &ldquo;us&rdquo; or &ldquo;our&rdquo; in these Terms.
           </P>
           <P>
             {CO.legalName} and its affiliates own and operate {CO.product} and the other applications
@@ -282,20 +234,14 @@ export default function Terms() {
 
           <H id="billing" n="7">Plans, billing and refunds</H>
           <UL>
-            <L>Paid plans are billed in advance on a monthly or annual basis through our payment processors. Prices are shown at checkout and exclude taxes unless stated.</L>
-            <L><Strong>Subscriptions renew automatically</Strong> at the then-current price until cancelled. You may cancel at any time from Billing; cancellation takes effect at the end of the current paid period, and you keep access until then.</L>
+            <L>Paid plans are billed in advance on a monthly or annual basis. Indian customers are shown INR prices with GST identified at checkout; payments in INR through Cashfree Payments, when offered, are processed securely by Cashfree. Prices exclude applicable taxes unless stated otherwise.</L>
+            <L><Strong>Subscriptions renew automatically</Strong> at the then-current price until cancelled. For Indian customers, recurring payments may use UPI AutoPay, eNACH or card mandates where available and authorised by you. You may cancel anytime from account settings under Billing; cancellation takes effect at the end of the current billing cycle, and you keep access until then.</L>
             <L>You authorise us and our processors to charge your payment method for all amounts due, including applicable taxes and any overage or usage charges described on the pricing page.</L>
             <L>We may change prices on reasonable notice. Changes apply from your next renewal.</L>
             <L>You are responsible for any taxes, duties or withholdings arising from your use, other than taxes on our income.</L>
           </UL>
           <P>
-            <Strong>Refunds.</Strong> Fees are non-refundable, and payments are not pro-rated on
-            cancellation, mid-term downgrade, or termination for breach —{" "}
-            <Strong>except where a refund is required by applicable law</Strong>, including any
-            statutory cancellation or cooling-off right you may have as a consumer, which these Terms
-            do not limit or exclude. Amounts already consumed as AI generation, render or dubbing
-            usage are not refundable in any event, because the underlying third-party cost has already
-            been incurred on your behalf.
+            <Strong>Refunds.</Strong> Cancellation does not normally prorate a current billing cycle, except where required by applicable law. Eligible refunds are processed within 5–7 business days to the original payment method after approval; bank posting may take longer. Failed or duplicate debits are automatically refunded after confirmation. Already-consumed AI generation, render and dubbing usage is generally not refundable except where law requires otherwise. To request a refund, email {CO.supportEmail} with your transaction reference. See our <Link to="/refund-policy" className="text-fuchsia-400 hover:underline">Refund & Cancellation Policy</Link>.
           </P>
           <P>
             <Strong>Who is paid.</Strong> All amounts payable under these Terms are payable to{" "}
@@ -460,15 +406,10 @@ export default function Terms() {
 
           <H id="law" n="18">Governing law and disputes</H>
           <P>
-            These Terms are governed by the laws of the State of {CO.state}, United States, without
-            regard to its conflict-of-laws rules. The United Nations Convention on Contracts for the
-            International Sale of Goods does not apply.
+            For customers in India, these Terms are governed by Indian law, and disputes are subject to the courts at Hyderabad, Telangana, India. For customers outside India, these Terms are governed by the laws of New York, USA, without regard to its conflict-of-laws rules. The United Nations Convention on Contracts for the International Sale of Goods does not apply.
           </P>
           <P>
-            Before filing any claim, you agree to contact us at {CO.legalEmail} and attempt to resolve
-            it informally for at least thirty (30) days. Any dispute not resolved that way will be
-            brought exclusively in the state or federal courts located in {CO.state}, and both parties
-            consent to their jurisdiction.
+            Before filing any claim, you agree to contact us at {CO.legalEmail} and attempt to resolve it informally for at least thirty (30) days. An unresolved dispute involving an Indian customer will be brought before courts at Hyderabad, India; for a customer outside India, before state or federal courts in New York, USA, subject to mandatory consumer protections.
           </P>
           <P>
             Where you are a consumer, this section does not deprive you of the protection of mandatory
@@ -489,7 +430,9 @@ export default function Terms() {
 
           <H id="contact" n="20">Contact</H>
           <P>
-            <Strong>{CO.legalName}</Strong><br />
+            <Strong>Zoa Zone Services Pvt Ltd (India)</Strong><br />
+            {CO.indiaAddress}<br />
+            <Strong>Zoa Zone Services LLC (outside India)</Strong><br />
             {CO.address}<br />
             Telephone: {CO.phone}<br />
             {CO.product} support: {CO.supportEmail}<br />
@@ -497,7 +440,7 @@ export default function Terms() {
           </P>
 
           <p className="text-xs text-muted-foreground mt-10 pt-6 border-t border-border">
-            Effective {CO.effective}. Please also read our{" "}
+            Last updated {CO.effective}. Please also read our{" "}
             <Link to="/privacy" className="text-fuchsia-400 hover:underline">Privacy Policy</Link>,
             which explains how we handle your data.
           </p>

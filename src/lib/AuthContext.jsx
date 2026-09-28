@@ -6,7 +6,7 @@ import { createAxiosClient } from '@base44/sdk/dist/utils/axios-client';
 const AuthContext = createContext();
 
 // Routes that are always public — no auth check needed
-const PUBLIC_PATHS = new Set(["/", "/Home", "/home", "/pricing", "/Pricing", "/WidgetHost", "/login", "/Login", "/auth", "/Auth", "/beta", "/lead-capture", "/onboarding", "/invite", "/agent-program", "/agency-enquiry", "/free-trial"]);
+const PUBLIC_PATHS = new Set(["/", "/Home", "/home", "/pricing", "/Pricing", "/WidgetHost", "/login", "/Login", "/auth", "/Auth", "/beta", "/lead-capture", "/onboarding", "/invite", "/agent-program", "/agency-enquiry", "/free-trial", "/privacy", "/terms", "/about", "/contact", "/refund-policy", "/shipping-policy"]);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
