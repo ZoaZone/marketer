@@ -482,7 +482,7 @@ export default function BetaOnboarding() {
         </div>
 
         <p className="text-center text-white/20 text-xs mt-6">
-          © 2026 ZoaZone Services LLC · DigitalStudios.app · Questions? <a href="mailto:care@digitalstudios.app" className="hover:text-white/40 transition-colors">care@digitalstudios.app</a>
+          © 2026 Zoa Zone Services LLC · DigitalStudios.app · Questions? <a href="mailto:care@digitalstudios.app" className="hover:text-white/40 transition-colors">care@digitalstudios.app</a>
         </p>
       </div>
     </div>
