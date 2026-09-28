@@ -19,7 +19,7 @@ export default function PrivacyFooterSnippet({ variant = "dark" }) {
     <footer className={`border-t ${borderColor} mt-16 px-4 py-8`}>
       <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm">
         <p className={`${variant === "dark" ? "text-gray-600" : "text-gray-400"}`}>
-          © {new Date().getFullYear()} ZoaZone Services LLC All rights reserved.
+          © {new Date().getFullYear()} Zoa Zone Services LLC All rights reserved.
         </p>
         <div className="flex flex-wrap gap-4 items-center">
           <Link to="/privacy" className={`${textColor} transition`}>
