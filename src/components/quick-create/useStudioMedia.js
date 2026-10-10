@@ -74,7 +74,7 @@ export default function useStudioMedia({ type, prompt, referenceImageUrls, ratio
     setSaving(true); setError('');
     try {
       const result = results[type];
-      await base44.entities.ContentAsset.create({ type: result.type, title: result.prompt.slice(0, 60) || 'Base44 Studio', file_url: result.fileUri || result.url, ai_generated: true, prompt_used: result.prompt.slice(0, 500) });
+      await base44.entities.ContentAsset.create({ type: result.type, title: result.prompt.slice(0, 60) || 'Create with Studio', file_url: result.fileUri || result.url, ai_generated: true, prompt_used: result.prompt.slice(0, 500) });
       await qc.invalidateQueries({ queryKey: ['media_library'] });
       setSaved(prev => ({ ...prev, [type]: true }));
     } catch (e) { setError(e?.response?.data?.error || e.message); }

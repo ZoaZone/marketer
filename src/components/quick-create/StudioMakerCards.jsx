@@ -8,7 +8,7 @@ export default function StudioMakerCards({ canMovieMaker }) {
         <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-fuchsia-500 to-purple-600 flex items-center justify-center shrink-0"><Briefcase className="w-4 h-4 text-white" /></div>
         <div><p className="text-sm font-bold text-foreground">Create with Studio</p><p className="text-[10px] font-bold tracking-widest text-fuchsia-400 uppercase">You are here</p></div>
       </div>
-      <p className="text-xs text-muted-foreground mt-2.5 leading-relaxed">Choose Base44 integration credits only above for direct image or moving-video generation. The existing workflow keeps storyboard stills, external assembly, and optional premium video and audio.</p>
+      <p className="text-xs text-muted-foreground mt-2.5 leading-relaxed">Create images and short videos from your prompt, or build them step by step with a storyboard, motion and audio.</p>
     </div>
     {canMovieMaker ? <Link to="/movie-maker" className="group p-4 rounded-2xl border border-border bg-card hover:border-cyan-500/40 transition-all">
       <div className="flex items-center gap-2">

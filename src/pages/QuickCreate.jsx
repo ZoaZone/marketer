@@ -770,7 +770,7 @@ export default function QuickCreate() {
     <div className="max-w-5xl mx-auto space-y-5">
       <div>
         <h1 className="text-2xl font-black text-foreground flex items-center gap-2"><Wand2 className="w-6 h-6 text-fuchsia-400" /> Quick Create</h1>
-        <p className="text-muted-foreground text-sm mt-0.5">Create an image or video using Base44 integration credits only, or keep the existing guided Studio workflow.</p>
+        <p className="text-muted-foreground text-sm mt-0.5">Create images and short videos with Studio, or use Movie Maker Pro for longer films.</p>
       </div>
 
       <div>
