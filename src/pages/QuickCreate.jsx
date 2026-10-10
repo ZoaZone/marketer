@@ -9,6 +9,10 @@ import { generateText, generateImage, generateVoiceover, uploadFile, splitScript
 // instead of a failed request.
 import { generateSceneVideo, generateMusic, submitRender, getRenderStatus, MAX_MUSIC_SECONDS } from "@/utils/lane2";
 import { VIDEO_RATIOS } from "@/utils/videoAssembler";
+import StudioEngineSelector from "@/components/quick-create/StudioEngineSelector";
+import Base44Studio from "@/components/quick-create/Base44Studio";
+import StudioMakerCards from "@/components/quick-create/StudioMakerCards";
+import StudioImagePreview from "@/components/quick-create/StudioImagePreview";
 import {
   Wand2, Image as ImageIcon, Video, Loader2, Download, Save, CheckCircle2,
   AlertTriangle, Mic, Sparkles, Paperclip, X, Music, VolumeX, ChevronRight,
@@ -16,29 +20,10 @@ import {
   Lock, Upload,
 } from "lucide-react";
 
-// Quick Create uses Lane 1 for standard generation and assembly, plus
-// server-gated Lane 2 calls for entitled AI video clips and AI music.
-// Short-video assembly
-// happens server-side via lane1.js's assembleLane1Video (the shared
-// FFmpeg-assembly worker route — 1080p, real H.264 with audio,
-// loudnorm/contrast finishing pass), not the old client-side
-// Canvas+MediaRecorder path (src/utils/videoAssembler.js's assembleVideo,
-// still in the repo but no longer called here). Paid clip and music calls
-// remain protected by their backend subscription and usage gates.
-//
-// The video path is a linear, gated stepper (Work Package G): each step's
-// "Next" stays disabled until that step's own artifact exists (script
-// written, storyboard images generated, audio resolved, video assembled).
-// The image path stays a single quick action — the stepper only applies to
-// video, which is the pipeline the mux/audio/publish steps describe.
-//
-// AUDIO. Speech and music are independent, and per-scene dialogue is the
-// default shape of speech. Both were previously a single three-way choice
-// (voiceover XOR music XOR silent), which produced two distinct faults from
-// one cause: a generated music track was silently discarded whenever a
-// voiceover was selected, and the only speech on offer was one continuous
-// narration track laid over the whole video — no lines, no timing, nothing
-// tied to a scene. See NARRATION_MODES and assembleStep.
+// Base44Studio is an isolated Core-only generation path: no provider keys,
+// premium calls or render worker. The existing guided workflow below keeps
+// Lane 1 assembly and subscription-gated Lane 2 generation unchanged.
+// Speech and music in that workflow remain independent.
 
 const STEPS = [
   { id: "idea", label: "Prompt/Idea", icon: Lightbulb },
@@ -229,6 +214,8 @@ export default function QuickCreate() {
   const [clipStatus, setClipStatus] = useState(null);
   const [prompt, setPrompt] = useState("");
   const [outputType, setOutputType] = useState("image"); // "image" | "video"
+  const [studioEngine, setStudioEngine] = useState("workflow");
+  const [base44Busy, setBase44Busy] = useState(false);
   const [attachments, setAttachments] = useState([]); // [{ url, name }]
   const [uploadingFile, setUploadingFile] = useState(false);
   const [expandingPrompt, setExpandingPrompt] = useState(false);
@@ -295,11 +282,13 @@ export default function QuickCreate() {
     setExpandingPrompt(true);
     setError("");
     try {
-      const expanded = await generateText({
-        type: "caption",
-        prompt: `Expand this brief into a detailed, vivid AI image/video generation prompt (2-3 sentences, no preamble, just the prompt): "${prompt}"`,
-        tone: "Professional",
-      });
+      const expanded = studioEngine === "base44"
+        ? (await base44.functions.invoke("generateBase44Studio", { action: "expand", prompt })).data.text
+        : await generateText({
+            type: "caption",
+            prompt: `Expand this brief into a detailed, vivid AI image/video generation prompt (2-3 sentences, no preamble, just the prompt): "${prompt}"`,
+            tone: "Professional",
+          });
       if (expanded) setPrompt(expanded.trim());
     } catch { setError("AI expansion failed."); }
     setExpandingPrompt(false);
@@ -781,86 +770,27 @@ export default function QuickCreate() {
     <div className="max-w-5xl mx-auto space-y-5">
       <div>
         <h1 className="text-2xl font-black text-foreground flex items-center gap-2"><Wand2 className="w-6 h-6 text-fuchsia-400" /> Quick Create</h1>
-        <p className="text-muted-foreground text-sm mt-0.5">Generate a standalone image (one click) or a short video (guided steps) — script, dialogue, visuals and voices on your plan&apos;s built-in AI credits.</p>
+        <p className="text-muted-foreground text-sm mt-0.5">Create an image or video using Base44 integration credits only, or keep the existing guided Studio workflow.</p>
       </div>
 
       <div>
         <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">Output</label>
         <div className="flex gap-2 max-w-sm">
-          <button onClick={() => switchOutputType("image")}
+          <button disabled={base44Busy} onClick={() => switchOutputType("image")}
             className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-semibold transition-all ${outputType === "image" ? "bg-fuchsia-500/15 border-fuchsia-500/50 text-fuchsia-400" : "border-border text-muted-foreground hover:bg-muted/20"}`}>
             <ImageIcon className="w-4 h-4" /> Image
           </button>
-          <button onClick={() => switchOutputType("video")}
+          <button disabled={base44Busy} onClick={() => switchOutputType("video")}
             className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-semibold transition-all ${outputType === "video" ? "bg-fuchsia-500/15 border-fuchsia-500/50 text-fuchsia-400" : "border-border text-muted-foreground hover:bg-muted/20"}`}>
             <Video className="w-4 h-4" /> Video
           </button>
         </div>
       </div>
 
-      {/* Which maker builds this video. Quick Create IS the Studio path —
-          Base44's own AI credits for script, dialogue, images and narration,
-          then FFmpeg assembly — and Movie Maker Pro is the premium route,
-          which is a separate page rather than a mode of this one. Naming both
-          here means the choice is visible at the point it's made instead of
-          being something you had to already know about. */}
-      {outputType === "video" && (
-        <div className="grid sm:grid-cols-2 gap-3">
-          <div className="p-4 rounded-2xl border-2 border-fuchsia-500/50 bg-fuchsia-500/5">
-            <div className="flex items-center gap-2">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-fuchsia-500 to-purple-600 flex items-center justify-center shrink-0">
-                <Briefcase className="w-4 h-4 text-white" />
-              </div>
-              <div>
-                <p className="text-sm font-bold text-foreground">Create with Studio</p>
-                <p className="text-[10px] font-bold tracking-widest text-fuchsia-400 uppercase">You are here</p>
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground mt-2.5 leading-relaxed">
-              Script, dialogue, images and voices on your plan&apos;s built-in AI credits, assembled here.
-              Fast, and the primary way to make a video. Real AI motion clips are an option at the storyboard step.
-            </p>
-          </div>
+      <StudioEngineSelector value={studioEngine} onChange={value => { setStudioEngine(value); setError(""); setWarnings([]); setUpgradeRequired(false); }} disabled={base44Busy || expandingPrompt || generating || generatingScript || generatingStoryboard || assembling || generatingVoiceover || generatingMusic || !!voiceBatch || Object.values(clipGenerating).some(Boolean) || Object.values(voiceLoading).some(Boolean)} />
 
-          {canMovieMaker ? (
-            <Link to="/movie-maker"
-              className="group p-4 rounded-2xl border border-border bg-card hover:border-cyan-500/40 transition-all">
-              <div className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shrink-0">
-                  <Clapperboard className="w-4 h-4 text-white" />
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-foreground flex items-center gap-1.5">
-                    Movie Maker Pro
-                    <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/60 group-hover:translate-x-0.5 transition-transform" />
-                  </p>
-                  <p className="text-[10px] font-bold tracking-widest text-cyan-400 uppercase">Premium</p>
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground mt-2.5 leading-relaxed">
-                Multi-shot scenes, reference locking for character consistency, dubbing, lip-sync and captions.
-                For films rather than shorts.
-              </p>
-            </Link>
-          ) : (
-            <div className="p-4 rounded-2xl border border-border bg-card opacity-80">
-              <div className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center shrink-0">
-                  <Lock className="w-4 h-4 text-muted-foreground" />
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-foreground">Movie Maker Pro</p>
-                  <p className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase">Paid tiers only</p>
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground mt-2.5 leading-relaxed">
-                Multi-shot scenes, reference locking, dubbing, lip-sync and captions.{" "}
-                <Link to="/pricing" className="text-fuchsia-400 hover:underline font-semibold">See plans</Link>
-              </p>
-            </div>
-          )}
-        </div>
-      )}
+      {/* Movie Maker Pro remains a separate, unchanged premium route. */}
+      {outputType === "video" && <StudioMakerCards canMovieMaker={canMovieMaker} />}
 
       {error && !upgradeRequired && (
         <div className="flex items-start gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
@@ -891,17 +821,17 @@ export default function QuickCreate() {
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wide">Describe what you want</label>
-            <button onClick={expandPrompt} disabled={expandingPrompt || !prompt.trim()}
+            <button onClick={expandPrompt} disabled={base44Busy || expandingPrompt || !prompt.trim()}
               className="flex items-center gap-1 text-xs text-fuchsia-400 hover:text-fuchsia-300 disabled:opacity-40 transition-colors">
               {expandingPrompt ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
               {expandingPrompt ? "Expanding…" : "✨ Expand with AI"}
             </button>
           </div>
-          <textarea value={prompt} onChange={e => setPrompt(e.target.value)} rows={4}
+          <textarea value={prompt} disabled={base44Busy} maxLength={studioEngine === "base44" ? 8000 : undefined} onChange={e => setPrompt(e.target.value)} rows={4}
             placeholder="Brief description → click '✨ Expand with AI' to get a detailed prompt, or write your own..."
             className="w-full rounded-xl border border-input bg-background text-sm p-3 focus:outline-none focus:ring-2 focus:ring-ring resize-none" />
         </div>
-        <div>
+        {!(studioEngine === "base44" && outputType === "video") && <div>
           <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">Reference Images (optional)</label>
           <div className="flex flex-wrap gap-2">
             {attachments.map((a, i) => (
@@ -915,14 +845,16 @@ export default function QuickCreate() {
             ))}
             <label className="w-16 h-16 rounded-lg border border-dashed border-border flex items-center justify-center cursor-pointer text-muted-foreground hover:bg-muted/20 transition-colors">
               {uploadingFile ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
-              <input type="file" accept="image/*" multiple className="hidden" disabled={uploadingFile}
+              <input type="file" accept="image/*" multiple className="hidden" disabled={uploadingFile || base44Busy}
                 onChange={e => { addAttachments(e.target.files); e.target.value = ""; }} />
             </label>
           </div>
-        </div>
+        </div>}
       </div>
 
-      {outputType === "image" ? (
+      {studioEngine === "base44" ? (
+        <Base44Studio type={outputType} prompt={prompt} referenceImageUrls={referenceImageUrls} onBusyChange={setBase44Busy} />
+      ) : outputType === "image" ? (
         <div className="grid md:grid-cols-2 gap-5">
           <div className="bg-card border border-border rounded-2xl p-6 space-y-5">
             <div>
@@ -941,32 +873,7 @@ export default function QuickCreate() {
               {generating ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</> : <><Wand2 className="w-4 h-4" /> Generate</>}
             </button>
           </div>
-          <div className="bg-card border border-border rounded-2xl p-6 flex flex-col">
-            <h3 className="font-semibold text-foreground mb-3">Preview</h3>
-            {!imageResult && !generating && (
-              <div className="flex-1 flex items-center justify-center text-center text-sm text-muted-foreground py-12">Your generated image will appear here.</div>
-            )}
-            {generating && (
-              <div className="flex-1 flex flex-col items-center justify-center gap-3 text-sm text-muted-foreground py-12">
-                <Loader2 className="w-8 h-8 animate-spin text-fuchsia-400" />
-              </div>
-            )}
-            {imageResult && !generating && (
-              <div className="space-y-4">
-                <img src={imageResult} alt="" className="w-full rounded-xl border border-border" />
-                <div className="flex gap-2">
-                  <a href={imageResult} download target="_blank" rel="noopener noreferrer"
-                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border text-sm font-semibold text-foreground hover:bg-muted/20">
-                    <Download className="w-4 h-4" /> Download
-                  </a>
-                  <button onClick={saveImageToLibrary} disabled={imageSaved}
-                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-fuchsia-500/15 border border-fuchsia-500/50 text-fuchsia-400 text-sm font-semibold hover:bg-fuchsia-500/25 disabled:opacity-60">
-                    {imageSaved ? <><CheckCircle2 className="w-4 h-4" /> Saved</> : <><Save className="w-4 h-4" /> Save to Library</>}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+          <StudioImagePreview imageResult={imageResult} generating={generating} imageSaved={imageSaved} onSave={saveImageToLibrary} />
         </div>
       ) : (
         <div className="space-y-4">
