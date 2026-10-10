@@ -5,6 +5,7 @@ import { base44 } from "@/api/base44Client";
 import { mine } from "@/utils/scope";
 import { Image, FileText, Video, Trash2, Download, Copy, Search, Loader2, Sparkles, X, ExternalLink, Wand2 } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
+import resolveStudioMedia from '@/components/quick-create/resolveStudioMedia';
 
 const TYPE_COLORS = {
   image: "bg-purple-500/10 text-purple-400",
@@ -58,7 +59,10 @@ export default function MediaLibrary() {
   const [view, setView] = useState("grid");
   const [preview, setPreview] = useState(null);
 
-  const { data: assets = [], isLoading } = useQuery({ queryKey: ["media_library", user?.email], queryFn: () => base44.entities.ContentAsset.filter(mine(user), "-created_date", 200), enabled: !!user?.email });
+  const { data: assets = [], isLoading } = useQuery({ queryKey: ["media_library", user?.email], queryFn: async () => {
+    const items = await base44.entities.ContentAsset.filter(mine(user), "-created_date", 200);
+    return Promise.all(items.map(resolveStudioMedia));
+  }, enabled: !!user?.email });
 
   const filtered = assets.filter(a => {
     const q = search.toLowerCase();
