@@ -13,6 +13,7 @@ import { BASE44_VIDEO_CREDITS_PER_5S } from "@/config/plans";
 import StudioEngineSelector from "@/components/quick-create/StudioEngineSelector";
 import Base44Studio from "@/components/quick-create/Base44Studio";
 import StudioMakerCards from "@/components/quick-create/StudioMakerCards";
+import AutoVideoCreator from "@/components/quick-create/AutoVideoCreator";
 import StudioImagePreview from "@/components/quick-create/StudioImagePreview";
 import {
   Wand2, Image as ImageIcon, Video, Loader2, Download, Save, CheckCircle2,
@@ -220,6 +221,7 @@ export default function QuickCreate() {
   const [outputType, setOutputType] = useState("image"); // "image" | "video"
   const [studioEngine, setStudioEngine] = useState("workflow");
   const [base44Busy, setBase44Busy] = useState(false);
+  const [advanced, setAdvanced] = useState(false);
   const [attachments, setAttachments] = useState([]); // [{ url, name }]
   const [uploadingFile, setUploadingFile] = useState(false);
   const [expandingPrompt, setExpandingPrompt] = useState(false);
@@ -879,8 +881,11 @@ export default function QuickCreate() {
           </div>
           <StudioImagePreview imageResult={imageResult} generating={generating} imageSaved={imageSaved} onSave={saveImageToLibrary} />
         </div>
+      ) : !advanced ? (
+        <AutoVideoCreator prompt={prompt} referenceImageUrls={referenceImageUrls} canMotion={canMotion} canMusic={canMusic} onBusyChange={setBase44Busy} onAdvanced={() => setAdvanced(true)} />
       ) : (
         <div className="space-y-4">
+          <button type="button" onClick={() => setAdvanced(false)} className="text-xs text-fuchsia-400 hover:underline">← Back to simple mode</button>
           {/* Stepper tabs */}
           <div className="flex items-center gap-1 overflow-x-auto pb-1">
             {STEPS.map((s, i) => (
