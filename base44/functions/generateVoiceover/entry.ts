@@ -446,9 +446,6 @@ Deno.serve(async (req) => {
     if (denied) return denied;
 
     const apiKey = Deno.env.get('ELEVENLABS_API_KEY');
-    if (!apiKey?.trim()) {
-      return Response.json({ error: 'ELEVENLABS_API_KEY is not configured.' }, { status: 500, headers: CORS });
-    }
 
     const body = (await req.json().catch(() => ({}))) as {
       text?: string;
@@ -470,12 +467,43 @@ Deno.serve(async (req) => {
 
     // SPEND CEILING. ElevenLabs bills per character. One AI credit buys
     // 1,500 characters, so a long script costs proportionally more.
+    // Base44's built-in speech is the primary engine (no ElevenLabs surcharge);
+    // an explicit ElevenLabs voice choice, or any Base44 failure, uses ElevenLabs.
+    const wantsElevenLabs = !!body.voiceId?.trim();
+    if (wantsElevenLabs && !apiKey?.trim()) {
+      return Response.json({ error: 'ELEVENLABS_API_KEY is not configured.' }, { status: 500, headers: CORS });
+    }
     {
       const overBudget = await meterUsage(
         base44, user, 'voiceover', Math.max(1, Math.ceil(limitedText.length / 1500)),
-        { provider: 'elevenlabs' },
+        { provider: wantsElevenLabs ? 'elevenlabs' : 'base44' },
       );
       if (overBudget) return overBudget;
+    }
+
+    if (!wantsElevenLabs) {
+      try {
+        const native: Uint8Array[] = [];
+        for (const chunk of chunks) {
+          const speech = await base44.asServiceRole.integrations.Core.GenerateSpeech({ text: chunk, ...(body.lang ? { language_code: body.lang.slice(0, 2) } : {}) });
+          const audioUrl = speech?.url;
+          if (!audioUrl) throw new Error('No audio returned.');
+          const res = await fetch(audioUrl);
+          if (!res.ok) throw new Error('Could not fetch generated audio.');
+          native.push(new Uint8Array(await res.arrayBuffer()));
+        }
+        const size = native.reduce((n, p) => n + p.byteLength, 0);
+        const joined = new Uint8Array(size);
+        let at = 0;
+        for (const p of native) { joined.set(p, at); at += p.byteLength; }
+        return Response.json({ success: true, audio_base64: toBase64(joined), mime: 'audio/mpeg', provider: 'base44' }, { headers: CORS });
+      } catch (e) {
+        if (!apiKey?.trim()) throw e;
+        // fall through to ElevenLabs
+      }
+    }
+    if (!apiKey?.trim()) {
+      return Response.json({ error: 'ELEVENLABS_API_KEY is not configured.' }, { status: 500, headers: CORS });
     }
 
     const voiceId = body.voiceId?.trim() || Deno.env.get('ELEVENLABS_DEFAULT_VOICE_ID')?.trim() || DEFAULT_VOICE_ID;

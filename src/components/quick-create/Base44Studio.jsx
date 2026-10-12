@@ -17,15 +17,15 @@ export default function Base44Studio({ type, prompt, referenceImageUrls, onBusyC
   useEffect(() => { onBusyChange(blocked); return () => onBusyChange(false); }, [blocked, onBusyChange]);
   const error = optionsError || media.error;
   const graphicsKey = JSON.stringify([options.logo?.fileUri || null, options.text]);
-  const needsGraphics = type === 'video' && media.result && media.result.renderedKey !== graphicsKey;
+  const needsGraphics = !!media.result && media.result.renderedKey !== graphicsKey;
   return <div className="space-y-3">
     {error && <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
     {media.message && <p role="status" className="text-sm text-muted-foreground">{media.message}</p>}
     <div className="grid md:grid-cols-2 gap-5">
       <Base44StudioControls type={type} ratio={type === 'video' ? videoRatio : imageRatio} setRatio={type === 'video' ? setVideoRatio : setImageRatio} duration={duration} setDuration={setDuration} audio={audio} setAudio={setAudio} busy={blocked} pending={type === 'video' && !!media.pending} gateway={media.gateway} estimatedCredits={media.estimatedCredits} onEstimate={media.estimate} hasPrompt={!!prompt.trim()} onGenerate={() => { setOptionsError(''); media.generate(); }}>
-        {type === 'video' && <StudioVideoBranding {...options} disabled={blocked || !!media.pending} />}
+        <StudioVideoBranding {...options} showCharacter={type === 'video'} disabled={blocked || !!media.pending} />
       </Base44StudioControls>
-      <Base44StudioPreview result={media.result} busy={blocked} saving={media.saving} saved={media.saved && !needsGraphics} onSave={media.save} needsGraphics={needsGraphics} onRender={() => { setOptionsError(''); media.render(options); }} />
+      <Base44StudioPreview result={media.result} busy={blocked} saving={media.saving} saved={media.saved && !needsGraphics} onSave={media.save} needsGraphics={needsGraphics} onRender={() => { setOptionsError(''); media.render(options); }} type={type} />
     </div>
   </div>;
 }
