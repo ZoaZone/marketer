@@ -1,4 +1,5 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
+import { startBase44Clip, creditsForSeconds, refundCredits } from '../../shared/base44Video.ts';
 
 /**
  * submitVideo — server-side proxy that hands an AI per-scene video-
@@ -58,6 +59,9 @@ async function buildByok(apiKeys: any, fields: Array<'replicate' | 'elevenlabs'>
 // could call this endpoint directly and bill the platform. Kling/Minimax bill per clip against the platform Replicate key.
 // The eslint lane guard stops Lane 1 *code* importing Lane 2, but a lint rule
 // is not an access control: it does nothing about a direct HTTP call.
+// Base44 video is open to every account (metered in AI credits, free trial
+// included). Only the Kling fallback on the render worker stays tier-gated,
+// because it bills the platform's Replicate key per clip.
 const GENERATION_ENTITLED_TIERS = ["byok","indie","studio","dubbing_house","enterprise","agency"];
 async function assertEntitled(base44: any, user: any): Promise<Response | null> {
   if (user.role === 'admin') return null;
@@ -418,19 +422,38 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401, headers: CORS });
 
+    const spec = await req.json().catch(() => ({}));
+    if (spec && typeof spec.durationSeconds !== 'undefined') {
+      spec.durationSeconds = snapToValidClipDuration(Number(spec.durationSeconds) || 5);
+    }
+
+    // 1. Base44 video first (every account, charged in AI credits).
+    //    provider === 'kling' is sent by the client after a Base44 clip failed.
+    let creditDenial: Response | null = null;
+    if (spec.provider !== 'kling') {
+      const credits = creditsForSeconds(spec.durationSeconds);
+      creditDenial = await meterUsage(base44, user, 'ai_generation', credits, { provider: 'base44' });
+      if (!creditDenial) {
+        try {
+          const jobId = await startBase44Clip(base44, user, spec);
+          return Response.json({ jobId, provider: 'base44' }, { headers: CORS });
+        } catch (e) {
+          console.error('Base44 video start failed, falling back to Kling:', (e as Error).message);
+          await refundCredits(base44, user, credits);
+        }
+      }
+    }
+
+    // 2. Kling on the render worker (tier-gated fallback).
     const denied = await assertEntitled(base44, user);
-    if (denied) return denied;
+    if (denied) return creditDenial || denied;
 
     const workerUrl = Deno.env.get('RENDER_WORKER_URL')?.trim();
     const sharedSecret = Deno.env.get('RENDER_SHARED_SECRET')?.trim();
     if (!workerUrl || !sharedSecret) {
       return Response.json({ error: 'RENDER_WORKER_URL/RENDER_SHARED_SECRET is not configured.' }, { status: 500, headers: CORS });
     }
-
-    const spec = await req.json().catch(() => ({}));
-    if (spec && typeof spec.durationSeconds !== 'undefined') {
-      spec.durationSeconds = snapToValidClipDuration(Number(spec.durationSeconds) || 5);
-    }
+    delete spec.provider;
     const entitled = await isByokEntitled(base44, user);
     const byok = entitled ? await buildByok(user.settings?.api_keys || {}, ['replicate']) : {};
     if (Object.keys(byok).length) spec.byok = byok;

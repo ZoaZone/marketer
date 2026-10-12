@@ -9,6 +9,7 @@ import { generateText, generateImage, generateVoiceover, uploadFile, splitScript
 // instead of a failed request.
 import { generateSceneVideo, generateMusic, submitRender, getRenderStatus, MAX_MUSIC_SECONDS } from "@/utils/lane2";
 import { VIDEO_RATIOS } from "@/utils/videoAssembler";
+import { BASE44_VIDEO_CREDITS_PER_5S } from "@/config/plans";
 import StudioEngineSelector from "@/components/quick-create/StudioEngineSelector";
 import Base44Studio from "@/components/quick-create/Base44Studio";
 import StudioMakerCards from "@/components/quick-create/StudioMakerCards";
@@ -187,7 +188,10 @@ export default function QuickCreate() {
   // AppLayout supplies this via <Outlet context>. Defaults keep the page
   // usable if it is ever rendered outside that shell.
   const { userTier = 0, isAdmin = false } = useOutletContext() || {};
-  const canMotion = isAdmin || userTier >= MOTION_MIN_TIER;
+  // Base44 scene video is open to every account, free trial included (it is
+  // metered in AI credits server-side). Only AI music stays tier-gated.
+  const canMotion = true;
+  const canMusic = isAdmin || userTier >= MOTION_MIN_TIER;
   // Movie Maker Pro is a paid-tier page — same gate the sidebar applies to
   // its own /movie-maker entry, admins exempt.
   const canMovieMaker = isAdmin || userTier >= MOVIE_MAKER_MIN_TIER;
@@ -582,7 +586,7 @@ export default function QuickCreate() {
   };
 
   const generateAiMusic = async () => {
-    if (!canMotion) {
+    if (!canMusic) {
       setError("Your plan does not include AI music generation.");
       setUpgradeRequired(true);
       return;
@@ -940,8 +944,7 @@ export default function QuickCreate() {
                         <Video className="w-3.5 h-3.5" /> Real AI video
                       </span>
                       <span className="block text-[11px] text-muted-foreground mt-1">
-                        A genuinely moving clip per scene. Costs premium credits and takes about 2-3 minutes per scene.
-                        {!canMotion && " Available on Agency and Movie Maker Pro plans."}
+                        A genuinely moving clip per scene, made with Base44 video. Uses {BASE44_VIDEO_CREDITS_PER_5S} AI credits per scene (free accounts included) and takes about 1-3 minutes per scene.
                       </span>
                     </button>
                     <button
@@ -1210,12 +1213,12 @@ export default function QuickCreate() {
                   </div>
                   {musicEnabled && (
                     <div className="w-full max-w-md space-y-2">
-                      <button type="button" onClick={generateAiMusic} disabled={generatingMusic || !canMotion}
+                      <button type="button" onClick={generateAiMusic} disabled={generatingMusic || !canMusic}
                         className="w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-fuchsia-500/15 border border-fuchsia-500/50 text-fuchsia-400 text-sm font-semibold hover:bg-fuchsia-500/25 disabled:opacity-50">
                         {generatingMusic ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
                         {generatingMusic ? "Generating AI music…" : musicUrl ? "Regenerate AI Music" : "Generate AI Music"}
                       </button>
-                      {!canMotion && <p className="text-[11px] text-muted-foreground">AI music is available on Agency and Movie Maker Pro plans. You can still upload your own track.</p>}
+                      {!canMusic && <p className="text-[11px] text-muted-foreground">AI music is available on Agency and Movie Maker Pro plans. You can still upload your own track.</p>}
                       <label className="w-full flex items-center gap-3 p-3 rounded-xl border border-border text-left cursor-pointer hover:bg-muted/20 transition-all">
                         <Music className="w-4 h-4 shrink-0 text-muted-foreground" />
                         <span className="flex-1 text-sm text-muted-foreground truncate">{uploadingMusic ? "Uploading…" : musicName || "Or upload a music track"}</span>

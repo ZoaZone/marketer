@@ -1,4 +1,5 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
+import { BASE44_JOB_PREFIX, base44ClipStatus } from '../../shared/base44Video.ts';
 
 /**
  * getVideoStatus — polls the standalone render worker for a per-scene
@@ -26,14 +27,19 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401, headers: CORS });
 
+    const { jobId } = await req.json().catch(() => ({}));
+    if (!jobId) return Response.json({ error: 'jobId is required' }, { status: 400, headers: CORS });
+
+    // Base44-generated clips are polled through the Base44 gateway.
+    if (String(jobId).startsWith(BASE44_JOB_PREFIX)) {
+      return Response.json(await base44ClipStatus(base44, user, String(jobId)), { headers: CORS });
+    }
+
     const workerUrl = Deno.env.get('RENDER_WORKER_URL')?.trim();
     const sharedSecret = Deno.env.get('RENDER_SHARED_SECRET')?.trim();
     if (!workerUrl || !sharedSecret) {
       return Response.json({ error: 'RENDER_WORKER_URL/RENDER_SHARED_SECRET is not configured.' }, { status: 500, headers: CORS });
     }
-
-    const { jobId } = await req.json().catch(() => ({}));
-    if (!jobId) return Response.json({ error: 'jobId is required' }, { status: 400, headers: CORS });
 
     let workerRes: Response;
     try {

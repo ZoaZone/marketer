@@ -6,6 +6,7 @@ import PayPalButton from "@/components/PayPalButton";
 import { Check, ArrowRight, ArrowLeft, Loader2, Star, Sparkles, Gift, Mail, Phone, MessageSquare, Film, Clapperboard, KeyRound, Briefcase } from "lucide-react";
 import { BRAND } from "@/lib/brand";
 import { useSeo, SEO } from "@/lib/seo";
+import CreditCostChips from "@/components/CreditCostChips";
 import PlanAdvisor from "@/components/PlanAdvisor";
 import PricingFAQ from "@/components/PricingFAQ";
 
@@ -183,7 +184,7 @@ export default function Pricing() {
           <p className="text-white/50 text-lg mb-6">Two lanes, priced for what they actually cost: Business runs on pooled AI credits, Studio &amp; Dubbing meters real external render work in Render Minutes.</p>
 
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-fuchsia-500/10 border border-fuchsia-500/20 text-fuchsia-300 text-sm font-medium mb-8">
-            <Gift className="w-4 h-4" /> Start free — {FREE_TRIAL_LIMIT} AI generations, images and voiceover included, no credit card required
+            <Gift className="w-4 h-4" /> Start free — {FREE_TRIAL_LIMIT} AI generations, images, voiceover and Base44 AI video included, no credit card required
           </div>
 
           <div className="inline-flex items-center bg-white/5 border border-white/10 rounded-xl p-1">
@@ -203,7 +204,8 @@ export default function Pricing() {
             <Sparkles className="w-6 h-6 text-fuchsia-400 shrink-0 mt-0.5" />
             <div>
               <h3 className="text-base font-black text-white mb-0.5">Pay-as-you-go AI Credits</h3>
-              <p className="text-sm text-white/50">No subscription, or need to top up this month&rsquo;s AI credits? Buy anytime. 1 credit = 1 AI image or short video scene = {isIndia ? `approximately ₹${(PRICE_PER_CREDIT * 85).toFixed(2)} (excludes GST)` : `$${PRICE_PER_CREDIT.toFixed(2)} + applicable taxes`}. Credits never expire.</p>
+              <p className="text-sm text-white/50">No subscription, or need to top up this month&rsquo;s AI credits? Buy anytime. 1 credit = {isIndia ? `approximately ₹${(PRICE_PER_CREDIT * 85).toFixed(2)} (excludes GST)` : `$${PRICE_PER_CREDIT.toFixed(2)} + applicable taxes`}. Credits never expire. Base44 AI video is available to every account, free trial included.</p>
+              <CreditCostChips />
             </div>
           </div>
           <div className="flex gap-2 flex-wrap shrink-0">

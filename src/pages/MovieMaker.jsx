@@ -18,6 +18,7 @@ import {
 // generation endpoints (generateSceneVideo/Kling, generateMusic/ElevenLabs Music,
 // dubAudioFile/dubVideoFile/ElevenLabs) alongside the shared FFmpeg
 // assembly route (submitRender/getRenderStatus).
+import { BASE44_VIDEO_CREDITS_PER_5S } from "@/config/plans";
 import { generateText, generateVoiceover, generateMusic, MAX_MUSIC_SECONDS, uploadFile, generateImage, splitScriptIntoScenes, submitRender, getRenderStatus, generateSceneVideo, dubAudioFile, dubVideoFile as dubVideoJob, probeMediaDuration } from "@/utils/lane2";
 // dubVideoFile (the aiClient job function) is imported as dubVideoJob — the
 // Dubbing Studio already has a dubVideoFile *state variable* holding the
@@ -619,7 +620,7 @@ export default function MovieMaker() {
         // scene, which is how an out-of-credit account came to look like a
         // quality problem instead of an outage.
         if (e?.billing) {
-          setError(`${e.message} Scene video generation is paused until the provider account is funded.`);
+          setError(`${e.message} Scene video generation is paused. Top up your AI credits or try again shortly.`);
           break;
         }
         const msg = shotCount > 1
@@ -1532,7 +1533,10 @@ export default function MovieMaker() {
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-500/10 border border-violet-500/20 text-violet-400 text-xs font-semibold hover:bg-violet-500/20 disabled:opacity-50 transition-colors">
                       {sceneVideoLoading[scene.id] ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
                       {scene.clips?.length ? "Regenerate clips" : "Generate video clip"}
-                    </button>
+                      </button>
+                      <span className="text-[10px] text-muted-foreground" title="Base44 video, drawn from your AI credits">
+                      ≈ {Math.ceil(clampToValidClipDuration(scene.clipDuration || 5) * BASE44_VIDEO_CREDITS_PER_5S / 5) * (scene.shotsPerScene ?? 1)} credits
+                      </span>
                   </div>
                   {/* Live status for a running clip. A generation takes two
                       to three minutes and the worker runs one job at a time,
@@ -1542,12 +1546,12 @@ export default function MovieMaker() {
                     <p className="text-[11px] text-violet-400/90 mt-1.5 flex items-center gap-1.5">
                       <Loader2 className="w-3 h-3 animate-spin shrink-0" />
                       {sceneVideoProgress[scene.id].status === "queued"
-                        ? "Queued — the render worker is busy with another job"
+                        ? "Queued — waiting for the next free video slot"
                         : "Generating"}
                       {sceneVideoProgress[scene.id].shotCount > 1 &&
                         ` · shot ${sceneVideoProgress[scene.id].shot}/${sceneVideoProgress[scene.id].shotCount}`}
                       {` · ${Math.round((sceneVideoProgress[scene.id].elapsedMs || 0) / 1000)}s elapsed`}
-                      <span className="text-muted-foreground">· usually 2-3 min per clip</span>
+                      <span className="text-muted-foreground">· usually 1-3 min per clip</span>
                     </p>
                   )}
                 </div>

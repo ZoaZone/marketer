@@ -49,6 +49,22 @@ export const RENDER_MINUTE_WEIGHTS = {
   music_vocal_track: 1,
 };
 
+/**
+ * Base44 video: AI credits drawn by one 5-second scene clip (a 10-second clip
+ * draws double). Open to every account, free trial included. Mirrors
+ * CREDITS_PER_5S in base44/shared/base44Video.ts. The Kling fallback on the
+ * render worker is billed in Render Minutes instead (ai_video_scene above).
+ */
+export const BASE44_VIDEO_CREDITS_PER_5S = 6;
+
+/** What one AI credit buys, shown on /pricing. */
+export const CREDIT_COSTS = [
+  { label: "AI image", credits: 1 },
+  { label: "Voice-over (up to 1,500 characters)", credits: 1 },
+  { label: "Video scene, 5 seconds", credits: BASE44_VIDEO_CREDITS_PER_5S },
+  { label: "Video scene, 10 seconds", credits: BASE44_VIDEO_CREDITS_PER_5S * 2 },
+];
+
 /** Free trial, pre-subscription. Mirrors generateImage's server-side gate. */
 export const FREE_TRIAL_GENERATIONS = 25;
 

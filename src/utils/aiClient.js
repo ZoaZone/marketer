@@ -380,7 +380,19 @@ export async function getVideoStatus(jobId) {
  *   its still image.
  */
 export async function generateSceneVideo({ prompt, imageUrl, durationSeconds = 5, aspectRatio = "16:9", onProgress } = {}) {
-  const jobId = await submitVideo({ prompt, imageUrl, durationSeconds, aspectRatio });
+  // Base44 video is tried first by the server; if that clip fails, the same
+  // scene is resubmitted once to Kling (provider: "kling"), which only works
+  // for accounts whose plan includes it.
+  try {
+    return await pollSceneVideo(await submitVideo({ prompt, imageUrl, durationSeconds, aspectRatio }), onProgress);
+  } catch (e) {
+    if (e?.billing || !e?.base44Clip) throw e;
+    return pollSceneVideo(await submitVideo({ prompt, imageUrl, durationSeconds, aspectRatio, provider: "kling" }), onProgress);
+  }
+}
+
+async function pollSceneVideo(jobId, onProgress) {
+  const isBase44 = String(jobId).startsWith("b44:");
 
   const POLL_MS = 4000;
   // 10 minutes. Kling itself can take several minutes per clip, and the worker
@@ -403,7 +415,11 @@ export async function generateSceneVideo({ prompt, imageUrl, durationSeconds = 5
       onProgress?.({ jobId, status: "done", progress: 1, elapsedMs: Date.now() - startedAt, budgetMs: TIMEOUT_MS });
       return job.url;
     }
-    if (job?.status === "error") throw asProviderError(job.error || "Video generation failed.");
+    if (job?.status === "error") {
+      const err = asProviderError(job.error || "Video generation failed.");
+      err.base44Clip = isBase44;
+      throw err;
+    }
 
     // Report progress on every poll, exactly as dubAudioFile/dubVideoFile
     // already do. Scene video was the ONLY long-running job kind that read

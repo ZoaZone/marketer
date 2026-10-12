@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import OpenAI from 'npm:openai@6.45.0';
+import { chargeStudioCredits, creditsForSeconds, refundCredits } from '../../shared/base44Video.ts';
 
 export default async function(req) {
   try {
@@ -19,13 +20,17 @@ export default async function(req) {
     if (!['expand', 'proofread', 'image', 'video', 'videoCreate', 'videoEstimate'].includes(action) || typeof prompt !== 'string' || !prompt.trim() || prompt.length > 8000) {
       return Response.json({ error: 'Choose image or video and enter a description of up to 8,000 characters.' }, { status: 400 });
     }
-    // Spend gate: video draws heavily on workspace credits, so non-admins need an active plan.
-    if (['video', 'videoCreate', 'videoEstimate'].includes(action) && user.role !== 'admin') {
-      const subs = await base44.asServiceRole.entities.Subscription.filter({ owner_email: user.email }, '-created_date', 10);
-      if (!(subs || []).some(s => ['active', 'trialing'].includes(s.status) && s.plan_tier && s.plan_tier !== 'free')) {
-        return Response.json({ error: 'AI video needs an active plan. Please upgrade to continue.', code: 'upgrade_required' }, { status: 403 });
-      }
-    }
+    // Every account (free trial included) can create with Studio; generations are
+    // charged in AI credits before any media is produced and refunded on failure.
+    let charged = 0;
+    // Called only after the request has been validated, right before generation.
+    const charge = async () => {
+      const credits = action === 'image' ? 1 : creditsForSeconds(duration);
+      const refused = await chargeStudioCredits(base44, user, credits, action);
+      if (!refused) charged = credits;
+      return refused;
+    };
+    try {
     // Continuity: one coherent, consistently-styled shot, with spelling cleaned up.
     const direct = async (text: string, hasRef: boolean) => {
       try {
@@ -54,6 +59,7 @@ export default async function(req) {
         ...(referenceImageUrls.length ? { input_references: referenceImageUrls.map(url => ({ type: 'image_url', image_url: { url } })) } : {}),
         ...(action === 'videoEstimate' ? { dry_run: true } : {}),
       };
+      if (action === 'videoCreate') { const refused = await charge(); if (refused) return refused; }
       const video = await videos.create(request, { maxRetries: 0 });
       if (action === 'videoEstimate') return Response.json({ estimatedCredits: video.usage?.base44_credits });
       if (!video.id) throw new Error('No video job was returned.');
@@ -77,6 +83,7 @@ export default async function(req) {
     }
     // This isolated path uses only managed Core integrations. No BYOK,
     // provider secrets, external render worker, or provider fallback.
+    { const refused = await charge(); if (refused) return refused; }
     const result = action === 'video'
       ? await base44.asServiceRole.integrations.Core.GenerateVideo({
           prompt: `${await direct(prompt.trim(), false)}\nNo visible lettering, captions, watermarks or logos. Branding will be composited separately.`, duration, aspect_ratio: aspectRatio, generate_audio: audio,
@@ -88,6 +95,10 @@ export default async function(req) {
     const url = result?.url || result?.file_url;
     if (!url) throw new Error('Base44 did not return a media file. Please try again.');
     return Response.json({ url, type: action });
+    } catch (failure) {
+      if (charged) await refundCredits(base44, user, charged);
+      throw failure;
+    }
   } catch (error) {
     return Response.json({ error: error?.message || 'Base44 generation failed.' }, { status: 500 });
   }
