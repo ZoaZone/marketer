@@ -8,9 +8,9 @@ function loadMedia(element, event, src) {
   });
 }
 
-export default async function renderStudioVideo({ url, logoUrl, text, hasAudio, onProgress, dims }) {
+export default async function renderStudioVideo({ url, logoUrl, text, hasAudio, musicUrl, onProgress, dims }) {
   if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) throw new Error('Video graphics export needs a supported browser such as Chrome or Edge.');
-  const audioContext = hasAudio ? new (window.AudioContext || window.webkitAudioContext)() : null;
+  const audioContext = hasAudio || musicUrl ? new (window.AudioContext || window.webkitAudioContext)() : null;
   if (audioContext) await audioContext.resume();
   let video, recorder, stream, objectUrl, animation;
   try {
@@ -25,9 +25,22 @@ export default async function renderStudioVideo({ url, logoUrl, text, hasAudio, 
     const canvas = document.createElement('canvas'); canvas.width = dims ? dims[0] : video.videoWidth; canvas.height = dims ? dims[1] : video.videoHeight;
     const ctx = canvas.getContext('2d');
     stream = canvas.captureStream(30);
+    let musicSource = null;
     if (audioContext) {
       const destination = audioContext.createMediaStreamDestination();
-      audioContext.createMediaElementSource(video).connect(destination);
+      if (hasAudio) audioContext.createMediaElementSource(video).connect(destination);
+      if (musicUrl) {
+        const musicResponse = await fetch(musicUrl);
+        if (!musicResponse.ok) throw new Error('Could not download your music track.');
+        let buffer;
+        try { buffer = await audioContext.decodeAudioData(await musicResponse.arrayBuffer()); }
+        catch { throw new Error('Your music track could not be read. Try an MP3 or WAV file.'); }
+        const gain = audioContext.createGain();
+        gain.gain.value = hasAudio ? 0.3 : 0.9; // sit under generated sound, full level otherwise
+        musicSource = audioContext.createBufferSource();
+        musicSource.buffer = buffer; musicSource.loop = true;
+        musicSource.connect(gain).connect(destination);
+      }
       destination.stream.getAudioTracks().forEach(track => stream.addTrack(track));
     }
     const mimeType = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4'].find(mime => MediaRecorder.isTypeSupported(mime));
@@ -54,8 +67,10 @@ export default async function renderStudioVideo({ url, logoUrl, text, hasAudio, 
       video.onended = resolve;
       video.onerror = () => reject(new Error('Video playback failed during branding.'));
     });
+    musicSource?.start();
     await video.play();
     await playbackEnded;
+    musicSource?.stop();
     cancelAnimationFrame(animation); recorder.stop();
     const blob = await done; onProgress(100);
     return blob;
