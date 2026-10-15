@@ -1,4 +1,5 @@
-import { Download, Save, Loader2, CheckCircle2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Download, Save, Loader2, CheckCircle2, Sliders } from 'lucide-react';
 
 export default function Base44StudioPreview({ result, busy, saving, saved, onSave, needsGraphics, onRender, type }) {
   return <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
@@ -11,6 +12,7 @@ export default function Base44StudioPreview({ result, busy, saving, saved, onSav
         {!needsGraphics && !busy && <a href={result.url} target="_blank" rel="noopener noreferrer" download className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-border p-3 text-sm text-foreground"><Download className="w-4 h-4" />Download</a>}
         <button type="button" onClick={onSave} disabled={busy || saving || saved || needsGraphics} className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-primary bg-primary/10 p-3 text-sm text-primary disabled:opacity-60">{saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}{saving ? 'Saving…' : saved ? 'Saved' : 'Save to Library'}</button>
       </div>
+      {!busy && <Link to="/media-editor" state={{ assets: [{ type: result.type, file_url: result.url, title: (result.prompt || 'Studio creation').slice(0, 40) }] }} className="flex items-center justify-center gap-2 rounded-xl border border-border p-3 text-sm text-foreground"><Sliders className="w-4 h-4" />Fix text, logos &amp; more in Edit Media</Link>}
     </>}
   </div>;
 }
