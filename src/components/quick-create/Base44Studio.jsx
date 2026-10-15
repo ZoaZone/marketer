@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Base44StudioControls from '@/components/quick-create/Base44StudioControls';
 import Base44StudioPreview from '@/components/quick-create/Base44StudioPreview';
 import StudioVideoBranding from '@/components/quick-create/StudioVideoBranding';
@@ -19,6 +19,14 @@ export default function Base44Studio({ type, prompt, referenceImageUrls, onBusyC
   const error = optionsError || media.error;
   const graphicsKey = JSON.stringify([options.logo?.fileUri || null, options.text, type === 'video' ? options.music?.fileUri || options.musicPreset || null : null]);
   const needsGraphics = !!media.result && media.result.renderedKey !== graphicsKey;
+  // Finish automatically right after generation (once per generated clip) so chosen music, logo and text are in the video without an extra click.
+  const autoTried = useRef(null);
+  useEffect(() => {
+    if (type !== 'video' || !media.result || !needsGraphics || blocked || media.pending) return;
+    if (autoTried.current === media.result.rawUrl) return;
+    autoTried.current = media.result.rawUrl;
+    media.render(options);
+  });
   return <div className="space-y-3">
     {error && <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
     {media.message && <p role="status" className="text-sm text-muted-foreground">{media.message}</p>}
