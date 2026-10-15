@@ -1,4 +1,5 @@
 import { drawStudioVideoGraphics } from '@/components/quick-create/studioVideoGraphics';
+import { renderPresetBuffer } from '@/components/quick-create/musicPresets';
 
 function loadMedia(element, event, src) {
   return new Promise((resolve, reject) => {
@@ -8,9 +9,9 @@ function loadMedia(element, event, src) {
   });
 }
 
-export default async function renderStudioVideo({ url, logoUrl, text, hasAudio, musicUrl, onProgress, dims }) {
+export default async function renderStudioVideo({ url, logoUrl, text, hasAudio, musicUrl, musicPreset, onProgress, dims }) {
   if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) throw new Error('Video graphics export needs a supported browser such as Chrome or Edge.');
-  const audioContext = hasAudio || musicUrl ? new (window.AudioContext || window.webkitAudioContext)() : null;
+  const audioContext = hasAudio || musicUrl || musicPreset ? new (window.AudioContext || window.webkitAudioContext)() : null;
   if (audioContext) await audioContext.resume();
   let video, recorder, stream, objectUrl, animation;
   try {
@@ -29,12 +30,16 @@ export default async function renderStudioVideo({ url, logoUrl, text, hasAudio, 
     if (audioContext) {
       const destination = audioContext.createMediaStreamDestination();
       if (hasAudio) audioContext.createMediaElementSource(video).connect(destination);
+      let buffer = null;
       if (musicUrl) {
         const musicResponse = await fetch(musicUrl);
         if (!musicResponse.ok) throw new Error('Could not download your music track.');
-        let buffer;
         try { buffer = await audioContext.decodeAudioData(await musicResponse.arrayBuffer()); }
         catch { throw new Error('Your music track could not be read. Try an MP3 or WAV file.'); }
+      } else if (musicPreset) {
+        buffer = await renderPresetBuffer(musicPreset, Math.ceil(video.duration) + 2);
+      }
+      if (buffer) {
         const gain = audioContext.createGain();
         gain.gain.value = hasAudio ? 0.3 : 0.9; // sit under generated sound, full level otherwise
         musicSource = audioContext.createBufferSource();

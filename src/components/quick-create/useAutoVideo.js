@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { generateText, generateImage, generateVoiceover, uploadFile, splitScriptIntoScenes, assembleLane1Video } from "@/utils/lane1";
+import { renderPresetBlob } from "@/components/quick-create/musicPresets";
 import { generateSceneVideo, generateMusic, submitRender, getRenderStatus, MAX_MUSIC_SECONDS } from "@/utils/lane2";
 
 // Look applied to every shot so scenes share one grade, lens and realism.
@@ -9,7 +10,7 @@ const CLEAN = "High quality, natural lighting, realistic, sharp detail, no text,
 
 const CLIP_SECONDS = 5;
 
-export default function useAutoVideo({ cinematic, canMotion, canMusic, ratio, resolution, referenceImageUrls, musicMode = "none", uploadedMusicUrl = "" }) {
+export default function useAutoVideo({ cinematic, canMotion, canMusic, ratio, resolution, referenceImageUrls, musicMode = "none", uploadedMusicUrl = "", musicPreset = "cinematic" }) {
   const [stage, setStage] = useState("");
   const [progress, setProgress] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -85,8 +86,15 @@ export default function useAutoVideo({ cinematic, canMotion, canMusic, ratio, re
             instrumental: true, mood: "cinematic",
           });
           musicUrl = m?.url;
-        } catch (e) { warn(`AI music could not be created (${e?.message || "failed"}). Your video has no music. Try uploading your own track instead.`); }
-        if (!musicUrl) warn("AI music was not produced, so your video has no music. Try uploading your own track instead.");
+        } catch (e) { warn(`AI music was unavailable (${e?.message || "failed"}), so a library track was used instead.`); }
+      }
+      // Library track: chosen directly, or the automatic fallback when AI music is unavailable.
+      if (!musicUrl && (musicMode === "preset" || musicMode === "ai")) {
+        try {
+          const total = scenes.reduce((a, s) => a + (Number(s.seconds) || 8), 0);
+          const blob = await renderPresetBlob(musicPreset, Math.round(total) + 8);
+          musicUrl = await uploadFile(new File([blob], "library-music.wav", { type: "audio/wav" }));
+        } catch (e) { warn(`No music: ${e?.message || "failed"}`); }
       }
 
       setStage("Putting it all together"); setProgress(0.88);

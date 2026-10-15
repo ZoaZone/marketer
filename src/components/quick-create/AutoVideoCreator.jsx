@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Wand2, Loader2, Download, Save, CheckCircle2, AlertTriangle, Clapperboard, Zap, SlidersHorizontal } from "lucide-react";
 import { VIDEO_RATIOS } from "@/utils/videoAssembler";
 import { uploadFile } from "@/utils/lane1";
+import { MUSIC_PRESETS, defaultPresetFor } from "@/components/quick-create/musicPresets";
 import useAutoVideo from "@/components/quick-create/useAutoVideo";
 
 const btn = (on) => `px-3 py-1.5 rounded-lg border text-xs font-bold transition-all ${on ? "bg-fuchsia-500/15 border-fuchsia-500/50 text-fuchsia-400" : "border-border text-muted-foreground hover:bg-muted/20"}`;
@@ -13,12 +14,15 @@ export default function AutoVideoCreator({ prompt, referenceImageUrls, canMotion
   const [ratio, setRatio] = useState(VIDEO_RATIOS[0]);
   const cinematic = quality === "cinematic";
   const [resolution, setResolution] = useState("1080p");
-  const [musicMode, setMusicMode] = useState(isPro ? "ai" : "none");
+  // Every video gets a background track by default: a library style, which is always available.
+  const [musicMode, setMusicMode] = useState("preset");
+  const [pickedPreset, setPickedPreset] = useState("");
+  const musicPreset = pickedPreset || defaultPresetFor(cinematic);
   const [musicUrl, setMusicUrl] = useState("");
   const [musicName, setMusicName] = useState("");
   const [uploading, setUploading] = useState(false);
   const [musicError, setMusicError] = useState("");
-  const v = useAutoVideo({ cinematic, canMotion, canMusic, ratio, resolution, referenceImageUrls, musicMode, uploadedMusicUrl: musicUrl });
+  const v = useAutoVideo({ cinematic, canMotion, canMusic, ratio, resolution, referenceImageUrls, musicMode, uploadedMusicUrl: musicUrl, musicPreset });
 
   const uploadMusic = async (file) => {
     if (!file) return;
@@ -68,6 +72,7 @@ export default function AutoVideoCreator({ prompt, referenceImageUrls, canMotion
           <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">Background music</label>
           <div className="flex gap-2 flex-wrap">
             <button type="button" disabled={v.busy} onClick={() => setMusicMode("none")} className={btn(musicMode === "none")}>No music</button>
+            <button type="button" disabled={v.busy} onClick={() => setMusicMode("preset")} className={btn(musicMode === "preset")}>Library track</button>
             <button type="button" disabled={v.busy || !canMusic} onClick={() => setMusicMode("ai")} className={btn(musicMode === "ai")}>AI-composed score</button>
             <button type="button" disabled={v.busy || !musicUrl} onClick={() => setMusicMode("upload")} className={btn(musicMode === "upload")}>My track{musicName ? `: ${musicName.slice(0, 18)}` : ""}</button>
             <label className={`${btn(false)} cursor-pointer ${v.busy || uploading ? "opacity-50 pointer-events-none" : ""}`}>
@@ -75,6 +80,10 @@ export default function AutoVideoCreator({ prompt, referenceImageUrls, canMotion
               <input type="file" accept="audio/*" className="hidden" onChange={e => { uploadMusic(e.target.files?.[0]); e.target.value = ""; }} />
             </label>
           </div>
+          {musicMode === "preset" && <div className="flex gap-2 flex-wrap mt-2">
+            {MUSIC_PRESETS.map(p => <button key={p.id} type="button" disabled={v.busy} onClick={() => setPickedPreset(p.id)} title={p.hint} className={btn(musicPreset === p.id)}>{p.label}</button>)}
+          </div>}
+          {musicMode === "preset" && <p className="text-[11px] text-muted-foreground mt-1">{MUSIC_PRESETS.find(p => p.id === musicPreset)?.hint}. Added automatically to your video.</p>}
           {!canMusic && <p className="text-[11px] text-muted-foreground mt-2">AI-composed music is on Pro plans. You can upload your own track on any plan.</p>}
           {musicError && <p className="text-[11px] text-red-400 mt-2">{musicError}</p>}
           {musicMode === "upload" && musicUrl && <audio src={musicUrl} controls className="w-full mt-2 h-8" />}

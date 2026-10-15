@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 
 export default function useStudioVideoOptions(setError) {
-  const [logo, setLogo] = useState(null), [character, setCharacter] = useState(null), [music, setMusic] = useState(null);
+  const [logo, setLogo] = useState(null), [character, setCharacter] = useState(null), [music, setMusic] = useState(null), [musicPreset, setMusicPreset] = useState('');
   const [text, updateText] = useState(''), [suggestion, setSuggestion] = useState(null);
   const [uploading, setUploading] = useState(''), [checking, setChecking] = useState(false);
   const setText = value => { updateText(value); setSuggestion(null); };
@@ -37,6 +37,6 @@ export default function useStudioVideoOptions(setError) {
     } catch (error) { setError(error?.response?.data?.error || error.message); }
     finally { setChecking(false); }
   };
-  return { logo, character, music, text, setText, suggestion, uploading, checking, upload, uploadMusic, proofread,
+  return { logo, character, music, musicPreset, setMusicPreset, text, setText, suggestion, uploading, checking, upload, uploadMusic, proofread,
     applySuggestion: () => setText(suggestion), clear: kind => (kind === 'logo' ? setLogo : kind === 'music' ? setMusic : setCharacter)(null) };
 }
