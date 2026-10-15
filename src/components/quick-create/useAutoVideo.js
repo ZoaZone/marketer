@@ -9,7 +9,7 @@ const CLEAN = "High quality, natural lighting, realistic, sharp detail, no text,
 
 const CLIP_SECONDS = 5;
 
-export default function useAutoVideo({ cinematic, canMotion, canMusic, ratio, referenceImageUrls }) {
+export default function useAutoVideo({ cinematic, canMotion, canMusic, ratio, resolution, referenceImageUrls }) {
   const [stage, setStage] = useState("");
   const [progress, setProgress] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -87,7 +87,6 @@ export default function useAutoVideo({ cinematic, canMotion, canMusic, ratio, re
       }
 
       setStage("Putting it all together"); setProgress(0.88);
-      const resolution = cinematic ? "1080p" : "720p";
       const payload = { scenes, ratio, resolution, voiceoverUrl, musicUrl };
       let url;
       if (scenes.some(s => s.videoUrl)) {

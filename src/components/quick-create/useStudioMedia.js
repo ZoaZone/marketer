@@ -3,18 +3,19 @@ import { useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import renderStudioVideo from '@/components/quick-create/renderStudioVideo';
 import renderStudioImage from '@/components/quick-create/renderStudioImage';
+import { generationRatio, exportDims, needsFormatPass } from '@/components/quick-create/studioFormat';
 
 const emptyGraphics = JSON.stringify([null, '']);
 const invoke = async payload => (await base44.functions.invoke('generateBase44Studio', payload)).data;
 
-export default function useStudioMedia({ type, prompt, referenceImageUrls, ratio, duration, audio }) {
+export default function useStudioMedia({ type, prompt, referenceImageUrls, ratio, duration, audio, size = 'hd' }) {
   const qc = useQueryClient();
   const [busy, setBusy] = useState(false), [saving, setSaving] = useState(false), [error, setError] = useState('');
   const [results, setResults] = useState({}), [saved, setSaved] = useState({});
   const [pending, setPending] = useState(null), [message, setMessage] = useState(''), [estimatedCredits, setEstimatedCredits] = useState(null);
   useEffect(() => { setEstimatedCredits(null); }, [prompt, ratio, duration, audio, referenceImageUrls.join('|')]);
   const gateway = duration === 15 || referenceImageUrls.length > 0;
-  const request = { prompt, aspectRatio: ratio, duration, audio, referenceImageUrls };
+  const request = { prompt, aspectRatio: type === 'video' ? generationRatio(ratio) : ratio, duration, audio, referenceImageUrls };
   const estimate = async () => {
     setBusy(true); setError(''); setMessage('Estimating video credits…');
     try {
@@ -52,7 +53,7 @@ export default function useStudioMedia({ type, prompt, referenceImageUrls, ratio
         data = await invoke({ ...request, action: type, referenceImageUrls: type === 'image' ? referenceImageUrls.slice(0, 6) : [] });
       }
       if (!data?.url) throw new Error(data?.error || 'No media was returned.');
-      setResults(prev => ({ ...prev, [type]: { url: data.url, rawUrl: data.url, type, prompt: sourcePrompt, hasAudio: sourceAudio, renderedKey: emptyGraphics } }));
+      setResults(prev => ({ ...prev, [type]: { url: data.url, rawUrl: data.url, type, prompt: sourcePrompt, hasAudio: sourceAudio, ratio, size, renderedKey: type === 'video' && needsFormatPass(ratio, size) ? 'format-pending' : emptyGraphics } }));
       setSaved(prev => ({ ...prev, [type]: false })); setMessage('');
     } catch (e) { setError(e?.response?.data?.error || e.message); }
     finally { setBusy(false); }
@@ -72,7 +73,7 @@ export default function useStudioMedia({ type, prompt, referenceImageUrls, ratio
       const logoUrl = logo ? (await base44.integrations.Core.CreateFileSignedUrl({ file_uri: logo.fileUri, expires_in: 3600 })).signed_url : '';
       const blob = type === 'image'
         ? await renderStudioImage({ url: result.rawUrl, logoUrl, text })
-        : await renderStudioVideo({ url: result.rawUrl, logoUrl, text, hasAudio: result.hasAudio, onProgress: percent => setMessage(`Applying logo and text: ${percent}% · keep this tab visible`) });
+        : await renderStudioVideo({ url: result.rawUrl, logoUrl, text, hasAudio: result.hasAudio, dims: needsFormatPass(result.ratio, result.size) ? exportDims(result.ratio, result.size) : undefined, onProgress: percent => setMessage(`Applying logo and text: ${percent}% · keep this tab visible`) });
       const file = new File([blob], type === 'image' ? 'studio-branded-image.png' : `studio-branded-video.${blob.type.includes('mp4') ? 'mp4' : 'webm'}`, { type: blob.type });
       const { file_uri } = await base44.integrations.Core.UploadPrivateFile({ file });
       const { signed_url } = await base44.integrations.Core.CreateFileSignedUrl({ file_uri, expires_in: 3600 });

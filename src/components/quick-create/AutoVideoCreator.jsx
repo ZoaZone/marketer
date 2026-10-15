@@ -11,7 +11,8 @@ export default function AutoVideoCreator({ prompt, referenceImageUrls, canMotion
   const [quality, setQuality] = useState(isPro ? "cinematic" : "standard");
   const [ratio, setRatio] = useState(VIDEO_RATIOS[0]);
   const cinematic = quality === "cinematic";
-  const v = useAutoVideo({ cinematic, canMotion, canMusic, ratio, referenceImageUrls });
+  const [resolution, setResolution] = useState("1080p");
+  const v = useAutoVideo({ cinematic, canMotion, canMusic, ratio, resolution, referenceImageUrls });
 
   useEffect(() => { onBusyChange(v.busy); return () => onBusyChange(false); }, [v.busy, onBusyChange]);
 
@@ -24,7 +25,7 @@ export default function AutoVideoCreator({ prompt, referenceImageUrls, canMotion
             <button type="button" disabled={v.busy} onClick={() => setQuality("standard")} aria-pressed={!cinematic}
               className={`text-left p-3 rounded-lg border transition-all ${!cinematic ? "bg-fuchsia-500/15 border-fuchsia-500/50" : "border-border hover:bg-muted/20"}`}>
               <span className="flex items-center gap-1.5 text-sm font-bold text-foreground"><Zap className="w-3.5 h-3.5" /> Quick</span>
-              <span className="block text-[11px] text-muted-foreground mt-1">3 scenes with a voice-over. Ready in a couple of minutes.</span>
+              <span className="block text-[11px] text-muted-foreground mt-1">3 scenes with a voice-over, ready in a couple of minutes.</span>
             </button>
             <button type="button" disabled={v.busy || !isPro} onClick={() => setQuality("cinematic")} aria-pressed={cinematic}
               className={`text-left p-3 rounded-lg border transition-all disabled:opacity-60 ${cinematic ? "bg-fuchsia-500/15 border-fuchsia-500/50" : "border-border hover:bg-muted/20"}`}>
@@ -38,6 +39,12 @@ export default function AutoVideoCreator({ prompt, referenceImageUrls, canMotion
           <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">Format</label>
           <div className="flex gap-2 flex-wrap">
             {VIDEO_RATIOS.map(r => <button key={r} type="button" disabled={v.busy} onClick={() => setRatio(r)} className={btn(ratio === r)}>{r}</button>)}
+          </div>
+        </div>
+        <div>
+          <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">Quality / size</label>
+          <div className="flex gap-2 flex-wrap">
+            {[["720p", "HD 720p"], ["1080p", "Full HD 1080p"]].map(([r, l]) => <button key={r} type="button" disabled={v.busy} onClick={() => setResolution(r)} className={btn(resolution === r)}>{l}</button>)}
           </div>
         </div>
         <button onClick={() => v.run(prompt)} disabled={v.busy || !prompt.trim()}

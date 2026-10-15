@@ -13,7 +13,7 @@ export default function LeadCapturePage() {
   const [search, setSearch] = useState("");
   const [sourceFilter, setSourceFilter] = useState("all");
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ full_name:"", email:"", phone:"", whatsapp:"", source:"website", utm_source:"", utm_campaign:"" });
+  const [form, setForm] = useState({ full_name:"", email:"", phone:"", whatsapp:"", source:"website", utm_source:"", utm_campaign:"", funnel_id:"" });
   const [saving, setSaving] = useState(false);
 
   const { data: leads = [], isLoading } = useQuery({ queryKey:["leads", user?.email], queryFn:()=>base44.entities.LeadCapture.filter(mine(user),"-captured_at",200), enabled:!!user?.email });
@@ -30,10 +30,18 @@ export default function LeadCapturePage() {
     if (!form.full_name && !form.email) { alert("Name or email required"); return; }
     setSaving(true);
     try {
-      await base44.entities.LeadCapture.create({ ...form, captured_at:new Date().toISOString() });
+      const { funnel_id, ...rest } = form;
+      await base44.entities.LeadCapture.create({ ...rest, ...(funnel_id ? { funnel_id } : {}), captured_at:new Date().toISOString() });
+      if (funnel_id) {
+        const f = funnels.find(x => x.id === funnel_id);
+        await base44.entities.Funnel.update(funnel_id, { total_leads: (f?.total_leads || 0) + 1 });
+        const first = (await base44.entities.FunnelStage.filter({ funnel_id }, "stage_order", 1))[0];
+        if (first) await base44.entities.FunnelStage.update(first.id, { entry_count: (first.entry_count || 0) + 1 });
+        qc.invalidateQueries(["funnels"]); qc.invalidateQueries(["funnel_stages"]); qc.invalidateQueries(["funnels_list"]);
+      }
       await base44.entities.MarketingContact.create({ full_name:form.full_name, email:form.email, phone:form.phone, whatsapp:form.whatsapp, source:form.source });
-      qc.invalidateQueries(["leads"]); qc.invalidateQueries(["contacts"]);
-      setForm({ full_name:"", email:"", phone:"", whatsapp:"", source:"website", utm_source:"", utm_campaign:"" });
+      qc.invalidateQueries(["leads"]); qc.invalidateQueries(["contacts"]); qc.invalidateQueries(["leads_count"]);
+      setForm({ full_name:"", email:"", phone:"", whatsapp:"", source:"website", utm_source:"", utm_campaign:"", funnel_id:"" });
       setShowAdd(false);
     } catch(e) { alert(e.message); }
     setSaving(false);
@@ -134,6 +142,11 @@ export default function LeadCapturePage() {
               <div className="space-y-1.5"><label className="text-xs font-medium text-muted-foreground">Source</label>
               <select value={form.source} onChange={e=>setForm(p=>({...p,source:e.target.value}))} className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none">
                 {["website","social","ad","referral","qr_code","manual"].map(s=><option key={s}>{s}</option>)}
+              </select></div>
+              <div className="space-y-1.5"><label className="text-xs font-medium text-muted-foreground">Add to funnel (optional)</label>
+              <select value={form.funnel_id} onChange={e=>setForm(p=>({...p,funnel_id:e.target.value}))} className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none">
+                <option value="">No funnel</option>
+                {funnels.map(f=><option key={f.id} value={f.id}>{f.name}</option>)}
               </select></div>
             </div>
             <div className="flex gap-3 mt-5">

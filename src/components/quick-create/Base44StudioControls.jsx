@@ -1,13 +1,16 @@
 import { Loader2, Wand2 } from 'lucide-react';
 
-export default function Base44StudioControls({ type, ratio, setRatio, duration, setDuration, audio, setAudio, busy, onGenerate, hasPrompt, children, gateway, pending, estimatedCredits, onEstimate }) {
+import { VIDEO_FORMATS, EXPORT_SIZES } from '@/components/quick-create/studioFormat';
+
+export default function Base44StudioControls({ type, ratio, setRatio, size, setSize, duration, setDuration, audio, setAudio, busy, onGenerate, hasPrompt, children, gateway, pending, estimatedCredits, onEstimate }) {
   const locked = busy || pending;
-  const ratios = type === 'video' ? ['16:9', '9:16'] : ['1:1', '16:9', '9:16', '4:5'];
+  const ratios = type === 'video' ? VIDEO_FORMATS : ['1:1', '16:9', '9:16', '4:5'];
   return <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
     <h3 className="font-semibold text-foreground">Create with Studio</h3>
     <p className="text-xs text-muted-foreground">Uses your AI credits: 1 per image, about 6 per 5 seconds of video. Free accounts start with 25 credits.</p>
     <div className="space-y-2"><p className="text-xs font-semibold text-muted-foreground">{type === 'video' ? 'Aspect ratio' : 'Image framing'}</p><div className="flex flex-wrap gap-2">{ratios.map(r => <button key={r} type="button" disabled={locked} aria-pressed={ratio === r} onClick={() => setRatio(r)} className={`rounded-lg border px-3 py-2 text-xs ${ratio === r ? 'border-primary bg-primary/10 text-primary' : 'border-border text-foreground'}`}>{r}</button>)}</div></div>
     {type === 'video' && <>
+      <div className="space-y-2"><p className="text-xs font-semibold text-muted-foreground">Export size</p><div className="flex gap-2">{EXPORT_SIZES.map(([id, label]) => <button key={id} type="button" disabled={locked} aria-pressed={size === id} onClick={() => setSize(id)} className={`rounded-lg border px-3 py-2 text-xs ${size === id ? 'border-primary bg-primary/10 text-primary' : 'border-border text-foreground'}`}>{label}</button>)}</div><p className="text-[11px] text-muted-foreground">Square, 4:5 and 1080p are finished in your browser after generation (a short extra step).</p></div>
       <div className="space-y-2"><p className="text-xs font-semibold text-muted-foreground">Clip length</p><div className="flex gap-2">{[4, 6, 8, 15].map(s => <button key={s} type="button" disabled={locked} aria-pressed={duration === s} onClick={() => setDuration(s)} className={`rounded-lg border px-3 py-2 text-xs ${duration === s ? 'border-primary bg-primary/10 text-primary' : 'border-border text-foreground'}`}>{s}s</button>)}</div></div>
       <label className="flex items-center gap-2 text-sm text-foreground"><input type="checkbox" checked={audio} disabled={locked} onChange={e => setAudio(e.target.checked)} />Generate sound with the video</label>
       {gateway ? <div className="space-y-2"><p className="text-xs text-muted-foreground">15-second videos and videos with character references are generated at 720p. This advanced option can cost substantially more credits than short clips. Estimate the credits first to enable generation; the final charge may differ.</p><button type="button" disabled={locked || !hasPrompt} onClick={onEstimate} className="rounded-lg border border-border px-3 py-2 text-xs text-foreground disabled:opacity-50">Estimate generation credits</button>{estimatedCredits !== null && <p className="text-xs text-primary">Estimated: {estimatedCredits.toFixed(2)} credits. Final charge may differ.</p>}</div> : <p className="text-xs text-muted-foreground">About {Math.ceil(duration * 6 / 5)} AI credits for this clip. Generation may take a few minutes.</p>}

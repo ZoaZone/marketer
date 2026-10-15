@@ -8,7 +8,7 @@ function loadMedia(element, event, src) {
   });
 }
 
-export default async function renderStudioVideo({ url, logoUrl, text, hasAudio, onProgress }) {
+export default async function renderStudioVideo({ url, logoUrl, text, hasAudio, onProgress, dims }) {
   if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) throw new Error('Video graphics export needs a supported browser such as Chrome or Edge.');
   const audioContext = hasAudio ? new (window.AudioContext || window.webkitAudioContext)() : null;
   if (audioContext) await audioContext.resume();
@@ -22,7 +22,7 @@ export default async function renderStudioVideo({ url, logoUrl, text, hasAudio, 
     let logo = null;
     if (logoUrl) { logo = new Image(); logo.crossOrigin = 'anonymous'; await loadMedia(logo, 'load', logoUrl); }
     if (!Number.isFinite(video.duration) || video.duration <= 0) throw new Error('The generated video has no readable duration.');
-    const canvas = document.createElement('canvas'); canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+    const canvas = document.createElement('canvas'); canvas.width = dims ? dims[0] : video.videoWidth; canvas.height = dims ? dims[1] : video.videoHeight;
     const ctx = canvas.getContext('2d');
     stream = canvas.captureStream(30);
     if (audioContext) {
@@ -40,7 +40,10 @@ export default async function renderStudioVideo({ url, logoUrl, text, hasAudio, 
       recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
     });
     const frame = () => {
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      // Cover-fit: fills the frame, cropping the overflow (centre crop for square / 4:5).
+      const s = Math.max(canvas.width / video.videoWidth, canvas.height / video.videoHeight);
+      const dw = video.videoWidth * s, dh = video.videoHeight * s;
+      ctx.drawImage(video, (canvas.width - dw) / 2, (canvas.height - dh) / 2, dw, dh);
       drawStudioVideoGraphics(ctx, canvas.width, canvas.height, logo, text);
       onProgress(Math.min(99, Math.round(video.currentTime / video.duration * 100)));
       animation = requestAnimationFrame(frame);
