@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 
 export default function useStudioVideoOptions(setError) {
-  const [logo, setLogo] = useState(null), [character, setCharacter] = useState(null), [music, setMusic] = useState(null), [musicPreset, setMusicPreset] = useState('');
+  const [logo, setLogo] = useState(null), [character, setCharacter] = useState(null), [music, setMusic] = useState(null), [musicPreset, setMusicPreset] = useState(''), [extras, setExtras] = useState([]);
   const [text, updateText] = useState(''), [suggestion, setSuggestion] = useState(null);
   const [uploading, setUploading] = useState(''), [checking, setChecking] = useState(false);
   const setText = value => { updateText(value); setSuggestion(null); };
@@ -13,7 +13,9 @@ export default function useStudioVideoOptions(setError) {
       if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 10 * 1024 * 1024) throw new Error('Choose a PNG, JPG or WebP image smaller than 10 MB.');
       const { file_uri } = await base44.integrations.Core.UploadPrivateFile({ file });
       const { signed_url } = await base44.integrations.Core.CreateFileSignedUrl({ file_uri, expires_in: 3600 });
-      (kind === 'logo' ? setLogo : setCharacter)({ fileUri: file_uri, url: signed_url, name: file.name });
+      const asset = { fileUri: file_uri, url: signed_url, name: file.name };
+      if (kind === 'extra') setExtras(prev => [...prev, asset].slice(0, 3));
+      else (kind === 'logo' ? setLogo : setCharacter)(asset);
     } catch (error) { setError(error.message || 'Image upload failed.'); }
     finally { setUploading(''); }
   };
@@ -37,6 +39,6 @@ export default function useStudioVideoOptions(setError) {
     } catch (error) { setError(error?.response?.data?.error || error.message); }
     finally { setChecking(false); }
   };
-  return { logo, character, music, musicPreset, setMusicPreset, text, setText, suggestion, uploading, checking, upload, uploadMusic, proofread,
+  return { extras, removeExtra: index => setExtras(prev => prev.filter((_, i) => i !== index)), logo, character, music, musicPreset, setMusicPreset, text, setText, suggestion, uploading, checking, upload, uploadMusic, proofread,
     applySuggestion: () => setText(suggestion), clear: kind => (kind === 'logo' ? setLogo : kind === 'music' ? setMusic : setCharacter)(null) };
 }

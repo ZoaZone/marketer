@@ -859,7 +859,7 @@ export default function QuickCreate() {
       </div>
 
       {studioEngine === "base44" ? (
-        <Base44Studio type={outputType} prompt={prompt} referenceImageUrls={referenceImageUrls} onBusyChange={setBase44Busy} />
+        <Base44Studio type={outputType} prompt={prompt} referenceImageUrls={referenceImageUrls} onBusyChange={setBase44Busy} onPromptChange={setPrompt} />
       ) : outputType === "image" ? (
         <div className="grid md:grid-cols-2 gap-5">
           <div className="bg-card border border-border rounded-2xl p-6 space-y-5">

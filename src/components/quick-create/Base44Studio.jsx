@@ -4,8 +4,9 @@ import Base44StudioPreview from '@/components/quick-create/Base44StudioPreview';
 import StudioVideoBranding from '@/components/quick-create/StudioVideoBranding';
 import useStudioVideoOptions from '@/components/quick-create/useStudioVideoOptions';
 import useStudioMedia from '@/components/quick-create/useStudioMedia';
+import StudioReviewPanel from '@/components/quick-create/StudioReviewPanel';
 
-export default function Base44Studio({ type, prompt, referenceImageUrls, onBusyChange }) {
+export default function Base44Studio({ type, prompt, referenceImageUrls, onBusyChange, onPromptChange }) {
   const [imageRatio, setImageRatio] = useState('1:1');
   const [videoRatio, setVideoRatio] = useState('16:9');
   const [duration, setDuration] = useState(15);
@@ -13,7 +14,7 @@ export default function Base44Studio({ type, prompt, referenceImageUrls, onBusyC
   const [size, setSize] = useState('hd');
   const [optionsError, setOptionsError] = useState('');
   const options = useStudioVideoOptions(setOptionsError);
-  const media = useStudioMedia({ type, prompt, referenceImageUrls: type === 'video' ? (options.character ? [options.character.fileUri] : []) : referenceImageUrls, ratio: type === 'video' ? videoRatio : imageRatio, duration, audio, size });
+  const media = useStudioMedia({ type, prompt, referenceImageUrls: type === 'video' ? [options.character, ...options.extras].filter(Boolean).map(a => a.fileUri) : referenceImageUrls, ratio: type === 'video' ? videoRatio : imageRatio, duration, audio, size });
   const blocked = media.busy || media.saving || !!options.uploading || options.checking;
   useEffect(() => { onBusyChange(blocked); return () => onBusyChange(false); }, [blocked, onBusyChange]);
   const error = optionsError || media.error;
@@ -34,7 +35,10 @@ export default function Base44Studio({ type, prompt, referenceImageUrls, onBusyC
       <Base44StudioControls type={type} ratio={type === 'video' ? videoRatio : imageRatio} setRatio={type === 'video' ? setVideoRatio : setImageRatio} size={size} setSize={setSize} duration={duration} setDuration={setDuration} audio={audio} setAudio={setAudio} busy={blocked} pending={type === 'video' && !!media.pending} gateway={media.gateway} estimatedCredits={media.estimatedCredits} onEstimate={media.estimate} hasPrompt={!!prompt.trim()} onGenerate={() => { setOptionsError(''); media.generate(); }}>
         <StudioVideoBranding {...options} showCharacter={type === 'video'} disabled={blocked || !!media.pending} />
       </Base44StudioControls>
-      <Base44StudioPreview result={media.result} busy={blocked} saving={media.saving} saved={media.saved && !needsGraphics} onSave={media.save} needsGraphics={needsGraphics} onRender={() => { setOptionsError(''); media.render(options); }} type={type} />
+      <div className="space-y-5">
+        <Base44StudioPreview result={media.result} busy={blocked} saving={media.saving} saved={media.saved && !needsGraphics} onSave={media.save} needsGraphics={needsGraphics} onRender={() => { setOptionsError(''); media.render(options); }} type={type} />
+        <StudioReviewPanel prompt={prompt} text={options.text} referenceCount={type === 'video' ? (options.character ? 1 : 0) + options.extras.length : 0} disabled={blocked} onApplyPrompt={onPromptChange} onApplyText={options.setText} />
+      </div>
     </div>
   </div>;
 }
