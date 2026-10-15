@@ -3,7 +3,7 @@ import { useOutletContext, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { mine } from "@/utils/scope";
-import { Image, FileText, Video, Trash2, Download, Copy, Search, Loader2, Sparkles, X, ExternalLink, Wand2 } from "lucide-react";
+import { Image, FileText, Video, Trash2, Download, Copy, Search, Loader2, Sparkles, X, ExternalLink, Wand2, Sliders } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 import resolveStudioMedia from '@/components/quick-create/resolveStudioMedia';
 
@@ -92,6 +92,8 @@ export default function MediaLibrary() {
     });
   };
 
+  const editAsset = (a) => navigate("/media-editor", { state: { assets: [a] } });
+
   // Thumbnail for grid cards
   const CardThumbnail = ({ a }) => {
     if (a.type === "image" && a.file_url) {
@@ -173,6 +175,12 @@ export default function MediaLibrary() {
                       <Wand2 className="w-3 h-3" /> Use as reference
                     </button>
                   )}
+                  {a.file_url && (a.type === "image" || a.type === "video") && (
+                    <button onClick={() => editAsset(a)}
+                      className="w-full mt-1.5 py-1.5 rounded-lg text-[10px] font-medium bg-fuchsia-500/10 text-fuchsia-400 hover:bg-fuchsia-500/20 flex items-center justify-center gap-1">
+                      <Sliders className="w-3 h-3" /> Edit media
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -198,6 +206,9 @@ export default function MediaLibrary() {
                   <div className="flex gap-2">
                     {a.file_url && (a.type === "image" || a.type === "video") && (
                       <button onClick={() => sendAsReference(a)} title="Use as reference" className="p-1.5 rounded-lg text-cyan-400 hover:bg-cyan-500/10"><Wand2 className="w-3.5 h-3.5" /></button>
+                    )}
+                    {a.file_url && (a.type === "image" || a.type === "video") && (
+                      <button onClick={() => editAsset(a)} title="Edit media" className="p-1.5 rounded-lg text-fuchsia-400 hover:bg-fuchsia-500/10"><Sliders className="w-3.5 h-3.5" /></button>
                     )}
                     <button onClick={() => copy(a)} className={`p-1.5 rounded-lg ${copiedId === a.id ? "text-emerald-400" : "text-muted-foreground hover:text-foreground"}`}><Copy className="w-3.5 h-3.5" /></button>
                     {a.file_url && <a href={a.file_url} download className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground"><Download className="w-3.5 h-3.5" /></a>}

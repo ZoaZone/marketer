@@ -29,7 +29,7 @@ const LANES = [
 const TOOLS = [
   { to: "/movie-maker",  icon: Film,    gradient: "from-cyan-500 to-blue-600",   label: "Movie Maker", description: "Feature-length AI films — scenes, music, subtitles, dubbing" },
   { to: "/song-creator", icon: Music,   gradient: "from-violet-500 to-pink-600", label: "Song Creator", description: "AI lyrics, voiceover, and multilingual dubbing" },
-  { to: "/media-editor", icon: Sliders, gradient: "from-fuchsia-500 to-purple-600", label: "Media Editor", description: "Style transforms, captions, background music" },
+  { to: "/media-editor", icon: Sliders, gradient: "from-fuchsia-500 to-purple-600", label: "Edit Media", description: "Trim, crop, text, logos, PiP, music, voice-over and AI fixes" },
   { to: "/demo-video",   icon: Monitor, gradient: "from-fuchsia-500 to-purple-600", label: "Demo Video", description: "Turn any URL into a narrated demo video" },
 ];
 

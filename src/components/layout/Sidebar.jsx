@@ -70,7 +70,7 @@ const NAV_SECTIONS = [
       { to: "/movie-maker",  icon: Film,    label: "Movie Maker", badge: "ENT", minTier: 4 },
       { to: "/song-creator", icon: Music,   label: "Song Creator", badge: "ENT", minTier: 4 },
       { to: "/dubbing",      icon: Languages, label: "Dubbing Studio", badge: "ENT", minTier: 4 },
-      { to: "/media-editor", icon: Sliders, label: "AI Media Editor", badge: "ENT", minTier: 4 },
+      { to: "/media-editor", icon: Sliders, label: "Edit Media", badge: "NEW" },
       { to: "/demo-video",   icon: Monitor, label: "Create Demo Video", badge: "NEW" },
       { to: "/ad-creator",   icon: PenTool, label: "Ad Creator", minTier: 2 },
       { to: "/quick-create", icon: Wand2,   label: "Quick Create", badge: "NEW" },
