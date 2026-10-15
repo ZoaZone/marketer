@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Wand2 } from 'lucide-react';
 import { generateImage, uploadFile } from '@/utils/aiClient';
 import { fetchBlobUrl } from '@/components/media-editor/importMedia';
+import CreditNotice from '@/components/media-editor/CreditNotice';
 import { btn, Chip } from '@/components/media-editor/ui';
 
 const STYLES = [
@@ -16,17 +17,21 @@ const STYLES = [
 ];
 
 export default function AiRestyle({ p, sel }) {
-  const [style, setStyle] = useState(null), [custom, setCustom] = useState('');
+  const [style, setStyle] = useState(null), [custom, setCustom] = useState(''), [needCredits, setNeedCredits] = useState(false);
   const isImage = sel?.kind === 'image';
   const apply = () => p.run(async () => {
     const prompt = `Edit this image: ${[style, custom].filter(Boolean).join(' ')}`;
     const blob = await (await fetch(sel.src)).blob();
     const url = await uploadFile(new File([blob], 'clip.png', { type: blob.type || 'image/png' }));
-    const result = await generateImage({ prompt, referenceImageUrls: [url] });
+    setNeedCredits(false);
+    let result;
+    try { result = await generateImage({ prompt, referenceImageUrls: [url] }); }
+    catch (e) { if (e.upgradeRequired) { setNeedCredits(true); return; } throw e; }
     if (!result) throw new Error('AI restyle failed. Try a different style.');
     p.updateClip(sel.id, { src: await fetchBlobUrl(result, 'image') });
   });
   return <div className="space-y-2 rounded-xl border border-border bg-card p-3">
+    {needCredits && <CreditNotice needed />}
     <p className="text-xs font-semibold text-foreground flex items-center gap-1.5"><Wand2 className="w-3.5 h-3.5 text-fuchsia-400" />AI restyle (photos)</p>
     <p className="text-[11px] text-muted-foreground">{isImage ? 'Transforms the selected photo with AI. This uses AI credits.' : 'Select a photo clip in the Clips tab to restyle it.'}</p>
     <div className="flex flex-wrap gap-2">{STYLES.map(([label, prompt]) => <Chip key={label} active={style === prompt} onClick={() => setStyle(style === prompt ? null : prompt)}>{label}</Chip>)}</div>

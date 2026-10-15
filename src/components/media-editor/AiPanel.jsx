@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Sparkles, SpellCheck, ScanSearch } from 'lucide-react';
 import { btn } from '@/components/media-editor/ui';
 import { proofreadText, suggestCopy, scanClipFrame } from '@/components/media-editor/aiTools';
+import CreditNotice from '@/components/media-editor/CreditNotice';
 import AiRestyle from '@/components/media-editor/AiRestyle';
 
 const Section = ({ title, hint, children }) => <div className="space-y-2 rounded-xl border border-border bg-card p-3"><p className="text-xs font-semibold text-foreground flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5 text-fuchsia-400" />{title}</p><p className="text-[11px] text-muted-foreground">{hint}</p>{children}</div>;
@@ -30,6 +31,7 @@ export default function AiPanel({ p }) {
   const scanFrame = () => p.run(async () => { setStatus('Scanning the frame…'); setScan(await scanClipFrame(sel, p.size)); setStatus(''); });
 
   return <div className="space-y-3">
+    <CreditNotice />
     {status && <p role="status" className="text-xs text-muted-foreground">{status}</p>}
     <Section title="Fix spelling" hint="Checks every text layer for spelling mistakes. Names and brands are kept.">
       <button type="button" className={btn} disabled={p.busy || !texts.length} onClick={fixSpelling}><SpellCheck className="w-3.5 h-3.5" />Fix spelling in my text</button>

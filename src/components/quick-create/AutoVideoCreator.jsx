@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Wand2, Loader2, Download, Save, CheckCircle2, AlertTriangle, Clapperboard, Zap, SlidersHorizontal } from "lucide-react";
+import { Wand2, Loader2, Download, Save, CheckCircle2, AlertTriangle, Clapperboard, Zap, SlidersHorizontal, Sliders } from "lucide-react";
 import { VIDEO_RATIOS } from "@/utils/videoAssembler";
 import { uploadFile } from "@/utils/lane1";
 import { MUSIC_PRESETS, defaultPresetFor } from "@/components/quick-create/musicPresets";
@@ -116,6 +116,7 @@ export default function AutoVideoCreator({ prompt, referenceImageUrls, canMotion
               {v.saved ? <><CheckCircle2 className="w-4 h-4" /> Saved</> : <><Save className="w-4 h-4" /> Save to Library</>}
             </button>
           </div>
+          <Link to="/media-editor" state={{ assets: [{ type: "video", file_url: v.result, title: (prompt || "Auto video").slice(0, 40) }] }} className="flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border text-sm text-foreground hover:bg-muted/20"><Sliders className="w-4 h-4" /> Fix text, logos &amp; more in Edit Media</Link>
         </div>
       )}
     </div>
