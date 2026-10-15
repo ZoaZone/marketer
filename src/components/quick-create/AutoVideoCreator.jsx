@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Wand2, Loader2, Download, Save, CheckCircle2, AlertTriangle, Clapperboard, Zap, SlidersHorizontal } from "lucide-react";
 import { VIDEO_RATIOS } from "@/utils/videoAssembler";
+import { uploadFile } from "@/utils/lane1";
 import useAutoVideo from "@/components/quick-create/useAutoVideo";
 
 const btn = (on) => `px-3 py-1.5 rounded-lg border text-xs font-bold transition-all ${on ? "bg-fuchsia-500/15 border-fuchsia-500/50 text-fuchsia-400" : "border-border text-muted-foreground hover:bg-muted/20"}`;
@@ -12,7 +13,23 @@ export default function AutoVideoCreator({ prompt, referenceImageUrls, canMotion
   const [ratio, setRatio] = useState(VIDEO_RATIOS[0]);
   const cinematic = quality === "cinematic";
   const [resolution, setResolution] = useState("1080p");
-  const v = useAutoVideo({ cinematic, canMotion, canMusic, ratio, resolution, referenceImageUrls });
+  const [musicMode, setMusicMode] = useState(isPro ? "ai" : "none");
+  const [musicUrl, setMusicUrl] = useState("");
+  const [musicName, setMusicName] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [musicError, setMusicError] = useState("");
+  const v = useAutoVideo({ cinematic, canMotion, canMusic, ratio, resolution, referenceImageUrls, musicMode, uploadedMusicUrl: musicUrl });
+
+  const uploadMusic = async (file) => {
+    if (!file) return;
+    setUploading(true); setMusicError("");
+    try {
+      const url = await uploadFile(file);
+      if (!url) throw new Error("Upload failed.");
+      setMusicUrl(url); setMusicName(file.name); setMusicMode("upload");
+    } catch (e) { setMusicError(e?.message || "Music upload failed."); }
+    setUploading(false);
+  };
 
   useEffect(() => { onBusyChange(v.busy); return () => onBusyChange(false); }, [v.busy, onBusyChange]);
 
@@ -46,6 +63,22 @@ export default function AutoVideoCreator({ prompt, referenceImageUrls, canMotion
           <div className="flex gap-2 flex-wrap">
             {[["720p", "HD 720p"], ["1080p", "Full HD 1080p"]].map(([r, l]) => <button key={r} type="button" disabled={v.busy} onClick={() => setResolution(r)} className={btn(resolution === r)}>{l}</button>)}
           </div>
+        </div>
+        <div>
+          <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">Background music</label>
+          <div className="flex gap-2 flex-wrap">
+            <button type="button" disabled={v.busy} onClick={() => setMusicMode("none")} className={btn(musicMode === "none")}>No music</button>
+            <button type="button" disabled={v.busy || !canMusic} onClick={() => setMusicMode("ai")} className={btn(musicMode === "ai")}>AI-composed score</button>
+            <button type="button" disabled={v.busy || !musicUrl} onClick={() => setMusicMode("upload")} className={btn(musicMode === "upload")}>My track{musicName ? `: ${musicName.slice(0, 18)}` : ""}</button>
+            <label className={`${btn(false)} cursor-pointer ${v.busy || uploading ? "opacity-50 pointer-events-none" : ""}`}>
+              {uploading ? "Uploading…" : "Upload a track"}
+              <input type="file" accept="audio/*" className="hidden" onChange={e => { uploadMusic(e.target.files?.[0]); e.target.value = ""; }} />
+            </label>
+          </div>
+          {!canMusic && <p className="text-[11px] text-muted-foreground mt-2">AI-composed music is on Pro plans. You can upload your own track on any plan.</p>}
+          {musicError && <p className="text-[11px] text-red-400 mt-2">{musicError}</p>}
+          {musicMode === "upload" && musicUrl && <audio src={musicUrl} controls className="w-full mt-2 h-8" />}
+          <p className="text-[11px] text-muted-foreground mt-2">Music plays under the voice-over at a lower volume. Works for Quick and Cinematic motion videos.</p>
         </div>
         <button onClick={() => v.run(prompt)} disabled={v.busy || !prompt.trim()}
           className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white text-sm font-bold hover:opacity-90 disabled:opacity-60 shadow-lg">

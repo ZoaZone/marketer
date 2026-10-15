@@ -9,7 +9,7 @@ const CLEAN = "High quality, natural lighting, realistic, sharp detail, no text,
 
 const CLIP_SECONDS = 5;
 
-export default function useAutoVideo({ cinematic, canMotion, canMusic, ratio, resolution, referenceImageUrls }) {
+export default function useAutoVideo({ cinematic, canMotion, canMusic, ratio, resolution, referenceImageUrls, musicMode = "none", uploadedMusicUrl = "" }) {
   const [stage, setStage] = useState("");
   const [progress, setProgress] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -73,17 +73,20 @@ export default function useAutoVideo({ cinematic, canMotion, canMusic, ratio, re
       } catch (e) { warn(`No voice-over: ${e?.message || "failed"}`); }
 
       let musicUrl;
-      if (cinematic && canMusic) {
+      if (musicMode === "upload" && uploadedMusicUrl) {
+        musicUrl = uploadedMusicUrl;
+      } else if (musicMode === "ai" && canMusic) {
         setStage("Composing the score"); setProgress(0.8);
         try {
           const total = scenes.reduce((a, s) => a + (Number(s.seconds) || 8), 0);
           const m = await generateMusic({
-            prompt: `Cinematic background score for: ${prompt}`,
+            prompt: `${cinematic ? "Cinematic" : "Uplifting"} background score for: ${prompt}`,
             durationSeconds: Math.min(MAX_MUSIC_SECONDS, Math.max(10, Math.round(total))),
             instrumental: true, mood: "cinematic",
           });
           musicUrl = m?.url;
-        } catch (e) { warn(`No music: ${e?.message || "failed"}`); }
+        } catch (e) { warn(`AI music could not be created (${e?.message || "failed"}). Your video has no music. Try uploading your own track instead.`); }
+        if (!musicUrl) warn("AI music was not produced, so your video has no music. Try uploading your own track instead.");
       }
 
       setStage("Putting it all together"); setProgress(0.88);
