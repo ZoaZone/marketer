@@ -31,11 +31,14 @@ export default function LeadCapturePage() {
     setSaving(true);
     try {
       const { funnel_id, ...rest } = form;
-      await base44.entities.LeadCapture.create({ ...rest, ...(funnel_id ? { funnel_id } : {}), captured_at:new Date().toISOString() });
+      const first = funnel_id ? (await base44.entities.FunnelStage.filter({ funnel_id }, "stage_order", 1))[0] : null;
+      const now = Date.now();
+      // Enrolling in a funnel schedules its first stage; the "Run Funnels" automation sends it when due.
+      const enroll = funnel_id ? { funnel_id, ...(first ? { funnel_status:"active", current_stage_order:first.stage_order, next_action_at:new Date(now + (first.delay_hours || 0) * 3600000).toISOString() } : {}) } : {};
+      await base44.entities.LeadCapture.create({ ...rest, ...enroll, captured_at:new Date(now).toISOString() });
       if (funnel_id) {
         const f = funnels.find(x => x.id === funnel_id);
         await base44.entities.Funnel.update(funnel_id, { total_leads: (f?.total_leads || 0) + 1 });
-        const first = (await base44.entities.FunnelStage.filter({ funnel_id }, "stage_order", 1))[0];
         if (first) await base44.entities.FunnelStage.update(first.id, { entry_count: (first.entry_count || 0) + 1 });
         qc.invalidateQueries(["funnels"]); qc.invalidateQueries(["funnel_stages"]); qc.invalidateQueries(["funnels_list"]);
       }
@@ -111,7 +114,7 @@ export default function LeadCapturePage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead><tr className="bg-muted/20 border-b border-border">
-                {["Name","Email","Phone","Source","Campaign","Captured"].map(h=><th key={h} className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">{h}</th>)}
+                {["Name","Email","Phone","Source","Campaign","Funnel status","Captured"].map(h=><th key={h} className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">{h}</th>)}
               </tr></thead>
               <tbody className="divide-y divide-border">
                 {filtered.slice(0,100).map(l=>(
@@ -121,6 +124,7 @@ export default function LeadCapturePage() {
                     <td className="px-4 py-3 text-xs text-muted-foreground">{l.phone||"—"}</td>
                     <td className="px-4 py-3"><span className={`text-xs px-2 py-0.5 rounded-full font-medium ${SOURCE_COLORS[l.source]||"bg-muted text-muted-foreground"}`}>{l.source}</span></td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">{l.utm_campaign||"—"}</td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">{l.funnel_id ? (l.last_action_note || (l.funnel_status === "active" ? "Waiting for first stage" : l.funnel_status || "—")) : "—"}</td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">{l.captured_at?new Date(l.captured_at).toLocaleDateString():""}</td>
                   </tr>
                 ))}

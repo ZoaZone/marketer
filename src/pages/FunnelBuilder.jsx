@@ -14,7 +14,8 @@ export default function FunnelBuilder() {
   const [showNewFunnel, setShowNewFunnel] = useState(false);
   const [showNewStage, setShowNewStage] = useState(false);
   const [funnelForm, setFunnelForm] = useState({ name:"", description:"" });
-  const [stageForm, setStageForm] = useState({ name:"", action_type:"email" });
+  const emptyStage = { name:"", action_type:"email", delay_hours:0, message_subject:"", message_body:"", whatsapp_template:"", whatsapp_language:"en_US", whatsapp_params:"" };
+  const [stageForm, setStageForm] = useState(emptyStage);
   const [saving, setSaving] = useState(false);
 
   const { data: funnels = [], isLoading } = useQuery({ queryKey:["funnels", user?.email], queryFn:()=>base44.entities.Funnel.filter(mine(user),"-created_date",50), enabled:!!user?.email });
@@ -39,7 +40,7 @@ export default function FunnelBuilder() {
     setSaving(true);
     await base44.entities.FunnelStage.create({ ...stageForm, funnel_id:selected.id, stage_order:stages.length+1, entry_count:0, exit_count:0 });
     qc.invalidateQueries(["funnel_stages"]);
-    setStageForm({ name:"", action_type:"email" }); setShowNewStage(false);
+    setStageForm(emptyStage); setShowNewStage(false);
     setSaving(false);
   };
 
@@ -126,6 +127,7 @@ export default function FunnelBuilder() {
                           <div className="flex items-center gap-2 mt-0.5">
                             <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${ACTION_COLORS[s.action_type]||"bg-muted text-muted-foreground"}`}>Action: {s.action_type}</span>
                             <span className="text-xs text-muted-foreground">{s.entry_count||0} entries</span>
+                            {s.delay_hours>0 && <span className="text-xs text-muted-foreground">· after {s.delay_hours}h</span>}
                           </div>
                         </div>
                       </div>
@@ -177,6 +179,28 @@ export default function FunnelBuilder() {
                 <option value="whatsapp">Send WhatsApp</option><option value="wait">Wait</option>
                 <option value="tag">Add Tag</option><option value="move_stage">Move Stage</option>
               </select></div>
+              <div className="space-y-1.5"><label className="text-xs font-medium text-muted-foreground">Send after (hours)</label>
+              <input type="number" min={0} value={stageForm.delay_hours} onChange={e=>setStageForm(p=>({...p,delay_hours:Math.max(0,+e.target.value||0)}))} className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"/>
+              <p className="text-[11px] text-muted-foreground">Delay after the lead reaches this stage. 0 = at the next check (every 15 minutes).</p></div>
+              {stageForm.action_type==="email" && <>
+                <div className="space-y-1.5"><label className="text-xs font-medium text-muted-foreground">Email subject</label>
+                <input value={stageForm.message_subject} onChange={e=>setStageForm(p=>({...p,message_subject:e.target.value}))} placeholder="Welcome, {{name}}!" className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"/></div>
+                <div className="space-y-1.5"><label className="text-xs font-medium text-muted-foreground">Email message</label>
+                <textarea value={stageForm.message_body} onChange={e=>setStageForm(p=>({...p,message_body:e.target.value}))} rows={4} placeholder="Hi {{name}}, thanks for your interest…" className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm focus:outline-none resize-none"/>
+                <p className="text-[11px] text-muted-foreground">You can use {"{{name}}"}, {"{{email}}"} and {"{{phone}}"}.</p></div>
+              </>}
+              {stageForm.action_type==="whatsapp" && <>
+                <div className="space-y-1.5"><label className="text-xs font-medium text-muted-foreground">Approved WhatsApp template name</label>
+                <input value={stageForm.whatsapp_template} onChange={e=>setStageForm(p=>({...p,whatsapp_template:e.target.value}))} placeholder="welcome_message" className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"/>
+                <p className="text-[11px] text-muted-foreground">WhatsApp only lets businesses start a chat with an approved template.</p></div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1.5"><label className="text-xs font-medium text-muted-foreground">Language</label>
+                  <input value={stageForm.whatsapp_language} onChange={e=>setStageForm(p=>({...p,whatsapp_language:e.target.value}))} className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none"/></div>
+                  <div className="space-y-1.5"><label className="text-xs font-medium text-muted-foreground">Variables (use |)</label>
+                  <input value={stageForm.whatsapp_params} onChange={e=>setStageForm(p=>({...p,whatsapp_params:e.target.value}))} placeholder="{{name}}" className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none"/></div>
+                </div>
+              </>}
+              {stageForm.action_type==="sms" && <p className="text-[11px] text-amber-400">SMS sending is not connected yet, so this stage is skipped.</p>}
             </div>
             <div className="flex gap-3 mt-5">
               <button onClick={()=>setShowNewStage(false)} className="flex-1 py-2.5 border border-border rounded-xl text-sm">Cancel</button>

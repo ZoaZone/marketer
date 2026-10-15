@@ -33,6 +33,31 @@
         "move_stage"
       ]
     },
+    "delay_hours": {
+      "type": "number",
+      "default": 0,
+      "description": "Hours to wait after the lead reaches this stage before its action runs."
+    },
+    "message_subject": {
+      "type": "string",
+      "description": "Email subject. Supports {{name}}."
+    },
+    "message_body": {
+      "type": "string",
+      "description": "Email body. Supports {{name}}, {{email}}, {{phone}}."
+    },
+    "whatsapp_template": {
+      "type": "string",
+      "description": "Name of an approved WhatsApp message template. WhatsApp only allows templates for first contact."
+    },
+    "whatsapp_language": {
+      "type": "string",
+      "description": "Template language code, e.g. en_US."
+    },
+    "whatsapp_params": {
+      "type": "string",
+      "description": "Template body variables, separated by |. Supports {{name}}."
+    },
     "description": {
       "type": "string",
       "maxLength": 1000

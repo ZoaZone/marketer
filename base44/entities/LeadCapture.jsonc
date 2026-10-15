@@ -44,6 +44,31 @@
       "type": "string",
       "format": "date-time"
     },
+    "funnel_status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "completed"
+      ],
+      "description": "active = the funnel is still working through stages for this lead."
+    },
+    "current_stage_order": {
+      "type": "number",
+      "description": "The stage whose action runs next."
+    },
+    "next_action_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the current stage's action is due."
+    },
+    "last_action_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "last_action_note": {
+      "type": "string",
+      "description": "Result of the last automated action, including any error."
+    },
     "description": {
       "type": "string",
       "maxLength": 1000
