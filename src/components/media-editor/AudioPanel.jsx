@@ -3,6 +3,7 @@ import { Upload, X } from 'lucide-react';
 import { MUSIC_PRESETS } from '@/components/quick-create/musicPresets';
 import { btn, Slider, Chip } from '@/components/media-editor/ui';
 import VoiceTimeline from '@/components/media-editor/VoiceTimeline';
+import AudioMixer from '@/components/media-editor/AudioMixer';
 
 function Track({ track, label, onVolume, onRemove }) {
   return <div className="space-y-1 rounded-xl border border-border bg-card p-3">
@@ -25,5 +26,6 @@ export default function AudioPanel({ p }) {
       <p className="text-[11px] text-muted-foreground">Your upload replaces the library style. Use only music you have the rights to.</p>
     </div>
     <VoiceTimeline p={p} />
+    <AudioMixer p={p} />
   </div>;
 }

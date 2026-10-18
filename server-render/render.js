@@ -66,10 +66,12 @@ export const MAX_TOTAL_DURATION_SECONDS = Number(process.env.MAX_TOTAL_DURATION_
 // — kept available for backward compatibility, but no longer the default.
 const VALID_SCENE_FILL_STRATEGIES = new Set(["loop", "slow", "freeze"]);
 const SCENE_FILL = (() => {
-  const raw = (process.env.SCENE_FILL || "loop").toLowerCase();
+  // Default is "slow": looping replays the same clip, which is what made
+  // multi-scene videos look like one clip repeated.
+  const raw = (process.env.SCENE_FILL || "slow").toLowerCase();
   if (!VALID_SCENE_FILL_STRATEGIES.has(raw)) {
-    console.error(`[render] SCENE_FILL="${process.env.SCENE_FILL}" is not one of loop|slow|freeze — defaulting to loop.`);
-    return "loop";
+    console.error(`[render] SCENE_FILL="${process.env.SCENE_FILL}" is not one of loop|slow|freeze — defaulting to slow.`);
+    return "slow";
   }
   return raw;
 })();
@@ -190,8 +192,11 @@ function videoFillFor(videoPath, naturalSeconds, targetSeconds) {
     // Stretches the clip's own playback speed to exactly fill
     // targetSeconds instead of repeating it — motion continues at a
     // slower pace rather than restarting from frame 1.
-    const ratio = targetSeconds / Math.max(0.1, naturalSeconds);
-    return { inputArgs: ["-i", videoPath], vf: `setpts=${ratio.toFixed(6)}*PTS` };
+    // Slows at most 2x; any remaining gap holds the last frame rather than
+    // repeating the clip or crawling in extreme slow motion.
+    const ratio = Math.min(2, targetSeconds / Math.max(0.1, naturalSeconds));
+    const padSeconds = Math.max(0, targetSeconds - naturalSeconds * ratio);
+    return { inputArgs: ["-i", videoPath], vf: `setpts=${ratio.toFixed(6)}*PTS${padSeconds > 0.05 ? `,tpad=stop_mode=clone:stop_duration=${padSeconds.toFixed(3)}` : ""}` };
   }
   // "freeze" — explicit backward-compat: hold the last decoded frame for
   // the remaining time via tpad, rather than relying on the video stream

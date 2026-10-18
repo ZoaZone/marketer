@@ -760,6 +760,8 @@ export default function QuickCreate() {
     try {
       await base44.entities.ContentAsset.create({
         type: "video", title: prompt.slice(0, 60) || "Quick Create", file_url: videoResult, ai_generated: true, prompt_used: prompt.slice(0, 500),
+        voiceover_url: voiceoverUrl && !/^blob:/i.test(voiceoverUrl) ? voiceoverUrl : undefined,
+        music_url: musicUrl && !/^blob:/i.test(musicUrl) ? musicUrl : undefined,
       });
       qc.invalidateQueries(["media_library"]);
       setVideoSaved(true);

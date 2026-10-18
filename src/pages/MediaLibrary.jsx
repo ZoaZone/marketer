@@ -7,6 +7,8 @@ import { Image, FileText, Video, Trash2, Download, Copy, Search, Loader2, Sparkl
 import PageHeader from "@/components/ui/PageHeader";
 import resolveStudioMedia from '@/components/quick-create/resolveStudioMedia';
 
+import CompanionFiles from "@/components/media-library/CompanionFiles";
+
 const TYPE_COLORS = {
   image: "bg-purple-500/10 text-purple-400",
   video: "bg-red-500/10 text-red-400",
@@ -43,6 +45,7 @@ function AssetPreview({ asset, onClose }) {
               <ExternalLink className="w-3 h-3" /> Open original
             </a>
           )}
+          <CompanionFiles asset={asset} />
         </div>
       </div>
     </div>

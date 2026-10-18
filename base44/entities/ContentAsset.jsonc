@@ -29,6 +29,18 @@
     "file_url": {
       "type": "string"
     },
+    "voiceover_url": {
+      "type": "string",
+      "description": "Separate voice-over audio file belonging to this item, kept for later editing or reference."
+    },
+    "music_url": {
+      "type": "string",
+      "description": "Separate background music file belonging to this item."
+    },
+    "dubbing_url": {
+      "type": "string",
+      "description": "Separate dubbed audio file belonging to this item."
+    },
     "platform": {
       "type": "string"
     },

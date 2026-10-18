@@ -13,7 +13,7 @@ export default function ExportPanel({ p }) {
   const doExport = () => p.run(async () => {
     setResult(null); setSaved(false); setProgress(0);
     try {
-      const project = { size: p.size, clips: p.clips, layers: p.layers, music: p.music, musicPreset: p.musicPreset, voice: p.voice, clipVolume: p.clipVolume };
+      const project = { size: p.size, clips: p.clips, layers: p.layers, music: p.music, musicPreset: p.musicPreset, voice: p.voice, clipVolume: p.clipVolume, mix: p.mix };
       const blob = imageOnly ? await exportImage(project) : await exportVideo(project, setProgress);
       setResult({ blob, url: URL.createObjectURL(blob), isImage: imageOnly });
     } finally { setProgress(null); }

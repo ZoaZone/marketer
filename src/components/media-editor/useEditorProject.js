@@ -10,6 +10,7 @@ export default function useEditorProject() {
   const [layers, setLayers] = useState([]), [selLayerId, setSelLayerId] = useState(null);
   const [music, setMusic] = useState(null), [musicPreset, setMusicPreset] = useState('');
   const [voice, setVoice] = useState(null), [clipVolume, setClipVolume] = useState(1);
+  const [mix, setMix] = useState({ bass: 0, treble: 0, fadeIn: 0, fadeOut: 0, duck: false });
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
 
   const run = useCallback(async job => {
@@ -61,7 +62,7 @@ export default function useEditorProject() {
 
   return {
     size, setSize, clips, selClipId, setSelClipId, layers, selLayerId, setSelLayerId, music, setMusic, musicPreset, setMusicPreset,
-    voice, setVoice, clipVolume, setClipVolume, busy, error, setError, run,
+    voice, setVoice, clipVolume, setClipVolume, mix, setMix, busy, error, setError, run,
     addFiles, addAssets, updateClip, removeClip, moveClip, addLayer, addMediaLayer, updateLayer, removeLayer, uploadAudio,
   };
 }

@@ -19,6 +19,7 @@ export default function useAutoVideo({ cinematic, canMotion, canMusic, ratio, re
   const [warnings, setWarnings] = useState([]);
   const [result, setResult] = useState("");
   const [saved, setSaved] = useState(false);
+  const [tracks, setTracks] = useState({});
 
   const run = async (prompt) => {
     setBusy(true); setError(""); setWarnings([]); setResult(""); setSaved(false); setProgress(0);
@@ -117,6 +118,7 @@ export default function useAutoVideo({ cinematic, canMotion, canMusic, ratio, re
         url = await assembleLane1Video(payload, { onProgress: p => setProgress(0.88 + 0.12 * p) });
       }
       if (!url) throw new Error("The video finished without a playable result.");
+      setTracks({ voiceoverUrl, musicUrl });
       setResult(url); setProgress(1); setStage("");
     } catch (e) {
       setError(e?.message || "Something went wrong creating your video.");
@@ -128,6 +130,7 @@ export default function useAutoVideo({ cinematic, canMotion, canMusic, ratio, re
   const save = async (prompt) => {
     await base44.entities.ContentAsset.create({
       type: "video", title: prompt.slice(0, 60) || "Quick Create", file_url: result, ai_generated: true, prompt_used: prompt.slice(0, 500),
+      voiceover_url: tracks.voiceoverUrl, music_url: tracks.musicUrl,
     });
     setSaved(true);
   };

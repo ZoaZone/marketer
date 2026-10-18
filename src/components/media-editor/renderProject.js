@@ -53,7 +53,12 @@ export async function exportVideo(project, onProgress) {
     const canvas = document.createElement('canvas'); canvas.width = size.w; canvas.height = size.h;
     const ctx = canvas.getContext('2d');
     for (const l of layers) assets[l.id] = await makeLayerElement(l);
-    const dest = audio.createMediaStreamDestination();
+    const mix = project.mix || {};
+    const out = audio.createMediaStreamDestination(), dest = audio.createGain();
+    const low = audio.createBiquadFilter(), high = audio.createBiquadFilter();
+    low.type = 'lowshelf'; low.frequency.value = 200; low.gain.value = mix.bass || 0;
+    high.type = 'highshelf'; high.frequency.value = 4000; high.gain.value = mix.treble || 0;
+    dest.connect(low).connect(high).connect(out);
     for (const c of clips) {
       const el = await makeMediaElement(c.kind, c.src); els.push(el);
       if (c.kind === 'video') { const g = audio.createGain(); g.gain.value = clipVolume; audio.createMediaElementSource(el).connect(g).connect(dest); }
@@ -61,13 +66,15 @@ export async function exportVideo(project, onProgress) {
     const tracks = [];
     const addTrack = (buffer, volume, delay = 0) => {
       const src = audio.createBufferSource(), g = audio.createGain();
-      src.buffer = buffer; src.delay = delay; g.gain.value = volume; src.connect(g).connect(dest); tracks.push(src); return src;
+      src.buffer = buffer; src.delay = delay; src.vol = g; g.gain.value = volume; src.connect(g).connect(dest); tracks.push(src); return src;
     };
-    if (music?.src) addTrack(await decode(audio, music.src), music.volume).loop = true;
-    else if (musicPreset) addTrack(await renderPresetBuffer(musicPreset, Math.ceil(total) + 2), 0.8).loop = true;
+    let musicTrack = null;
+    if (music?.src) musicTrack = addTrack(await decode(audio, music.src), music.volume);
+    else if (musicPreset) musicTrack = addTrack(await renderPresetBuffer(musicPreset, Math.ceil(total) + 2), 0.8);
+    if (musicTrack) musicTrack.loop = true;
     if (voice?.src) addTrack(await decode(audio, voice.src), voice.volume, voice.start || 0);
     stream = canvas.captureStream(30);
-    dest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
+    out.stream.getAudioTracks().forEach(t => stream.addTrack(t));
     const mimeType = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4'].find(m => MediaRecorder.isTypeSupported(m));
     if (!mimeType) throw new Error('This browser cannot export video. Please use Chrome or Edge.');
     recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 6000000 });
@@ -84,7 +91,15 @@ export async function exportVideo(project, onProgress) {
       raf = requestAnimationFrame(frame);
     };
     for (const l of layers) if (l.media === 'video') assets[l.id]?.play().catch(() => {});
-    frame(); recorder.start(); tracks.forEach(t => t.start(audio.currentTime + (t.delay || 0)));
+    const t0 = audio.currentTime;
+    if (mix.fadeIn > 0) { dest.gain.setValueAtTime(0, t0); dest.gain.linearRampToValueAtTime(1, t0 + mix.fadeIn); }
+    if (mix.fadeOut > 0) { dest.gain.setValueAtTime(1, t0 + Math.max(mix.fadeIn || 0, total - mix.fadeOut)); dest.gain.linearRampToValueAtTime(0, t0 + total); }
+    if (mix.duck && voice?.src && musicTrack) {
+      const g = musicTrack.vol.gain, base = g.value, vs = voice.start || 0, ve = vs + (voice.duration || total);
+      g.setValueAtTime(base, t0 + Math.max(0, vs - 0.3)); g.linearRampToValueAtTime(base * 0.3, t0 + vs + 0.01);
+      g.setValueAtTime(base * 0.3, t0 + ve); g.linearRampToValueAtTime(base, t0 + ve + 0.5);
+    }
+    frame(); recorder.start(); tracks.forEach(t => t.start(t0 + (t.delay || 0)));
     for (index = 0; index < clips.length; index++) {
       const c = clips[index], el = els[index]; started = performance.now();
       if (c.kind === 'image') await sleep(clipLength(c) * 1000);
