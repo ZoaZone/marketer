@@ -9,6 +9,7 @@ import { generateText, generateImage, generateVoiceover, uploadFile, splitScript
 // the client check below is UX, so an unentitled user gets an upgrade prompt
 // instead of a failed request.
 import { generateSceneVideo, generateMusic, submitRender, getRenderStatus, MAX_MUSIC_SECONDS } from "@/utils/lane2";
+import { buildStoryBible, shotFor, framePrompt, clipPrompt } from "@/components/quick-create/sceneContinuity";
 import { VIDEO_RATIOS } from "@/utils/videoAssembler";
 import { BASE44_VIDEO_CREDITS_PER_5S } from "@/config/plans";
 import StudioEngineSelector from "@/components/quick-create/StudioEngineSelector";
@@ -369,11 +370,15 @@ export default function QuickCreate() {
     try {
       const sceneScripts = splitScriptIntoScenes(script, sceneCount);
       const built = [];
+      const bible = await buildStoryBible(script, generateText);
       for (let i = 0; i < sceneScripts.length; i++) {
         setStoryboardProgress(i / sceneScripts.length);
-        const imgUrl = await generateImage({ prompt: `Shot ${i + 1} of ${sceneScripts.length} in a sequence. This shot must look clearly different from the other shots (new location or angle, new framing, new action). Show only this moment: ${sceneScripts[i].imagePrompt || sceneScripts[i].text || prompt}`, referenceImageUrls });
+        const shot = shotFor(i);
+        const imgUrl = await generateImage({ prompt: framePrompt({ bible, shot, index: i, total: sceneScripts.length, text: sceneScripts[i].imagePrompt || sceneScripts[i].text || prompt }), referenceImageUrls });
         built.push({
           imageUrl: imgUrl,
+          bible,
+          shot,
           text: sceneScripts[i].text,
           seconds: useMotion ? MOTION_CLIP_SECONDS : 8,
         });
@@ -391,7 +396,7 @@ export default function QuickCreate() {
         for (let i = 0; i < built.length; i++) {
           try {
             const clipUrl = await generateSceneVideo({
-              prompt: built[i].text || prompt,
+              prompt: clipPrompt({ bible: built[i].bible, shot: built[i].shot, text: built[i].text || prompt }),
               imageUrl: built[i].imageUrl,
               durationSeconds: MOTION_CLIP_SECONDS,
               aspectRatio: videoRatio,
@@ -630,7 +635,7 @@ export default function QuickCreate() {
     setClipGenerating(prev => ({ ...prev, [index]: true }));
     try {
       const clipUrl = await generateSceneVideo({
-        prompt: scene.text || prompt,
+        prompt: clipPrompt({ bible: scene.bible, shot: scene.shot || shotFor(index), text: scene.text || prompt }),
         imageUrl: scene.imageUrl,
         durationSeconds: MOTION_CLIP_SECONDS,
         aspectRatio: videoRatio,

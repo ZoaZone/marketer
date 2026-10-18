@@ -2,6 +2,7 @@ import { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { generateText, generateImage, generateVoiceover, uploadFile, splitScriptIntoScenes, assembleLane1Video } from "@/utils/lane1";
 import { renderPresetBlob } from "@/components/quick-create/musicPresets";
+import { buildStoryBible, shotFor, framePrompt, clipPrompt } from "@/components/quick-create/sceneContinuity";
 import { generateSceneVideo, generateMusic, submitRender, getRenderStatus, MAX_MUSIC_SECONDS } from "@/utils/lane2";
 
 // Look applied to every shot so scenes share one grade, lens and realism.
@@ -36,12 +37,14 @@ export default function useAutoVideo({ cinematic, canMotion, canMusic, ratio, re
 
       const sceneScripts = splitScriptIntoScenes(script, sceneCount);
       const scenes = [];
+      const bible = await buildStoryBible(script, generateText);
       for (let i = 0; i < sceneScripts.length; i++) {
         setStage(`Creating scene ${i + 1} of ${sceneScripts.length}`);
         setProgress(0.1 + 0.3 * (i / sceneScripts.length));
         const base = sceneScripts[i].imagePrompt || sceneScripts[i].text || prompt;
-        const imageUrl = await generateImage({ prompt: `Shot ${i + 1} of ${sceneScripts.length} in a sequence. This shot must look clearly different from the other shots (new location or angle, new framing, new action). Show only this moment: ${base}. ${look}`, referenceImageUrls });
-        scenes.push({ imageUrl, text: sceneScripts[i].text, seconds: useMotion ? CLIP_SECONDS : 8 });
+        const shot = shotFor(i);
+        const imageUrl = await generateImage({ prompt: `${framePrompt({ bible, shot, index: i, total: sceneScripts.length, text: base })} ${look}`, referenceImageUrls });
+        scenes.push({ imageUrl, shot, text: sceneScripts[i].text, seconds: useMotion ? CLIP_SECONDS : 8 });
       }
 
       if (useMotion) {
@@ -50,7 +53,7 @@ export default function useAutoVideo({ cinematic, canMotion, canMusic, ratio, re
           setProgress(0.4 + 0.3 * (i / scenes.length));
           try {
             const clip = await generateSceneVideo({
-              prompt: `${scenes[i].text || prompt}. ${look} Natural, fluid camera movement and realistic motion.`,
+              prompt: `${clipPrompt({ bible, shot: scenes[i].shot, text: scenes[i].text || prompt })} ${look}`,
               imageUrl: scenes[i].imageUrl, durationSeconds: CLIP_SECONDS, aspectRatio: ratio,
             });
             if (clip) scenes[i] = { ...scenes[i], videoUrl: clip };

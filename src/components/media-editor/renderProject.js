@@ -59,13 +59,13 @@ export async function exportVideo(project, onProgress) {
       if (c.kind === 'video') { const g = audio.createGain(); g.gain.value = clipVolume; audio.createMediaElementSource(el).connect(g).connect(dest); }
     }
     const tracks = [];
-    const addTrack = (buffer, volume) => {
+    const addTrack = (buffer, volume, delay = 0) => {
       const src = audio.createBufferSource(), g = audio.createGain();
-      src.buffer = buffer; g.gain.value = volume; src.connect(g).connect(dest); tracks.push(src); return src;
+      src.buffer = buffer; src.delay = delay; g.gain.value = volume; src.connect(g).connect(dest); tracks.push(src); return src;
     };
     if (music?.src) addTrack(await decode(audio, music.src), music.volume).loop = true;
     else if (musicPreset) addTrack(await renderPresetBuffer(musicPreset, Math.ceil(total) + 2), 0.8).loop = true;
-    if (voice?.src) addTrack(await decode(audio, voice.src), voice.volume);
+    if (voice?.src) addTrack(await decode(audio, voice.src), voice.volume, voice.start || 0);
     stream = canvas.captureStream(30);
     dest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
     const mimeType = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4'].find(m => MediaRecorder.isTypeSupported(m));
@@ -84,7 +84,7 @@ export async function exportVideo(project, onProgress) {
       raf = requestAnimationFrame(frame);
     };
     for (const l of layers) if (l.media === 'video') assets[l.id]?.play().catch(() => {});
-    frame(); recorder.start(); tracks.forEach(t => t.start());
+    frame(); recorder.start(); tracks.forEach(t => t.start(audio.currentTime + (t.delay || 0)));
     for (index = 0; index < clips.length; index++) {
       const c = clips[index], el = els[index]; started = performance.now();
       if (c.kind === 'image') await sleep(clipLength(c) * 1000);
