@@ -1,10 +1,12 @@
 import React from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
+import BackButton from "@/components/BackButton";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import Sidebar from "./Sidebar";
 
 export default function AppLayout() {
+  const { pathname } = useLocation();
   const { data: user } = useQuery({
     queryKey: ["me"],
     queryFn: () => base44.auth.me(),
@@ -38,6 +40,7 @@ export default function AppLayout() {
       <Sidebar userTier={userTier} isAdmin={isAdmin} user={user} subscription={subscription} />
       <main className="flex-1 overflow-y-auto lg:ml-64">
         <div className="p-4 md:p-6 min-h-full">
+          {!["/studio", "/dashboard"].includes(pathname) && <BackButton className="mb-4" />}
           <Outlet context={{ user, userTier, isAdmin, subscription }} />
         </div>
       </main>

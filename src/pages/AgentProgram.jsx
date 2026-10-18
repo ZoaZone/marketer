@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import {
   Handshake, DollarSign, Users, TrendingUp, CheckCircle2,
-  ArrowRight, Loader2, Sparkles, Gift, ChevronRight
+  ArrowRight, ArrowLeft, Loader2, Sparkles, Gift, ChevronRight
 } from "lucide-react";
 import { useSeo, SEO } from "@/lib/seo";
 import TurnstileWidget from "@/components/TurnstileWidget";
@@ -68,6 +68,7 @@ export default function AgentProgram() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
+      <div className="max-w-7xl mx-auto px-6 pt-4"><Link to="/" className="inline-flex items-center gap-1.5 text-sm text-white/60 hover:text-white"><ArrowLeft className="w-4 h-4" /> Back to home</Link></div>
       {/* Nav */}
       <nav className="border-b border-white/8 px-6 h-16 flex items-center justify-between max-w-7xl mx-auto">
         <Link to="/" className="text-lg font-black bg-gradient-to-r from-fuchsia-400 to-purple-400 bg-clip-text text-transparent">

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { Sparkles, Send, CheckCircle2, Loader2 } from "lucide-react";
+import { Sparkles, Send, CheckCircle2, Loader2, ArrowLeft } from "lucide-react";
+import { Link } from "react-router-dom";
 import { BRAND } from "@/lib/brand";
 import { useSeo, SEO } from "@/lib/seo";
 import TurnstileWidget from "@/components/TurnstileWidget";
@@ -32,6 +33,7 @@ export default function BetaSignup() {
   return (
     <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
+        <Link to="/" className="mb-4 inline-flex items-center gap-1.5 text-sm text-white/60 hover:text-white"><ArrowLeft className="w-4 h-4" /> Back to home</Link>
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-fuchsia-500 to-purple-600 flex items-center justify-center shadow-lg shadow-fuchsia-500/30 mb-3">

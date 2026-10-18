@@ -55,6 +55,7 @@ import Terms from './pages/Terms';
 import WhatsAppInbox from './pages/WhatsAppInbox';
 import WhatsAppSettings from './pages/WhatsAppSettings';
 import ContactWidget from '@/components/support/ContactWidget';
+import InstallPrompt from '@/components/InstallPrompt';
 import PublicFooter from '@/components/PublicFooter';
 import About from './pages/About';
 import Contact from './pages/Contact';
@@ -195,6 +196,7 @@ function App() {
           <Toaster/> nothing gates it.
         */}
         <ContactWidget />
+        <InstallPrompt />
         <Toaster />
       </AuthProvider>
     </QueryClientProvider>
