@@ -39,7 +39,7 @@ export function WhatsAppGlyph({ className = 'w-6 h-6' }) {
  * links reads as decoration.
  */
 export function WhatsAppNavButton({ appName, service, text, className = '' }) {
-  const label = `Email ${appName}`;
+  const label = `Message ${appName} on WhatsApp`;
   return (
     <a
       href={whatsappContactUrl({ appName, service, text })}
@@ -96,7 +96,7 @@ export function WhatsAppDockButton({
   text,
   fixedAbove,
 }) {
-  const accessibleLabel = `Email ${appName}`;
+  const accessibleLabel = `Message ${appName} on WhatsApp`;
   return (
     <a
       href={whatsappContactUrl({ appName, service, text })}

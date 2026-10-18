@@ -25,7 +25,7 @@
  * reserved for the four flagship apps that need real API actions (Aevoice,
  * health, HelloBiz, vetnpethospital), and this app is not one of them.
  */
-export const WHATSAPP_CONTACT_NUMBER = ''; // deprecated Oct 2026: phone contact removed - email-only support
+export const WHATSAPP_CONTACT_NUMBER = '917989880588'; // masked contact: never rendered as digits in the UI — buttons label the app name instead
 export const CONTACT_EMAIL = 'care@zoazoneservices.com';
 
 /**
@@ -68,8 +68,8 @@ export function whatsappContactUrl({
   appName,
   service,
   text,
-  } = {}) {
+  phone = WHATSAPP_CONTACT_NUMBER,
+} = {}) {
   const message = text || contactMessage(appName, service);
-  const subject = appName ? `Enquiry - ${appName}` : 'Website enquiry';
-  return `mailto:${CONTACT_EMAIL}?subject=${encodeWhatsAppText(subject)}&body=${encodeWhatsAppText(message)}`;
+  return `https://wa.me/${phone}?text=${encodeWhatsAppText(message)}`;
 }

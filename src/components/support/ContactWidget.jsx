@@ -219,7 +219,7 @@ function WhatsAppTab() {
   return (
     <div className="p-4 flex flex-col gap-3">
       <p className="text-sm text-muted-foreground">
-        Email us and we'll reply as soon as we can. This opens WhatsApp with a note already started.
+        Message us on WhatsApp and we'll reply as soon as we can. This opens WhatsApp with a note already started.
       </p>
       <a
         href={href}
