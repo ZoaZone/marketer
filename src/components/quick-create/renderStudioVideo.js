@@ -9,9 +9,9 @@ function loadMedia(element, event, src) {
   });
 }
 
-export default async function renderStudioVideo({ url, logoUrl, text, hasAudio, musicUrl, musicPreset, onProgress, dims }) {
+export default async function renderStudioVideo({ url, logoUrl, text, hasAudio, musicUrl, musicPreset, voiceUrl, onProgress, dims }) {
   if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) throw new Error('Video graphics export needs a supported browser such as Chrome or Edge.');
-  const audioContext = hasAudio || musicUrl || musicPreset ? new (window.AudioContext || window.webkitAudioContext)() : null;
+  const audioContext = hasAudio || musicUrl || musicPreset || voiceUrl ? new (window.AudioContext || window.webkitAudioContext)() : null;
   if (audioContext) await audioContext.resume();
   let video, recorder, stream, objectUrl, animation;
   try {
@@ -26,7 +26,7 @@ export default async function renderStudioVideo({ url, logoUrl, text, hasAudio, 
     const canvas = document.createElement('canvas'); canvas.width = dims ? dims[0] : video.videoWidth; canvas.height = dims ? dims[1] : video.videoHeight;
     const ctx = canvas.getContext('2d');
     stream = canvas.captureStream(30);
-    let musicSource = null;
+    let musicSource = null, voiceSource = null, voiceBuffer = null;
     if (audioContext) {
       const destination = audioContext.createMediaStreamDestination();
       if (hasAudio) audioContext.createMediaElementSource(video).connect(destination);
@@ -41,10 +41,17 @@ export default async function renderStudioVideo({ url, logoUrl, text, hasAudio, 
       }
       if (buffer) {
         const gain = audioContext.createGain();
-        gain.gain.value = hasAudio ? 0.3 : 0.9; // sit under generated sound, full level otherwise
+        gain.gain.value = hasAudio || voiceUrl ? 0.3 : 0.9; // sit under generated sound or narration, full level otherwise
         musicSource = audioContext.createBufferSource();
         musicSource.buffer = buffer; musicSource.loop = true;
         musicSource.connect(gain).connect(destination);
+      }
+      if (voiceUrl) {
+        const voiceResponse = await fetch(voiceUrl);
+        try { voiceBuffer = await audioContext.decodeAudioData(await voiceResponse.arrayBuffer()); }
+        catch { throw new Error('Your recorded narration could not be read. Please record it again.'); }
+        voiceSource = audioContext.createBufferSource();
+        voiceSource.buffer = voiceBuffer; voiceSource.connect(destination);
       }
       destination.stream.getAudioTracks().forEach(track => stream.addTrack(track));
     }
@@ -73,9 +80,11 @@ export default async function renderStudioVideo({ url, logoUrl, text, hasAudio, 
       video.onerror = () => reject(new Error('Video playback failed during branding.'));
     });
     musicSource?.start();
+    voiceSource?.start();
     await video.play();
     await playbackEnded;
     musicSource?.stop();
+    try { voiceSource?.stop(); } catch { /* already finished */ }
     cancelAnimationFrame(animation); recorder.stop();
     const blob = await done; onProgress(100);
     return blob;

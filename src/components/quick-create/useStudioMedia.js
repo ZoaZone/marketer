@@ -58,7 +58,7 @@ export default function useStudioMedia({ type, prompt, referenceImageUrls, ratio
     } catch (e) { setError(e?.response?.data?.error || e.message); }
     finally { setBusy(false); }
   };
-  const render = async ({ logo, music, musicPreset, text: rawText, setText }) => {
+  const render = async ({ logo, music, musicPreset, voice, text: rawText, setText }) => {
     setBusy(true); setError(''); setMessage('Checking spelling and applying your logo and text… Keep this tab visible.');
     try {
       const result = results[type];
@@ -73,11 +73,11 @@ export default function useStudioMedia({ type, prompt, referenceImageUrls, ratio
       const logoUrl = logo ? (await base44.integrations.Core.CreateFileSignedUrl({ file_uri: logo.fileUri, expires_in: 3600 })).signed_url : '';
       const blob = type === 'image'
         ? await renderStudioImage({ url: result.rawUrl, logoUrl, text })
-        : await renderStudioVideo({ url: result.rawUrl, logoUrl, text, hasAudio: result.hasAudio, musicUrl: music?.url, musicPreset: music ? '' : musicPreset, dims: needsFormatPass(result.ratio, result.size) ? exportDims(result.ratio, result.size) : undefined, onProgress: percent => setMessage(`Applying logo and text: ${percent}% · keep this tab visible`) });
+        : await renderStudioVideo({ url: result.rawUrl, logoUrl, text, hasAudio: result.hasAudio, musicUrl: music?.url, musicPreset: music ? '' : musicPreset, voiceUrl: voice?.url, dims: needsFormatPass(result.ratio, result.size) ? exportDims(result.ratio, result.size) : undefined, onProgress: percent => setMessage(`Applying logo and text: ${percent}% · keep this tab visible`) });
       const file = new File([blob], type === 'image' ? 'studio-branded-image.png' : `studio-branded-video.${blob.type.includes('mp4') ? 'mp4' : 'webm'}`, { type: blob.type });
       const { file_uri } = await base44.integrations.Core.UploadPrivateFile({ file });
       const { signed_url } = await base44.integrations.Core.CreateFileSignedUrl({ file_uri, expires_in: 3600 });
-      setResults(prev => ({ ...prev, [type]: { ...result, url: signed_url, fileUri: file_uri, renderedKey: JSON.stringify([logo?.fileUri || null, text, type === 'video' ? music?.fileUri || musicPreset || null : null]) } }));
+      setResults(prev => ({ ...prev, [type]: { ...result, url: signed_url, fileUri: file_uri, renderedKey: JSON.stringify([logo?.fileUri || null, text, type === 'video' ? music?.fileUri || musicPreset || null : null, type === 'video' ? voice?.url || null : null]) } }));
       setSaved(prev => ({ ...prev, [type]: false })); setMessage('Graphics applied. Preview the final video before downloading or saving.');
     } catch (e) { setError(e?.response?.data?.error || e.message); }
     finally { setBusy(false); }

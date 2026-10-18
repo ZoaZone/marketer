@@ -3,6 +3,7 @@ import { Upload, X, Loader2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { uploadFile } from "@/utils/aiClient";
+import DubAction from "@/components/media-library/DubAction";
 
 const SLOTS = [["voiceover_url", "Voice-over"], ["music_url", "Music"], ["dubbing_url", "Dubbing"]];
 
@@ -50,6 +51,7 @@ export default function CompanionFiles({ asset }) {
           )}
         </div>
       ))}
+      {asset.type === "video" && asset.file_url && <DubAction sourceUrl={asset.voiceover_url || asset.file_url} onDubbed={url => save("dubbing_url", url)} />}
       {error && <p className="text-xs text-red-400">{error}</p>}
       <p className="text-[11px] text-muted-foreground">Uploaded files are stored publicly — anyone with the link can open them.</p>
     </div>

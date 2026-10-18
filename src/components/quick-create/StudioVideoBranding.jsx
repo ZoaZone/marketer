@@ -1,8 +1,9 @@
 import { Upload, Loader2, X } from 'lucide-react';
 import LibraryPickButton from '@/components/media-editor/LibraryPickButton';
 import { MUSIC_PRESETS } from '@/components/quick-create/musicPresets';
+import StudioVoiceRecorder from '@/components/quick-create/StudioVoiceRecorder';
 
-export default function StudioVideoBranding({ showCharacter = true, extras = [], removeExtra, music, uploadMusic, musicPreset = '', setMusicPreset, logo, character, text, setText, upload, uploading, disabled, checking, proofread, suggestion, applySuggestion, clear, fromLibrary }) {
+export default function StudioVideoBranding({ showCharacter = true, extras = [], removeExtra, music, uploadMusic, musicPreset = '', setMusicPreset, logo, character, text, setText, upload, uploading, disabled, checking, proofread, suggestion, applySuggestion, clear, fromLibrary, voice, setVoice, setError }) {
   return <div className="space-y-4 border-t border-border pt-4">
     <div className="grid grid-cols-2 gap-3">{[['logo', 'Logo', logo], ['character', 'Reference character', character]].filter(([kind]) => showCharacter || kind === 'logo').map(([kind, label, asset]) => <div key={kind} className="space-y-2">
       <p className="text-xs font-semibold text-foreground">{label}</p>
@@ -34,6 +35,7 @@ export default function StudioVideoBranding({ showCharacter = true, extras = [],
       </label>
       <p className="text-xs text-muted-foreground">Choose a library style or upload your own (your upload wins). Mixed in when you finish the video after generation, under any generated sound. Upload only music you have the rights to use.</p>
     </div>}
+    {showCharacter && <StudioVoiceRecorder voice={voice} setVoice={setVoice} disabled={disabled} setError={setError} />}
     <div className="space-y-2">
       <label htmlFor="studio-overlay-text" className="text-xs font-semibold text-foreground">On-screen text / graphic</label>
       <textarea id="studio-overlay-text" value={text} onChange={e => setText(e.target.value)} spellCheck maxLength={160} rows={3} disabled={disabled} placeholder="Type the exact words to show…" className="w-full rounded-xl border border-input bg-background p-3 text-sm text-foreground" />

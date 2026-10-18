@@ -18,7 +18,7 @@ export default function Base44Studio({ type, prompt, referenceImageUrls, onBusyC
   const blocked = media.busy || media.saving || !!options.uploading || options.checking;
   useEffect(() => { onBusyChange(blocked); return () => onBusyChange(false); }, [blocked, onBusyChange]);
   const error = optionsError || media.error;
-  const graphicsKey = JSON.stringify([options.logo?.fileUri || null, options.text, type === 'video' ? options.music?.fileUri || options.musicPreset || null : null]);
+  const graphicsKey = JSON.stringify([options.logo?.fileUri || null, options.text, type === 'video' ? options.music?.fileUri || options.musicPreset || null : null, type === 'video' ? options.voice?.url || null : null]);
   const needsGraphics = !!media.result && media.result.renderedKey !== graphicsKey;
   // Finish automatically right after generation (once per generated clip) so chosen music, logo and text are in the video without an extra click.
   const autoTried = useRef(null);
