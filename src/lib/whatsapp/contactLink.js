@@ -1,5 +1,5 @@
 /**
- * Builds the wa.me deep link behind the public "message us on WhatsApp"
+ * Builds the wa.me deep link behind the public "email us"
  * buttons.
  *
  * Kept separate from the components, and free of any framework import, so the
@@ -18,14 +18,15 @@
  * button, so hiding it buys nothing, and a missing env var would silently ship
  * a dead link.
  *
- * +16469126066 is this app's own general "contact us" target: a plain,
+ * care@zoazoneservices.com is this app's own general "contact us" target: a plain,
  * non-priority-tier WABA number with no paid Meta Cloud API behind it, used
  * only as a free wa.me click-to-chat deep link. It is deliberately not
- * +12566998899 — that number is a different, priority-tier Cloud API account
+ * care@zoazoneservices.com — that number is a different, priority-tier Cloud API account
  * reserved for the four flagship apps that need real API actions (Aevoice,
  * health, HelloBiz, vetnpethospital), and this app is not one of them.
  */
-export const WHATSAPP_CONTACT_NUMBER = '16469126066';
+export const WHATSAPP_CONTACT_NUMBER = ''; // deprecated Oct 2026: phone contact removed - email-only support
+export const CONTACT_EMAIL = 'care@zoazoneservices.com';
 
 /**
  * Percent-encode message text for a wa.me query string.
@@ -67,8 +68,8 @@ export function whatsappContactUrl({
   appName,
   service,
   text,
-  phone = WHATSAPP_CONTACT_NUMBER,
-} = {}) {
+  } = {}) {
   const message = text || contactMessage(appName, service);
-  return `https://wa.me/${phone}?text=${encodeWhatsAppText(message)}`;
+  const subject = appName ? `Enquiry - ${appName}` : 'Website enquiry';
+  return `mailto:${CONTACT_EMAIL}?subject=${encodeWhatsAppText(subject)}&body=${encodeWhatsAppText(message)}`;
 }

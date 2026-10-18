@@ -396,9 +396,9 @@ export default function Home() {
 
       {/* Universal Contact */}
       <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground py-4 border-t border-border/30">
-        <a href="tel:+12566998899" className="hover:text-foreground transition-colors flex items-center gap-1.5">
+        <a href="mailto:care@zoazoneservices.com" className="hover:text-foreground transition-colors flex items-center gap-1.5">
           <span>📞</span>
-          <span>+1 256 699 8899</span>
+          <span>care@zoazoneservices.com</span>
           <span className="opacity-60">· {BRAND.name} AI Assistant 24/7</span>
         </a>
       </div>

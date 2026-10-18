@@ -59,7 +59,7 @@ export default function ConversationPanel({
         <MessageSquare className="w-10 h-10 text-slate-300 mb-3" />
         <p className="text-sm text-slate-500">Pick a conversation to start replying.</p>
         <p className="text-xs text-slate-400 mt-1">
-          Inbound messages to +1 (256) 699-8899 appear on the left as they arrive.
+          Inbound messages to care@zoazoneservices.com appear on the left as they arrive.
         </p>
       </div>
     );

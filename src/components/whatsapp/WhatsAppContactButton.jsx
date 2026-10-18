@@ -2,7 +2,7 @@ import React from 'react';
 import { whatsappContactUrl } from '@/lib/whatsapp/contactLink';
 
 /**
- * Public "message us on WhatsApp" buttons: a floating action button pinned to
+ * Public "email us" buttons: a floating action button pinned to
  * the viewport and a compact icon button for the header.
  *
  * Both are plain anchors to a wa.me link rather than anything scripted. That
@@ -39,7 +39,7 @@ export function WhatsAppGlyph({ className = 'w-6 h-6' }) {
  * links reads as decoration.
  */
 export function WhatsAppNavButton({ appName, service, text, className = '' }) {
-  const label = `Message ${appName} on WhatsApp`;
+  const label = `Email ${appName}`;
   return (
     <a
       href={whatsappContactUrl({ appName, service, text })}
@@ -96,7 +96,7 @@ export function WhatsAppDockButton({
   text,
   fixedAbove,
 }) {
-  const accessibleLabel = `Message ${appName} on WhatsApp`;
+  const accessibleLabel = `Email ${appName}`;
   return (
     <a
       href={whatsappContactUrl({ appName, service, text })}

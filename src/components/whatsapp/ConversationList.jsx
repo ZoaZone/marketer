@@ -171,7 +171,7 @@ export default function ConversationList({
             <MessageSquare className="w-8 h-8 text-slate-300 mx-auto mb-3" />
             <p className="text-sm text-slate-500">No conversations here yet.</p>
             <p className="text-xs text-slate-400 mt-1">
-              Messages sent to +1 (256) 699-8899 land in this list.
+              Messages sent to care@zoazoneservices.com land in this list.
             </p>
           </div>
         )}

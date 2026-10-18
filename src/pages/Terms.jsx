@@ -13,7 +13,7 @@ const CO = {
   supportEmail: "care@zoazoneservices.com",
   parentEmail: "care@zoazoneservices.com",
   legalEmail: "care@zoazoneservices.com",
-  phone: "+1 256 699 8899",
+  phone: "care@zoazoneservices.com",
   state: "New York",
   address: "1770 Grand Concourse 12A, Bronx, NY 10457, USA",
   indiaAddress: "376, G3, Road No 82, Film Nagar, Jubilee Hills, Hyderabad, Telangana 500096, India",
