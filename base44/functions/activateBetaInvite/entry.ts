@@ -40,8 +40,11 @@ Deno.serve(async (req) => {
 
     // Bind the activation to the holder of the invite link when a token is
     // supplied (BetaOnboarding always has invite.invite_token available).
-    if (token && invite.invite_token && invite.invite_token !== token) {
+    if (!token || !invite.invite_token || invite.invite_token !== token) {
       return Response.json({ error: 'Invite token mismatch.' }, { status: 403, headers: CORS });
+    }
+    if (String(invite.email || '').trim().toLowerCase() !== String(user.email || '').trim().toLowerCase()) {
+      return Response.json({ error: 'This invite was issued to a different email address.' }, { status: 403, headers: CORS });
     }
     if (invite.invite_expires_at && new Date(invite.invite_expires_at).getTime() < Date.now()) {
       return Response.json({ error: 'This invite has expired.' }, { status: 400, headers: CORS });

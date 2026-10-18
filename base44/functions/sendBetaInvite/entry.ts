@@ -1,7 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 const APP_URL = 'https://digitalstudios.app';
-const RESEND_KEY = 're_LGvr9fVz_4egrT1qX9NKcfKShZ7SoXfEY';
 const RESEND_FROM = 'digitalstudios.app <noreply@digitalstudios.app>';
 
 const genToken = (): string => {
@@ -165,6 +164,7 @@ Deno.serve(async (req) => {
     let provider = 'none';
     let emailError = '';
 
+    const RESEND_KEY = Deno.env.get('RESEND_API_KEY') || '';
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },

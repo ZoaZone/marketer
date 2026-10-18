@@ -84,6 +84,18 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Non-admins may only email an address they themselves just invited as a
+    // sub-affiliate (the only non-admin caller is AffiliatePortal).
+    if (!isAdmin) {
+      const recipient = String(to).trim().toLowerCase();
+      const own = await base44.asServiceRole.entities.Affiliate.filter({ user_id: user.email });
+      const ids = [user.email, ...own.map((a: any) => a.id)];
+      const invites = await base44.asServiceRole.entities.AffiliateInvite.filter({ email: recipient });
+      if (!invites.some((i: any) => ids.includes(i.inviter_id))) {
+        return Response.json({ error: 'Forbidden' }, { status: 403, headers: { 'Access-Control-Allow-Origin': '*' } });
+      }
+    }
+
     const fromName = from_name || 'digitalstudios.app';
     const fromEmail = Deno.env.get('RESEND_FROM_EMAIL') || 'noreply@digitalstudios.app';
     const plainText = text || body || '';
