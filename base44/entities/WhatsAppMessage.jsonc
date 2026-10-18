@@ -115,13 +115,17 @@
     "direction"
   ],
   "permissions": {
-    "read": "true",
+    "read": "user.role == 'admin'",
     "create": "user.role == 'admin'",
     "update": "user.role == 'admin'",
     "delete": "user.role == 'admin'"
   },
   "rls": {
-    "read": true,
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
     "create": {
       "user_condition": {
         "role": "admin"
