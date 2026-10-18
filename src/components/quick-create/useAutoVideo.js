@@ -40,7 +40,7 @@ export default function useAutoVideo({ cinematic, canMotion, canMusic, ratio, re
         setStage(`Creating scene ${i + 1} of ${sceneScripts.length}`);
         setProgress(0.1 + 0.3 * (i / sceneScripts.length));
         const base = sceneScripts[i].imagePrompt || sceneScripts[i].text || prompt;
-        const imageUrl = await generateImage({ prompt: `${base}. ${look}`, referenceImageUrls });
+        const imageUrl = await generateImage({ prompt: `Shot ${i + 1} of ${sceneScripts.length} in a sequence. This shot must look clearly different from the other shots (new location or angle, new framing, new action). Show only this moment: ${base}. ${look}`, referenceImageUrls });
         scenes.push({ imageUrl, text: sceneScripts[i].text, seconds: useMotion ? CLIP_SECONDS : 8 });
       }
 

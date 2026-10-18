@@ -19,6 +19,11 @@ export default function useStudioVideoOptions(setError) {
     } catch (error) { setError(error.message || 'Image upload failed.'); }
     finally { setUploading(''); }
   };
+  const fromLibrary = (kind, items) => {
+    const assets = items.filter(a => a.type === 'image').map(a => ({ fileUri: a.file_uri || a.file_url, url: a.file_url, name: a.title || 'Library image' }));
+    if (kind === 'extra') setExtras(prev => [...prev, ...assets].slice(0, 3));
+    else if (assets[0]) (kind === 'logo' ? setLogo : setCharacter)(assets[0]);
+  };
   const uploadMusic = async file => {
     if (!file) return;
     setUploading('music'); setError('');
@@ -39,6 +44,6 @@ export default function useStudioVideoOptions(setError) {
     } catch (error) { setError(error?.response?.data?.error || error.message); }
     finally { setChecking(false); }
   };
-  return { extras, removeExtra: index => setExtras(prev => prev.filter((_, i) => i !== index)), logo, character, music, musicPreset, setMusicPreset, text, setText, suggestion, uploading, checking, upload, uploadMusic, proofread,
+  return { extras, removeExtra: index => setExtras(prev => prev.filter((_, i) => i !== index)), logo, character, music, musicPreset, setMusicPreset, text, setText, suggestion, uploading, checking, upload, fromLibrary, uploadMusic, proofread,
     applySuggestion: () => setText(suggestion), clear: kind => (kind === 'logo' ? setLogo : kind === 'music' ? setMusic : setCharacter)(null) };
 }

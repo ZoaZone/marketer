@@ -19,6 +19,7 @@ import {
 // dubAudioFile/dubVideoFile/ElevenLabs) alongside the shared FFmpeg
 // assembly route (submitRender/getRenderStatus).
 import { BASE44_VIDEO_CREDITS_PER_5S } from "@/config/plans";
+import LibraryPickButton from "@/components/media-editor/LibraryPickButton";
 import { generateText, generateVoiceover, generateMusic, MAX_MUSIC_SECONDS, uploadFile, generateImage, splitScriptIntoScenes, submitRender, getRenderStatus, generateSceneVideo, dubAudioFile, dubVideoFile as dubVideoJob, probeMediaDuration } from "@/utils/lane2";
 // dubVideoFile (the aiClient job function) is imported as dubVideoJob — the
 // Dubbing Studio already has a dubVideoFile *state variable* holding the
@@ -1371,6 +1372,15 @@ export default function MovieMaker() {
                   {referenceUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
                   Add reference
                 </button>
+                <LibraryPickButton kinds={["image", "video"]} disabled={referenceUploading} label="From Media Library"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border text-xs font-semibold text-foreground hover:bg-muted/20 disabled:opacity-50"
+                  onPick={items => {
+                    const added = items.map(a => ({ id: crypto.randomUUID(), kind: a.type === "video" ? "video" : pendingReferenceKind === "video" ? "image" : pendingReferenceKind, label: pendingReferenceLabel.trim() || a.title || "Library item", url: a.file_url, thumbUrl: a.file_url, included: true }));
+                    setReferences(prev => [...prev, ...added]);
+                    const firstChar = added.find(r => r.kind === "character");
+                    if (firstChar && !primaryCharacterRefId) setPrimaryCharacterRefId(firstChar.id);
+                    setPendingReferenceLabel("");
+                  }} />
               </div>
 
               {references.length > 0 && (
@@ -1502,6 +1512,9 @@ export default function MovieMaker() {
                     {uploadLoading[scene.id] ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
                     Upload
                   </button>
+                  <LibraryPickButton kinds={["image", "video"]} multi={false} label="Library"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-background text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    onPick={items => items[0] && updateScene(scene.id, { imageUrl: items[0].file_url })} />
                   {/* AI Video clip — clip length is a discrete model-valid
                       choice (Kling only accepts specific durations), separate
                       from the free-range scene duration above. Shots chains

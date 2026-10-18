@@ -6,11 +6,11 @@ import { mine } from '@/utils/scope';
 import resolveStudioMedia from '@/components/quick-create/resolveStudioMedia';
 import { primaryBtn } from '@/components/media-editor/ui';
 
-export default function LibraryPicker({ user, multi, onPick, onClose }) {
+export default function LibraryPicker({ user, multi, kinds = ['image', 'video'], actionLabel = 'to editor', onPick, onClose }) {
   const [chosen, setChosen] = useState([]);
   const { data: assets = [], isLoading } = useQuery({
-    queryKey: ['editor_library', user?.email],
-    queryFn: async () => (await Promise.all((await base44.entities.ContentAsset.filter(mine(user), '-created_date', 100)).filter(a => a.file_url && (a.type === 'image' || a.type === 'video')).map(resolveStudioMedia))),
+    queryKey: ['editor_library', user?.email, kinds.join()],
+    queryFn: async () => (await Promise.all((await base44.entities.ContentAsset.filter(mine(user), '-created_date', 100)).filter(a => a.file_url && kinds.includes(a.type)).map(resolveStudioMedia))),
     enabled: !!user?.email,
   });
   const list = assets;
@@ -31,7 +31,7 @@ export default function LibraryPicker({ user, multi, onPick, onClose }) {
             </button>;
           })}</div>}
       </div>
-      <div className="p-4 border-t border-border"><button type="button" disabled={!chosen.length} onClick={() => onPick(chosen)} className={primaryBtn}>{chosen.length ? `Add ${chosen.length} to editor` : 'Select items'}</button></div>
+      <div className="p-4 border-t border-border"><button type="button" disabled={!chosen.length} onClick={() => onPick(chosen)} className={primaryBtn}>{chosen.length ? `Add ${chosen.length} ${actionLabel}` : 'Select items'}</button></div>
     </div>
   </div>;
 }

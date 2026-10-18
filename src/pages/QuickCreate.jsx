@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import LibraryPickButton from "@/components/media-editor/LibraryPickButton";
 import { Link, useOutletContext } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { generateText, generateImage, generateVoiceover, uploadFile, splitScriptIntoScenes, assembleLane1Video, probeMediaDuration } from "@/utils/lane1";
@@ -370,7 +371,7 @@ export default function QuickCreate() {
       const built = [];
       for (let i = 0; i < sceneScripts.length; i++) {
         setStoryboardProgress(i / sceneScripts.length);
-        const imgUrl = await generateImage({ prompt: sceneScripts[i].imagePrompt || sceneScripts[i].text || prompt, referenceImageUrls });
+        const imgUrl = await generateImage({ prompt: `Shot ${i + 1} of ${sceneScripts.length} in a sequence. This shot must look clearly different from the other shots (new location or angle, new framing, new action). Show only this moment: ${sceneScripts[i].imagePrompt || sceneScripts[i].text || prompt}`, referenceImageUrls });
         built.push({
           imageUrl: imgUrl,
           text: sceneScripts[i].text,
@@ -854,6 +855,8 @@ export default function QuickCreate() {
               <input type="file" accept="image/*" multiple className="hidden" disabled={uploadingFile || base44Busy}
                 onChange={e => { addAttachments(e.target.files); e.target.value = ""; }} />
             </label>
+            <LibraryPickButton disabled={base44Busy} label="From Media Library" className="h-16 px-3 rounded-lg border border-dashed border-border flex items-center gap-1.5 text-xs text-muted-foreground hover:bg-muted/20 disabled:opacity-50"
+              onPick={items => setAttachments(prev => [...prev, ...items.map(a => ({ url: a.file_url, name: a.title || "Library image" }))])} />
           </div>
         </div>}
       </div>

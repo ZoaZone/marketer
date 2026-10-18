@@ -783,7 +783,13 @@ export function splitScriptIntoScenes(script, sceneCount = 4) {
     }
   }
 
-  while (chunks.length < sceneCount) chunks.push(chunks[chunks.length - 1] || text);
+  // Too few sentences for the scene count: split the text into equal word
+  // ranges so every scene gets its own part instead of repeating one.
+  if (chunks.length < sceneCount) {
+    const words = text.replace(/\s+/g, " ").split(" ");
+    const per = Math.max(1, Math.ceil(words.length / sceneCount));
+    chunks = Array.from({ length: sceneCount }, (_, i) => words.slice(i * per, (i + 1) * per).join(" ") || text);
+  }
   chunks = chunks.slice(0, sceneCount);
 
   return chunks.map((c) => {

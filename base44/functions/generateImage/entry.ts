@@ -387,7 +387,7 @@ Deno.serve(async (req) => {
     }
 
     const refInstruction = reference_image_urls?.length
-      ? ' IMPORTANT: Replicate the exact person(s), face(s), outfit, and visual style from the provided reference images as faithfully as possible. Maintain their likeness while adapting composition to match the marketing context.'
+      ? ' IMPORTANT: Keep the identity (face, hair, outfit) of the person(s) and the visual style from the provided reference images. Do NOT copy the reference image\'s pose, background or framing: compose a new scene exactly as the prompt describes.'
       : '';
       
     // Added strict instructions to prevent text and fake logo hallucination
