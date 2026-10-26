@@ -50,11 +50,11 @@ export default function PayPalButton({ amount, currency = "INR", planName = "", 
             className="h-5"
           />
         )}
-        <span>{loading ? "Redirecting…" : `Pay ₹${amount.toLocaleString("en-IN")} with PayPal`}</span>
+        <span>{loading ? "Redirecting…" : `Pay ${new Intl.NumberFormat(currency === "INR" ? "en-IN" : "en-US", { style: "currency", currency }).format(amount)} with PayPal`}</span>
       </button>
       {error && <p className="text-red-400 text-xs text-center">{error}</p>}
       <p className="text-[10px] text-white/25 text-center">
-        🇮🇳 India payments via Zoa Zone Services Pvt Ltd · Secured by PayPal
+        Secured by PayPal
       </p>
     </div>
   );

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { planPrice } from "@/lib/geoPricing";
 import { useOutletContext, Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -269,7 +270,7 @@ export default function Integrations() {
           <Lock className="w-8 h-8 text-muted-foreground/30 mx-auto" />
           <p className="text-sm font-semibold text-foreground">BYOK requires a BYOK or Movie Maker Pro subscription</p>
           <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-            Connecting your own Replicate, ElevenLabs, or LLM key is available on the $49/mo BYOK add-on, or any Movie Maker Pro
+            Connecting your own Replicate, ElevenLabs, or LLM key is available on the {planPrice(49)}/mo BYOK add-on, or any Movie Maker Pro
             (Lane 2) plan — Indie, Studio, Dubbing House, or Enterprise.
           </p>
           <Link to="/pricing" className="inline-flex items-center gap-1 mt-2 text-xs font-semibold text-cyan-400 hover:underline">View plans →</Link>

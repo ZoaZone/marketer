@@ -1,6 +1,7 @@
 import React from "react";
 import { Bot, MessageCircle, Mic, MicOff, Send, Volume2, VolumeX, X } from "lucide-react";
 import { BRAND } from "@/lib/brand";
+import { localizePlanPrices } from "@/lib/geoPricing";
 
 /**
  * Sree, the site's AI assistant.
@@ -75,7 +76,7 @@ export default function SreeChat({ accentColor = "#d946ef", embedded = false }) 
       const res = await fetch("https://sreeagent.base44.app/functions/sriChat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: msg, history: history.slice(-8), systemPrompt: SITE_KNOWLEDGE })
+        body: JSON.stringify({ message: msg, history: history.slice(-8), systemPrompt: localizePlanPrices(SITE_KNOWLEDGE) })
       });
       const data = await res.json();
       const reply = data?.reply || data?.content || "How can I help you today?";

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { planPrice, isInIndia } from "@/lib/geoPricing";
 import { ArrowRight, RotateCcw, Sparkles, Info } from "lucide-react";
 import {
   ALL_PLANS, PLAN_BY_KEY, RENDER_MINUTE_WEIGHTS,
@@ -216,7 +217,7 @@ export default function PlanAdvisor({ onChoose }) {
           </p>
           <div className="flex items-baseline gap-2 flex-wrap mb-2">
             <span className="text-2xl font-black text-white">{result.pick.name}</span>
-            <span className="text-white/50 text-sm">${result.pick.price_monthly.toLocaleString()}/mo + tax</span>
+            <span className="text-white/50 text-sm">{planPrice(result.pick.price_monthly)}/mo{!isInIndia() && " + tax"}</span>
           </div>
 
           <p className="text-sm text-white/60 mb-3">
@@ -243,7 +244,7 @@ export default function PlanAdvisor({ onChoose }) {
           {result.fits && result.overageUsd > 0 && (
             <p className="text-xs text-amber-300/90 mb-3">
               Heads up: you&rsquo;d be right at the edge — about ${result.overageUsd.toLocaleString()}/mo in overage.
-              {result.stepUp && <> {result.stepUp.name} at ${result.stepUp.price_monthly.toLocaleString()}/mo would absorb it.</>}
+              {result.stepUp && <> {result.stepUp.name} at {planPrice(result.stepUp.price_monthly)}/mo would absorb it.</>}
             </p>
           )}
 

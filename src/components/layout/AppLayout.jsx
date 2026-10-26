@@ -1,6 +1,7 @@
 import React from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import BackButton from "@/components/BackButton";
+import PublicFooter from "@/components/PublicFooter";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import Sidebar from "./Sidebar";
@@ -43,6 +44,7 @@ export default function AppLayout() {
           {!["/studio", "/dashboard"].includes(pathname) && <BackButton className="mb-4" />}
           <Outlet context={{ user, userTier, isAdmin, subscription }} />
         </div>
+        <PublicFooter />
       </main>
     </div>
   );

@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { BRAND } from "@/lib/brand";
 import { ALL_PLANS, FREE_TRIAL_GENERATIONS } from "@/config/plans";
 import { PRICING_FAQ } from "@/config/faq";
+import { isInIndia, usdToInr, localizePlanPrices } from "@/lib/geoPricing";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SEO for a client-rendered SPA.
@@ -104,7 +105,7 @@ export const SEO = {
     path: "/pricing",
     title: "Pricing",
     description:
-      "Plans for creators, agencies, studios and dubbing houses. AI content from $19/mo; per-scene video and 22-language dubbing from $99/mo. Yearly saves 20%.",
+      localizePlanPrices("Plans for creators, agencies, studios and dubbing houses. AI content from $19/mo; per-scene video and 22-language dubbing from $99/mo. Yearly saves 20%."),
   },
   auth: {
     path: "/auth",
@@ -170,7 +171,7 @@ export function injectStructuredData() {
   const id = "ds-structured-data";
   if (document.getElementById(id)) return;
 
-  const prices = ALL_PLANS.map((p) => p.price_monthly).filter((n) => n > 0);
+  const prices = ALL_PLANS.map((p) => isInIndia() ? usdToInr(p.price_monthly) : p.price_monthly).filter((n) => n > 0);
 
   const app = {
     "@context": "https://schema.org",
@@ -183,7 +184,7 @@ export function injectStructuredData() {
     image: DEFAULT_IMAGE,
     offers: {
       "@type": "AggregateOffer",
-      priceCurrency: "USD",
+      priceCurrency: isInIndia() ? "INR" : "USD",
       lowPrice: String(Math.min(...prices)),
       highPrice: String(Math.max(...prices)),
       offerCount: String(ALL_PLANS.length),

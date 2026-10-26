@@ -5,6 +5,9 @@ import { base44 } from "@/api/base44Client";
 import { mine } from "@/utils/scope";
 import { CreditCard, Check, Zap, Loader2, ExternalLink, Calendar, AlertCircle, Mail, Phone, MessageSquare, Sparkles, Gift } from "lucide-react";
 import PayPalButton from "@/components/PayPalButton";
+import CashfreeButton from "@/components/CashfreeButton";
+import CashfreeReturn from "@/components/billing/CashfreeReturn";
+import { isInIndia, usdToInr, formatInr, GST_NOTE } from "@/lib/geoPricing";
 import { recordCommissionFor } from "@/utils/affiliate";
 
 // Plans come from the canonical catalog. This page used to carry its own
@@ -46,6 +49,7 @@ const PLAN_GROUPS = [
 export default function Billing() {
   const { user } = useOutletContext() || {};
   const qc = useQueryClient();
+  const isIndia = isInIndia();
   const [billing, setBilling] = useState("monthly");
   const [loading, setLoading] = useState(null);
   const [loadingPortal, setLoadingPortal] = useState(false);
@@ -174,6 +178,7 @@ export default function Billing() {
         <p className="text-muted-foreground text-sm">Manage your plan, usage, and payments</p>
       </div>
 
+      <CashfreeReturn />
       {error && (
         <div className="flex items-center gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
           <AlertCircle className="w-4 h-4 flex-shrink-0" /> {error}
@@ -292,8 +297,9 @@ export default function Billing() {
                   <h3 className="text-lg font-black text-foreground">{plan.name}</h3>
                   <p className="text-xs text-muted-foreground mt-1 mb-3 min-h-[2.5rem]">{plan.tagline}</p>
                   <div className="mb-2">
-                    <span className="text-3xl font-black text-foreground">${price.toLocaleString()}</span>
+                    <span className="text-3xl font-black text-foreground">{isIndia ? formatInr(usdToInr(price)) : `$${price.toLocaleString()}`}</span>
                     <span className="text-muted-foreground text-sm">/{billing === "yearly" ? "yr" : "mo"}</span>
+                    {isIndia && <p className="text-xs text-muted-foreground">{GST_NOTE}</p>}
                   </div>
                   {(plan.allowance.ai_credits > 0 || plan.allowance.render_minutes > 0) && (
                     <div className="mb-4 px-3 py-2 rounded-xl bg-muted/30 border border-border text-xs text-muted-foreground font-medium">
@@ -317,25 +323,20 @@ export default function Billing() {
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      <button onClick={() => subscribe(plan.key, plan.name, price)} disabled={loading === plan.key}
+                      {!isIndia && <button onClick={() => subscribe(plan.key, plan.name, price)} disabled={loading === plan.key}
                         className="w-full py-2.5 rounded-xl bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white text-sm font-semibold hover:opacity-90 transition-opacity shadow-lg shadow-fuchsia-500/20 disabled:opacity-50 flex items-center justify-center gap-2">
                         {loading === plan.key ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                         {loading === plan.key ? "Processing..." : `Choose ${plan.name}`}
-                      </button>
+                      </button>}
                       {plan.sales_assisted && (
                         <a href="mailto:care@digitalstudios.app?subject=Enterprise%20volume%20pricing"
                           className="block w-full text-center py-2 rounded-xl border border-border text-xs font-semibold text-muted-foreground hover:bg-muted/20 transition-colors">
                           Talk to sales about custom volume
                         </a>
                       )}
-                      <PayPalButton
-                        amount={Math.round(price * 83.5)}
-                        currency="INR"
-                        planName={plan.name}
-                        planTier={plan.key}
-                        sourceApp="marketer"
-                        userEmail={user?.email || ""}
-                      />
+                      {isIndia ? <CashfreeButton amount={usdToInr(price)} planTier={plan.key} billing={billing} /> : <PayPalButton
+                        amount={price} currency="USD" planName={plan.name} planTier={plan.key} userEmail={user?.email || ""}
+                      />}
                     </div>
                   )}
                 </div>
@@ -365,7 +366,7 @@ export default function Billing() {
           {CREDIT_PACKS.map(amt => (
             <button key={amt} onClick={() => setCreditAmount(amt)}
               className={`py-2.5 rounded-xl border text-sm font-semibold transition-all ${creditAmount === amt ? "bg-fuchsia-500/15 border-fuchsia-500/50 text-fuchsia-400" : "border-border text-muted-foreground hover:bg-muted/20"}`}>
-              ${amt} <span className="block text-[11px] font-normal opacity-70">{Math.floor(amt / PRICE_PER_CREDIT).toLocaleString()} credits</span>
+              {isIndia ? `${formatInr(usdToInr(amt))} (${GST_NOTE})` : `$${amt}`} <span className="block text-[11px] font-normal opacity-70">{Math.floor(amt / PRICE_PER_CREDIT).toLocaleString()} credits</span>
             </button>
           ))}
         </div>
@@ -377,12 +378,13 @@ export default function Billing() {
               onChange={e => setCreditAmount(Math.max(10, Number(e.target.value) || 0))}
               className="w-full h-10 pl-6 pr-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
           </div>
-          <button onClick={() => buyCredits(creditAmount)} disabled={buyingCredits || creditAmount < 10}
+          {!isIndia && <button onClick={() => buyCredits(creditAmount)} disabled={buyingCredits || creditAmount < 10}
             className="flex items-center gap-2 px-5 h-10 rounded-xl bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white text-sm font-semibold disabled:opacity-50 hover:opacity-90 transition-all shadow-lg shadow-fuchsia-500/20">
             {buyingCredits ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
             Buy {Math.floor(creditAmount / PRICE_PER_CREDIT).toLocaleString()} Credits
-          </button>
+          </button>}
         </div>
+        {isIndia && <div className="mt-3"><p className="text-xs text-muted-foreground mb-2">Enter a USD-equivalent credit amount above; pay the INR total below.</p><CashfreeButton amount={usdToInr(creditAmount)} creditAmount={creditAmount} /></div>}
         <p className="text-[11px] text-muted-foreground mt-2">Minimum purchase $10. Any amount $10 or above can be purchased — credits never expire.</p>
       </div>
 

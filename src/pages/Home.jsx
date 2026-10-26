@@ -7,6 +7,7 @@ import {
   Film, Music, Sliders, PenTool, Briefcase, Clapperboard } from
 "lucide-react";
 import { BRAND } from "@/lib/brand";
+import { planPrice, isInIndia } from "@/lib/geoPricing";
 import WhoItsFor from "@/components/WhoItsFor";
 import { LANE1_PLANS as CATALOG_LANE1, LANE2_PLANS as CATALOG_LANE2, BYOK_PLAN as CATALOG_BYOK } from "@/config/plans";
 import { useSeo, SEO, injectStructuredData } from "@/lib/seo";
@@ -247,7 +248,7 @@ export default function Home() {
                 bullets. Derived from the catalog so it cannot go stale. */}
             <p className="text-neutral-400 text-sm md:text-base max-w-xl mx-auto">
               {CATALOG_LANE1.length + CATALOG_LANE2.length} plans across two lanes, plus a{" "}
-              {CATALOG_BYOK.name} add-on at ${CATALOG_BYOK.price_monthly}/mo.
+              {CATALOG_BYOK.name} add-on at {planPrice(CATALOG_BYOK.price_monthly)}/mo.
               Pick the lane that matches your work, then the tier that matches your volume.
             </p>
           </div>
@@ -284,7 +285,7 @@ export default function Home() {
                     sits as a caption above the list rather than dominating
                     it. */}
                 <p className="text-[11px] text-neutral-500 mb-2">
-                  {lane.tiers.length} plans · from <span className="text-neutral-300 font-bold">${lane.fromPrice}</span>/mo + tax
+                  {lane.tiers.length} plans · from <span className="text-neutral-300 font-bold">{planPrice(lane.fromPrice)}</span>/mo{!isInIndia() && " + tax"}
                 </p>
                 <div className="mb-6 rounded-2xl border border-white/10 bg-black/25 divide-y divide-white/5 overflow-hidden">
                   {lane.tiers.map((t) =>
@@ -294,8 +295,8 @@ export default function Home() {
                         <span className="block text-sm font-bold text-white truncate">{t.name}</span>
                         <span className="block text-[11px] text-neutral-400 truncate">{t.note}</span>
                       </span>
-                      <span className="text-base font-black text-white whitespace-nowrap">
-                        ${t.price.toLocaleString()}
+                      <span className="text-base font-black text-white text-right">
+                        {planPrice(t.price)}
                         <span className="text-[10px] font-medium text-neutral-500">/mo</span>
                       </span>
                     </Link>
@@ -394,14 +395,7 @@ export default function Home() {
         }
 
 
-      {/* Universal Contact */}
-      <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground py-4 border-t border-border/30">
-        <a href="mailto:care@zoazoneservices.com" className="hover:text-foreground transition-colors flex items-center gap-1.5">
-          <span>📞</span>
-          <span>care@zoazoneservices.com</span>
-          <span className="opacity-60">· {BRAND.name} AI Assistant 24/7</span>
-        </a>
-      </div>
+
     </div>
     </>);
 

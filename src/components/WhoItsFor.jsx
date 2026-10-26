@@ -1,4 +1,5 @@
 import { Users, Briefcase, Building2, Clapperboard, Languages, GraduationCap } from "lucide-react";
+import { localizePlanPrices } from "@/lib/geoPricing";
 
 /**
  * "Who it's for" — the marketing page's plain-language answer to what the
@@ -85,7 +86,7 @@ export default function WhoItsFor() {
               </div>
               <h3 className="text-base font-black text-white mb-2">{s.title}</h3>
               <p className="text-neutral-400 text-xs leading-relaxed flex-1">{s.body}</p>
-              <p className="text-[11px] font-bold text-fuchsia-400/90 mt-4">{s.proof}</p>
+              <p className="text-[11px] font-bold text-fuchsia-400/90 mt-4">{localizePlanPrices(s.proof)}</p>
             </div>
           ))}
         </div>

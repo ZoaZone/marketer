@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import PayPalButton from "@/components/PayPalButton";
+import CashfreeButton from "@/components/CashfreeButton";
+import { isInIndia, usdToInr, formatInr, GST_NOTE } from "@/lib/geoPricing";
 import { Check, ArrowRight, ArrowLeft, Loader2, Star, Sparkles, Gift, Mail, Phone, MessageSquare, Film, Clapperboard, KeyRound, Briefcase } from "lucide-react";
 import { BRAND } from "@/lib/brand";
 import { useSeo, SEO } from "@/lib/seo";
@@ -78,7 +79,7 @@ export default function Pricing() {
   useSeo(SEO.pricing);
 
   const [billing, setBilling] = useState("monthly");
-  const isIndia = typeof Intl !== "undefined" && Intl.DateTimeFormat().resolvedOptions().timeZone === "Asia/Kolkata";
+  const isIndia = isInIndia();
   const [loadingPlan, setLoadingPlan] = useState(null);
 
   const { data: user } = useQuery({ queryKey: ["me"], queryFn: () => base44.auth.me().catch(() => null) });
@@ -123,11 +124,11 @@ export default function Pricing() {
         <p className="text-white/40 text-xs mb-1 mt-1">{plan.desc}</p>
         <h3 className="text-lg font-black text-white mb-2">{plan.name}</h3>
         <div className="mb-1">
-          <span className="text-3xl font-black text-white">{isIndia ? `₹${(perMonth * 85).toLocaleString('en-IN')}` : `$${perMonth}`}{plan.contactSales ? "+" : ""}</span>
-          <span className="text-white/40 text-xs">/mo</span>
+          <span className="text-3xl font-black text-white">{isIndia ? formatInr(usdToInr(price)) : `$${perMonth}`}{plan.contactSales ? "+" : ""}</span>
+          <span className="text-white/40 text-xs">/{isIndia && billing === "yearly" && plan.price_yearly ? "yr" : "mo"}</span>
           </div>
-          <p className="text-[11px] text-white/30 mb-1">{isIndia ? `Indicative conversion at ₹85/USD · excludes GST · USD $${perMonth}/mo` : '+ applicable taxes'}</p>
-        {billing === "yearly" && plan.price_yearly && <p className="text-xs text-fuchsia-400 mb-3">Billed {isIndia ? `approximately ₹${(price * 85).toLocaleString('en-IN')}` : `$${price}`}/year · save {savings(plan)}%</p>}
+          <p className="text-[11px] text-white/30 mb-1">{isIndia ? GST_NOTE : '+ applicable taxes'}</p>
+        {billing === "yearly" && plan.price_yearly && <p className="text-xs text-fuchsia-400 mb-3">Billed {isIndia ? `${formatInr(usdToInr(price))} (${GST_NOTE})` : `$${price}`}/year · save {savings(plan)}%</p>}
         {(billing === "monthly" || !plan.price_yearly) && <div className="mb-3" />}
         {plan.credits && (
           <div className="mb-4 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white/70 font-medium">{plan.credits}</div>
@@ -141,14 +142,14 @@ export default function Pricing() {
           ))}
         </div>
 
-        <button onClick={() => handleCheckout(plan)} disabled={!!loadingPlan}
+        {!isIndia && <button onClick={() => handleCheckout(plan)} disabled={!!loadingPlan}
           className={`w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
             plan.popular
               ? "bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white hover:opacity-90 shadow-lg shadow-fuchsia-500/30"
               : "border border-white/15 text-white/80 hover:border-white/30 hover:text-white"
           } disabled:opacity-60`}>
           {loadingPlan === plan.key ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Get Started <ArrowRight className="w-4 h-4" /></>}
-        </button>
+        </button>}
         {/* Enterprise is buyable at list price AND sales-assisted for custom
             volume — it used to be contact-sales only, with no checkout path
             behind it at all. */}
@@ -161,7 +162,7 @@ export default function Pricing() {
         {isIndia && (
           <div className="mt-3">
             <p className="text-xs text-center text-white/40 mb-2">🇮🇳 India? Pay in INR</p>
-            <PayPalButton amount={Math.round(perMonth * 85)} currency="INR" planName={plan.name} planTier={plan.key} sourceApp="marketer" userEmail={user?.email || ""} />
+            <CashfreeButton amount={usdToInr(price)} planTier={plan.key} billing={billing} />
           </div>
         )}
       </div>
@@ -195,7 +196,7 @@ export default function Pricing() {
               Yearly <span className="text-xs px-1.5 py-0.5 bg-fuchsia-500/20 text-fuchsia-300 rounded-full font-medium">Save 20%</span>
             </button>
           </div>
-          <p className="text-[11px] text-white/25 mt-3">{isIndia ? 'India: indicative INR prices converted from USD at ₹85/USD; GST is extra. Final payable amount and taxes are shown at checkout.' : 'All prices shown + applicable taxes, calculated at checkout based on your billing address.'}</p>
+          <p className="text-[11px] text-white/25 mt-3">{isIndia ? 'India plan prices: USD × 94.93, rounded to the nearest ₹50, exclusive of 18% GST. GST is added at checkout.' : 'All prices shown + applicable taxes, calculated at checkout based on your billing address.'}</p>
         </div>
 
         {/* Pay-as-you-go Credits callout */}
@@ -204,14 +205,14 @@ export default function Pricing() {
             <Sparkles className="w-6 h-6 text-fuchsia-400 shrink-0 mt-0.5" />
             <div>
               <h3 className="text-base font-black text-white mb-0.5">Pay-as-you-go AI Credits</h3>
-              <p className="text-sm text-white/50">No subscription, or need to top up this month&rsquo;s AI credits? Buy anytime. 1 credit = {isIndia ? `approximately ₹${(PRICE_PER_CREDIT * 85).toFixed(2)} (excludes GST)` : `$${PRICE_PER_CREDIT.toFixed(2)} + applicable taxes`}. Credits never expire. Base44 AI video is available to every account, free trial included.</p>
+              <p className="text-sm text-white/50">No subscription, or need to top up this month&rsquo;s AI credits? Buy anytime. 1 credit = {isIndia ? `approximately ₹${(PRICE_PER_CREDIT * 94.93).toFixed(2)} (${GST_NOTE})` : `$${PRICE_PER_CREDIT.toFixed(2)} + applicable taxes`}. Credits never expire. Base44 AI video is available to every account, free trial included.</p>
               <CreditCostChips />
             </div>
           </div>
           <div className="flex gap-2 flex-wrap shrink-0">
             {CREDIT_PACKS.map(amt => (
               <div key={amt} className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-center min-w-[64px]">
-                <div className="text-lg font-black text-white">{isIndia ? `₹${(amt * 85).toLocaleString('en-IN')}` : `$${amt}`}</div>
+                <div className="text-lg font-black text-white">{isIndia ? `${formatInr(usdToInr(amt))} (${GST_NOTE})` : `$${amt}`}</div>
                 <div className="text-[10px] text-white/40">{Math.floor(amt / PRICE_PER_CREDIT).toLocaleString()} cr</div>
               </div>
             ))}
@@ -311,9 +312,7 @@ export default function Pricing() {
         <p className="text-center text-xs text-white/25">
           All prices shown exclude applicable taxes, calculated and applied at checkout.
           Subscriptions auto-renew; cancel anytime before renewal to avoid charges.
-          Eligible refunds and duplicate payments are handled under our{" "}
-          <Link to="/refund-policy" className="underline hover:text-white/40">Refund & Cancellation Policy</Link>.
-          For billing questions: care@zoazoneservices.com
+          Eligible refunds and duplicate payments follow the refund policy linked below.
         </p>
       </div>
     </div>

@@ -1,91 +1,40 @@
-/**
- * cashfreeCheckout — ZoaZone standard Cashfree order creation
- *
- * Payment gateway for Indian business (Zoa Zone Services Pvt Ltd).
- * Stripe remains the gateway for international customers.
- *
- * POST body:
- *   { amount: number (INR), customerName, customerEmail, customerPhone,
- *     customerId?, orderId?, plan?, appId, meta? }
- *
- * Returns:
- *   { ok: true, paymentLink, orderId, sessionId } on success
- *   { ok: false, error } on failure
- */
-import { createClientFromRequest } from "/runtime/runtime.ts";
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.54';
+import { cashfreeQuote, cashfreeCreditQuote } from '../../shared/cashfreePlans.ts';
+import { cashfreeConfig, cashfreeRequest, fulfillCashfree } from '../../shared/cashfree.ts';
 
-const APP_ID = "69c3c2f5acaefc3a7afad5fd";
-
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-};
-
-const CASHFREE_APP_ID = Deno.env.get("CASHFREE_APP_ID") || "";
-const CASHFREE_SECRET_KEY = Deno.env.get("CASHFREE_SECRET_KEY") || "";
-const CASHFREE_ENV = (Deno.env.get("CASHFREE_ENV") || "production").toUpperCase();
-const API_BASE = CASHFREE_ENV === "TEST" ? "https://sandbox-api.cashfree.com/pg" : "https://api.cashfree.com/pg";
-
-export default async function handler(req) {
-  if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
+export default async function(req) {
   try {
-    if (!CASHFREE_APP_ID || !CASHFREE_SECRET_KEY) {
-      return Response.json({ ok: false, error: "Cashfree not configured (CASHFREE_APP_ID / CASHFREE_SECRET_KEY missing)" }, { status: 500, headers: CORS });
+    const base44 = createClientFromRequest(req);
+    const user = await base44.auth.me().catch(e => e.status === 401 ? null : Promise.reject(e));
+    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    const body = await req.json().catch(() => ({}));
+    if (body.action === 'confirm') {
+      if (!/^ds_[a-f0-9-]{36}$/.test(body.order_id || '')) return Response.json({ error: 'Invalid order ID' }, { status: 400 });
+      const order = await cashfreeRequest('/orders/' + encodeURIComponent(body.order_id));
+      if (order.order_tags?.owner !== user.email) return Response.json({ error: 'Forbidden' }, { status: 403 });
+      return Response.json(await fulfillCashfree(base44, order));
     }
-
-    const body = await req.json();
-    const amount = Number(body.amount);
-    if (!amount || amount < 1) {
-      return Response.json({ ok: false, error: "Invalid amount" }, { status: 400, headers: CORS });
-    }
-    if (!body.customerEmail || !body.customerPhone) {
-      return Response.json({ ok: false, error: "customerEmail and customerPhone are required by Cashfree" }, { status: 400, headers: CORS });
-    }
-
-    const origin = new URL(req.url).origin;
-    const orderId = body.orderId || `cf_${APP_ID}_${Date.now()}`;
-
-    const cfRes = await fetch(`${API_BASE}/orders`, {
-      method: "POST",
-      headers: {
-        "x-client-id": CASHFREE_APP_ID,
-        "x-client-secret": CASHFREE_SECRET_KEY,
-        "x-api-version": "2023-08-01",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        order_id: orderId,
-        order_amount: amount,
-        order_currency: "INR",
-        customer_details: {
-          customer_id: body.customerId || body.customerEmail,
-          customer_email: body.customerEmail,
-          customer_phone: String(body.customerPhone),
-          customer_name: body.customerName || body.customerEmail,
-        },
-        order_meta: {
-          return_url: `${origin}/payment/result?order_id=${orderId}`,
-          notify_url: `${origin}/api/apps/${APP_ID}/functions/cashfreeWebhook`,
-        },
-        order_tags: { app: APP_ID, plan: body.plan || "standard" },
-      }),
+    const { plan, billing = 'monthly', customerPhone } = body;
+    const isCredits = body.kind === 'credits';
+    const quote = isCredits ? cashfreeCreditQuote(body.amount_usd) : cashfreeQuote(plan, billing);
+    if (!quote) return Response.json({ error: 'Invalid plan, billing period or credit amount' }, { status: 400 });
+    if (!/^[6-9][0-9]{9}$/.test(String(customerPhone || ''))) return Response.json({ error: 'Enter a valid 10-digit Indian mobile number' }, { status: 400 });
+    const config = cashfreeConfig();
+    const orderId = 'ds_' + crypto.randomUUID();
+    // Never insert a pending paid plan: abandoned checkouts must not replace
+    // the current subscription or change existing generation entitlements.
+    const existing = await base44.asServiceRole.entities.Subscription.filter({ owner_email: user.email }, null, 1);
+    const sub = existing[0] || await base44.asServiceRole.entities.Subscription.create({ owner_email: user.email, plan_name: 'Free', plan_tier: 'free', status: 'active', credits_balance: 0 });
+    const origin = new URL(req.headers.get('X-Base44-App-Url') || 'https://agentmarketer.base44.app').origin;
+    const order = await cashfreeRequest('/orders', {
+      order_id: orderId, order_currency: 'INR', order_amount: quote.total,
+      customer_details: { customer_id: user.id, customer_email: user.email, customer_name: user.full_name || user.email, customer_phone: String(customerPhone) },
+      order_meta: { return_url: `${origin}/billing?cashfree_order_id=${orderId}`, notify_url: 'https://agentmarketer.base44.app/functions/cashfreeWebhook' },
+      order_note: `${quote.name}${isCredits ? '' : ' ' + billing}: INR ${quote.subtotal} + 18% GST INR ${quote.gst}`,
+      order_tags: isCredits ? { owner: user.email, kind: 'credits', amount_usd: String(body.amount_usd), subscription_id: sub.id } : { owner: user.email, plan, billing, subscription_id: sub.id },
     });
-
-    const cfData = await cfRes.json();
-    if (!cfRes.ok) {
-      console.error("[cashfreeCheckout] order creation failed:", cfRes.status, JSON.stringify(cfData));
-      return Response.json({ ok: false, error: cfData?.message || "Failed to create payment order" }, { status: 502, headers: CORS });
-    }
-
-    return Response.json({
-      ok: true,
-      orderId,
-      sessionId: cfData.payment_session_id,
-      paymentLink: `https://payments.cashfree.com/order/#${cfData.payment_session_id}`,
-    }, { headers: CORS });
-  } catch (err) {
-    console.error("[cashfreeCheckout] FATAL:", err?.message || String(err));
-    return Response.json({ ok: false, error: "Internal server error" }, { status: 500, headers: CORS });
+    return Response.json({ ok: true, orderId, sessionId: order.payment_session_id, mode: config.mode, ...quote });
+  } catch (_) {
+    return Response.json({ error: 'Unable to process Cashfree checkout. Please check payment settings or try again.' }, { status: 500 });
   }
 }

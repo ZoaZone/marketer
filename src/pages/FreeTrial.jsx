@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ArrowLeft, Upload, User, Lock, ArrowRight, Loader2, CheckCircle2, Sparkles, Image, Video, Mail, GitBranch, Share2, BarChart3, Zap } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { useSeo, SEO } from "@/lib/seo";
+import { planPrice } from "@/lib/geoPricing";
 
 const M_LOGO = "/brand/icon.png";
 
@@ -206,7 +207,7 @@ export default function FreeTrial() {
                 ))}
               </div>
               <div className="mt-5 pt-5 border-t border-white/8 text-center">
-                <p className="text-sm text-white/50 mb-3">Unlock everything from <span className="text-fuchsia-400 font-bold">$49/month</span></p>
+                <p className="text-sm text-white/50 mb-3">Unlock everything from <span className="text-fuchsia-400 font-bold">{planPrice(49)}/month</span></p>
                 <Link to="/pricing"
                   className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white font-bold text-sm hover:opacity-90 shadow-lg shadow-fuchsia-500/20">
                   Upgrade Now <ArrowRight className="w-4 h-4" />
@@ -282,7 +283,7 @@ export default function FreeTrial() {
                 className="inline-flex items-center gap-2 px-7 py-3 rounded-xl bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white font-bold text-sm hover:opacity-90 shadow-lg shadow-fuchsia-500/25">
                 View Plans & Upgrade <ArrowRight className="w-4 h-4" />
               </Link>
-              <p className="text-xs text-white/30 mt-3">Plans from $49/mo · Cancel anytime</p>
+              <p className="text-xs text-white/30 mt-3">Plans from {planPrice(49)}/mo · Cancel anytime</p>
             </div>
           </div>
         )}

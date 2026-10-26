@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { localizePlanPrices } from "@/lib/geoPricing";
 import { Mic, MicOff, Send, Volume2, VolumeX, Bot, Loader2 } from "lucide-react";
 
 const SRI_FN     = "https://sreeagent.base44.app/functions/sriChat";
@@ -16,7 +17,7 @@ function getConfig() {
     color:   p.get("color")   || SITE_COLOR,
     logo:    p.get("logo")    || LOGO_URL,
     mode:    p.get("mode")    || "both",  // "text" | "voice" | "both"
-    prompt:  p.get("prompt")  || SYSTEM_PROMPT,
+    prompt:  p.get("prompt")  || localizePlanPrices(SYSTEM_PROMPT),
   };
 }
 

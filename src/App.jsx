@@ -64,6 +64,7 @@ import ShippingPolicy from './pages/ShippingPolicy';
 
 
 const AuthenticatedApp = () => {
+  const { pathname } = useLocation();
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
 
   if (isLoadingPublicSettings || isLoadingAuth) {
@@ -94,7 +95,7 @@ const AuthenticatedApp = () => {
   }
 
   const publicPages = new Set(['/', '/Home', '/home', '/pricing', '/Pricing', '/auth', '/login', '/privacy', '/terms', '/about', '/contact', '/refund-policy', '/shipping-policy', '/beta', '/free-trial', '/agent-program', '/agency-enquiry', '/lead-capture', '/admin/login', '/onboarding']);
-  const showFooter = publicPages.has(window.location.pathname) || window.location.pathname.startsWith('/invite');
+  const showFooter = publicPages.has(pathname) || pathname.startsWith('/invite') || pathname === '/oauth/consent';
   return (
     <>
     <Routes>

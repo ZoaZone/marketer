@@ -16,6 +16,8 @@ import {
   FREE_TRIAL_GENERATIONS, MIN_CREDIT_PURCHASE_USD, BYOK_INCLUDED_TIERS, PLAN_BY_KEY,
 } from "@/config/plans";
 
+import { planPrice } from "@/lib/geoPricing";
+
 const byokIncluded = BYOK_INCLUDED_TIERS.map((k) => PLAN_BY_KEY[k]?.name).filter(Boolean).join(", ");
 
 export const PRICING_FAQ = [
@@ -41,7 +43,7 @@ export const PRICING_FAQ = [
   },
   {
     q: "Can I use my own Replicate or ElevenLabs account?",
-    a: `Yes — that is the BYO Providers add-on. Connect your keys from Integrations and jobs run on your account, so your provider bills you directly and those jobs consume none of your Render Minutes. It is $${PLAN_BY_KEY.byok.price_monthly}/mo standalone and included free with ${byokIncluded}. Useful if you already have negotiated provider rates or your own compliance requirements.`,
+    a: `Yes — that is the BYO Providers add-on. Connect your keys from Integrations and jobs run on your account, so your provider bills you directly and those jobs consume none of your Render Minutes. It is ${planPrice(PLAN_BY_KEY.byok.price_monthly)}/mo standalone and included free with ${byokIncluded}. Useful if you already have negotiated provider rates or your own compliance requirements.`,
   },
   {
     q: "What do I get before paying anything?",

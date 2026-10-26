@@ -16,7 +16,7 @@ const SAMPLE = [
   { id: "s2", type: "funnel",   title: "New lead captured via Free Trial Funnel", body: "priya@example.com just signed up", read: false, created_date: new Date(Date.now() - 1000 * 60 * 60 * 2) },
   { id: "s3", type: "social",   title: "Scheduled post published", body: "TikTok reel went live · 2.3K likes so far", read: true,  created_date: new Date(Date.now() - 1000 * 60 * 60 * 5) },
   { id: "s4", type: "ai",       title: "AI image generated", body: "Your Spring Campaign banner is ready in Media Library", read: true, created_date: new Date(Date.now() - 1000 * 60 * 60 * 24) },
-  { id: "s5", type: "success",  title: "Payment received", body: "Growth plan · ₹12,350/month activated", read: true, created_date: new Date(Date.now() - 1000 * 60 * 60 * 48) },
+  { id: "s5", type: "success",  title: "Payment received", body: "Growth plan · ₹12,350/month (exclusive of 18% GST) activated", read: true, created_date: new Date(Date.now() - 1000 * 60 * 60 * 48) },
 ];
 
 function timeAgo(d) {

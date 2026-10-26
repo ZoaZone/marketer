@@ -1,67 +1,29 @@
-/**
- * cashfreeWebhook — ZoaZone standard Cashfree webhook receiver
- *
- * Verifies the x-webhook-signature header (HMAC-SHA256 of the raw body with
- * CASHFREE_SECRET_KEY) and then updates the app's payment entity.
- *
- * APP-SPECIFIC: update the entity name + status update in the marked section.
- */
-import { createClientFromRequest } from "/runtime/runtime.ts";
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.54';
+import { cashfreeConfig, cashfreeRequest, fulfillCashfree } from '../../shared/cashfree.ts';
 
-const CASHFREE_SECRET_KEY = Deno.env.get("CASHFREE_SECRET_KEY") || "";
-
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
-};
-
-async function verifySignature(rawBody, signature) {
-  if (!CASHFREE_SECRET_KEY || !signature) return false;
-  const keyData = new TextEncoder().encode(CASHFREE_SECRET_KEY);
-  const key = await crypto.subtle.importKey("raw", keyData, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(rawBody));
-  const expected = btoa(String.fromCharCode(...new Uint8Array(mac)));
-  return expected === signature;
-}
-
-export default async function handler(req) {
-  if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
+export default async function(req) {
   try {
+    if (req.method !== 'POST') return Response.json({ error: 'Method not allowed' }, { status: 405 });
+    const signature = req.headers.get('x-webhook-signature'), timestamp = req.headers.get('x-webhook-timestamp');
+    if (!signature || !timestamp) return Response.json({ error: 'Invalid signature' }, { status: 401 });
     const raw = await req.text();
-    const signature = req.headers.get("x-webhook-signature") || "";
-
-    if (!(await verifySignature(raw, signature))) {
-      console.error("[cashfreeWebhook] signature verification failed");
-      return new Response("Invalid signature", { status: 401, headers: CORS });
-    }
-
+    const { key: secret } = cashfreeConfig();
+    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
+    let signatureBytes;
+    try { signatureBytes = Uint8Array.from(atob(signature), c => c.charCodeAt(0)); }
+    catch (_) { return Response.json({ error: 'Invalid signature' }, { status: 401 }); }
+    const valid = await crypto.subtle.verify('HMAC', key, signatureBytes, new TextEncoder().encode(timestamp + raw));
+    if (!valid) return Response.json({ error: 'Invalid signature' }, { status: 401 });
     const event = JSON.parse(raw);
-    const data = event?.data || {};
-    const orderId = data.order?.order_id || data.order_id;
-    const paymentStatus = data.payment?.payment_status || data.payment_status;
-    const cfPaymentId = data.payment?.cf_payment_id;
-
-    console.log(`[cashfreeWebhook] type=${event.type} order=${orderId} status=${paymentStatus}`);
-
-    if (!orderId) {
-      return Response.json({ received: true }, { headers: CORS });
-    }
-
-    const base44 = await createClientFromRequest(req);
-    const asAdmin = base44.asServiceRole ?? base44;
-
-    // ─────────────────────────────────────────────────────────────
-    // APP-SPECIFIC SECTION — adapt entity + fields per app
-    // ─────────────────────────────────────────────────────────────
-    // App-specific fulfilment not wired yet (log-only for now).
-    // TODO: when wiring this app's checkout, update the app's payment/order entity for orderId here.
-    console.log(`[cashfreeWebhook] verified event for order ${orderId} status=${paymentStatus} (fulfilment TODO)`);
-    // ─────────────────────────────────────────────────────────────
-
-    return Response.json({ received: true }, { headers: CORS });
-  } catch (err) {
-    console.error("[cashfreeWebhook] FATAL:", err?.message || String(err));
-    return Response.json({ received: true }, { headers: CORS });
+    if (event.type !== 'PAYMENT_SUCCESS_WEBHOOK') return Response.json({ received: true });
+    const orderId = event.data?.order?.order_id;
+    if (!/^ds_[a-f0-9-]{36}$/.test(orderId || '')) return Response.json({ received: true });
+    // Re-fetch provider state: neither browser parameters nor webhook amounts
+    // alone can activate a plan. Fulfillment is replay-safe for the same order.
+    const order = await cashfreeRequest('/orders/' + encodeURIComponent(orderId));
+    const result = await fulfillCashfree(createClientFromRequest(req), order);
+    return Response.json({ received: true, confirmed: result.confirmed });
+  } catch (_) {
+    return Response.json({ error: 'Payment confirmation failed; retry required.' }, { status: 500 });
   }
 }
