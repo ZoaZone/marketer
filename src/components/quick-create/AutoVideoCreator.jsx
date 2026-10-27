@@ -10,7 +10,7 @@ const btn = (on) => `px-3 py-1.5 rounded-lg border text-xs font-bold transition-
 
 export default function AutoVideoCreator({ prompt, referenceImageUrls, canMotion, canMusic, onBusyChange, onAdvanced }) {
   const isPro = canMusic;
-  const [quality, setQuality] = useState(isPro ? "cinematic" : "standard");
+  const [quality, setQuality] = useState("standard");
   const [ratio, setRatio] = useState(VIDEO_RATIOS[0]);
   const cinematic = quality === "cinematic";
   const [resolution, setResolution] = useState("1080p");
@@ -46,7 +46,7 @@ export default function AutoVideoCreator({ prompt, referenceImageUrls, canMotion
             <button type="button" disabled={v.busy} onClick={() => setQuality("standard")} aria-pressed={!cinematic}
               className={`text-left p-3 rounded-lg border transition-all ${!cinematic ? "bg-fuchsia-500/15 border-fuchsia-500/50" : "border-border hover:bg-muted/20"}`}>
               <span className="flex items-center gap-1.5 text-sm font-bold text-foreground"><Zap className="w-3.5 h-3.5" /> Quick</span>
-              <span className="block text-[11px] text-muted-foreground mt-1">3 scenes with a voice-over, ready in a couple of minutes.</span>
+              <span className="block text-[11px] text-muted-foreground mt-1">3 regular moving clips with a voice-over, made with AI credits.</span>
             </button>
             <button type="button" disabled={v.busy || !isPro} onClick={() => setQuality("cinematic")} aria-pressed={cinematic}
               className={`text-left p-3 rounded-lg border transition-all disabled:opacity-60 ${cinematic ? "bg-fuchsia-500/15 border-fuchsia-500/50" : "border-border hover:bg-muted/20"}`}>

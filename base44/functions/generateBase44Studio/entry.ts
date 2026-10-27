@@ -35,7 +35,7 @@ export default async function(req) {
     const direct = async (text: string, hasRef: boolean) => {
       try {
         const out = await base44.asServiceRole.integrations.Core.InvokeLLM({
-          prompt: `Rewrite this video brief as one precise, continuous cinematic shot description (max 120 words). Fix spelling. Keep every subject, setting, product, name and action the user mentioned; add no new characters, text or claims. Fix one visual style, lighting and color palette and keep the same subject throughout.${hasRef ? ' The main character is the supplied reference image; keep their look identical in every moment.' : ''} Return only the description:\n<brief>${text}</brief>`,
+          prompt: `Rewrite this video brief as one clear description of a natural, real-life moving video clip (max 120 words): ordinary lighting, realistic everyday look, and clearly visible subject movement and action throughout. Do NOT use film, movie, cinematic, anamorphic, film-grain, slow-motion or dramatic-grade language. Fix spelling. Keep every subject, setting, product, name and action the user mentioned; add no new characters, text or claims. Fix one visual style, lighting and color palette and keep the same subject throughout.${hasRef ? ' The main character is the supplied reference image; keep their look identical in every moment.' : ''} Return only the description:\n<brief>${text}</brief>`,
         });
         const t = String(out || '').trim();
         return t.length > 20 && t.length < 1500 ? t : text;

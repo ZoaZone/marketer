@@ -26,7 +26,7 @@ export default function useAutoVideo({ cinematic, canMotion, canMusic, ratio, re
     const warn = (m) => setWarnings(prev => [...prev, m]);
     try {
       const sceneCount = cinematic ? 5 : 3;
-      const useMotion = cinematic && canMotion;
+      const useMotion = canMotion;
       const look = cinematic ? CINEMATIC : CLEAN;
 
       setStage("Writing your script"); setProgress(0.05);
