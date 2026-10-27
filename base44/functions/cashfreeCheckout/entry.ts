@@ -2,6 +2,11 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.54';
 import { cashfreeQuote, cashfreeCreditQuote } from '../../shared/cashfreePlans.ts';
 import { cashfreeConfig, cashfreeRequest, fulfillCashfree } from '../../shared/cashfree.ts';
 
+// The app's own approved domain, as every other checkout function uses. The
+// old agentmarketer.base44.app host is not whitelisted on the Cashfree merchant
+// account, so an order carrying it is rejected as an unapproved domain.
+const APP_URL = 'https://digitalstudios.app';
+
 export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
@@ -25,11 +30,10 @@ export default async function(req) {
     // the current subscription or change existing generation entitlements.
     const existing = await base44.asServiceRole.entities.Subscription.filter({ owner_email: user.email }, null, 1);
     const sub = existing[0] || await base44.asServiceRole.entities.Subscription.create({ owner_email: user.email, plan_name: 'Free', plan_tier: 'free', status: 'active', credits_balance: 0 });
-    const origin = new URL(req.headers.get('X-Base44-App-Url') || 'https://agentmarketer.base44.app').origin;
     const order = await cashfreeRequest('/orders', {
       order_id: orderId, order_currency: 'INR', order_amount: quote.total,
       customer_details: { customer_id: user.id, customer_email: user.email, customer_name: user.full_name || user.email, customer_phone: String(customerPhone) },
-      order_meta: { return_url: `${origin}/billing?cashfree_order_id=${orderId}`, notify_url: 'https://agentmarketer.base44.app/functions/cashfreeWebhook' },
+      order_meta: { return_url: `${APP_URL}/billing?cashfree_order_id=${orderId}`, notify_url: `${APP_URL}/functions/cashfreeWebhook` },
       order_note: `${quote.name}${isCredits ? '' : ' ' + billing}: INR ${quote.subtotal} + 18% GST INR ${quote.gst}`,
       order_tags: isCredits ? { owner: user.email, kind: 'credits', amount_usd: String(body.amount_usd), subscription_id: sub.id } : { owner: user.email, plan, billing, subscription_id: sub.id },
     });
