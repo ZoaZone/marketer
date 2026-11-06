@@ -1,15 +1,21 @@
 import { secrets } from 'base44:runtime';
 import { cashfreeQuote, cashfreeCreditQuote } from './cashfreePlans.ts';
 
-export function cashfreeConfig() {
-  const appId = secrets.get('CASHFREE_APP_ID'), key = secrets.get('CASHFREE_SECRET_KEY');
-  const env = String(secrets.get('CASHFREE_ENV') || '').trim().toUpperCase();
+export function isMedhaOrigin(req) {
+  try {
+    const host = new URL(req.headers.get('origin') || '').hostname.toLowerCase();
+    return host === 'medha.io' || host.endsWith('.medha.io');
+  } catch { return false; }
+}
+export function cashfreeConfig(onMedha = false) {
+  const appId = secrets.get(onMedha ? 'CASHFREE_MEDHA_APP_ID' : 'CASHFREE_APP_ID'), key = secrets.get(onMedha ? 'CASHFREE_MEDHA_SECRET_KEY' : 'CASHFREE_SECRET_KEY');
+  const env = String(secrets.get(onMedha ? 'CASHFREE_MEDHA_ENV' : 'CASHFREE_ENV') || '').trim().toUpperCase();
   const sandbox = ['TEST', 'SANDBOX'].includes(env);
   if (!appId || !key || (!sandbox && !['PROD', 'PRODUCTION', 'LIVE'].includes(env))) throw new Error('Check Cashfree credentials and environment.');
   return { appId, key, mode: sandbox ? 'sandbox' : 'production', url: sandbox ? 'https://sandbox.cashfree.com/pg' : 'https://api.cashfree.com/pg' };
 }
-export async function cashfreeRequest(path, body) {
-  const c = cashfreeConfig();
+export async function cashfreeRequest(path, body, onMedha = false) {
+  const c = cashfreeConfig(onMedha);
   const res = await fetch(c.url + path, {
     method: body ? 'POST' : 'GET', signal: AbortSignal.timeout(15000),
     headers: { 'x-client-id': c.appId, 'x-client-secret': c.key, 'x-api-version': '2025-01-01', 'Content-Type': 'application/json' },
