@@ -4,10 +4,11 @@ import { cashfreeConfig, cashfreeRequest, fulfillCashfree } from '../../shared/c
 export default async function(req) {
   try {
     if (req.method !== 'POST') return Response.json({ error: 'Method not allowed' }, { status: 405 });
+    const onMedha = new URL(req.url).searchParams.get('brand') === 'medha';
     const signature = req.headers.get('x-webhook-signature'), timestamp = req.headers.get('x-webhook-timestamp');
     if (!signature || !timestamp) return Response.json({ error: 'Invalid signature' }, { status: 401 });
     const raw = await req.text();
-    const { key: secret } = cashfreeConfig();
+    const { key: secret } = cashfreeConfig(onMedha);
     const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
     let signatureBytes;
     try { signatureBytes = Uint8Array.from(atob(signature), c => c.charCodeAt(0)); }
@@ -20,7 +21,7 @@ export default async function(req) {
     if (!/^ds_[a-f0-9-]{36}$/.test(orderId || '')) return Response.json({ received: true });
     // Re-fetch provider state: neither browser parameters nor webhook amounts
     // alone can activate a plan. Fulfillment is replay-safe for the same order.
-    const order = await cashfreeRequest('/orders/' + encodeURIComponent(orderId));
+    const order = await cashfreeRequest('/orders/' + encodeURIComponent(orderId), undefined, onMedha);
     const result = await fulfillCashfree(createClientFromRequest(req), order);
     return Response.json({ received: true, confirmed: result.confirmed });
   } catch (_) {
