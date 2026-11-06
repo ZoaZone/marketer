@@ -75,7 +75,7 @@ const AuthenticatedApp = () => {
             letter "M" — a leftover from the MediaStudios name — which meant
             the old brand appeared briefly on literally every navigation. */}
         <div className="flex flex-col items-center gap-4">
-          <img src="/brand/icon.png" alt="" width="48" height="48"
+          <img src={typeof window !== "undefined" && window.location.hostname === "chitra.medha.io" ? "https://media.base44.com/images/public/6ae71c148cd6522784f9158f/93657ee90_generated_image.png" : "/brand/icon.png"} alt="" width="48" height="48"
             className="w-12 h-12 rounded-xl object-contain"
             onError={(e) => { e.target.style.display = "none"; }} />
           <div className="w-8 h-8 border-2 border-white/10 border-t-fuchsia-500 rounded-full animate-spin"></div>
