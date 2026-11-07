@@ -5,8 +5,9 @@ import {
   CheckCircle2, Loader2, ArrowRight,
   Gift, User, Mail, Lock
 } from "lucide-react";
+import { BRAND } from "@/lib/brand";
 
-const APP_URL = "https://digitalstudios.app";
+const APP_URL = typeof window !== "undefined" && window.location.hostname === "chitra.medha.io" ? "https://chitra.medha.io" : "https://digitalstudios.app";
 
 const STEPS = [
   { id: 1, label: "Verify Invite" },
@@ -192,8 +193,8 @@ export default function BetaOnboarding() {
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-fuchsia-500 to-purple-600 flex items-center justify-center shadow-lg shadow-fuchsia-500/30 mb-3">
             <span className="text-white font-black text-2xl">A</span>
           </div>
-          <h1 className="text-2xl font-black bg-gradient-to-r from-fuchsia-400 to-purple-400 bg-clip-text text-transparent">Digital Studio</h1>
-          <p className="text-white/40 text-xs mt-1">DigitalStudios.app</p>
+          <h1 className="text-2xl font-black bg-gradient-to-r from-fuchsia-400 to-purple-400 bg-clip-text text-transparent">{BRAND.name}</h1>
+          <p className="text-white/40 text-xs mt-1">{BRAND.domain}</p>
         </div>
 
         <div className="bg-white/5 border border-white/10 rounded-3xl p-8">
@@ -321,7 +322,7 @@ export default function BetaOnboarding() {
               <h1 className="text-2xl font-black text-white mb-2">
                 You're approved!<br />
                 <span className="bg-gradient-to-r from-fuchsia-400 to-purple-400 bg-clip-text text-transparent">
-                  Welcome to Digital Studio Beta
+                  Welcome to {BRAND.name} Beta
                 </span>
               </h1>
               <p className="text-white/50 text-sm mb-1">Invite reserved for</p>
@@ -390,7 +391,7 @@ export default function BetaOnboarding() {
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-white">Tell Us About You</h2>
-                  <p className="text-white/40 text-xs">Personalise your Digital Studio experience</p>
+                  <p className="text-white/40 text-xs">Personalise your {BRAND.name} experience</p>
                 </div>
               </div>
 
@@ -458,7 +459,7 @@ export default function BetaOnboarding() {
                 You're in{fullName ? ", " + fullName.split(" ")[0] : ""}! 🎉
               </h2>
               <p className="text-white/50 text-sm mb-6">
-                Full Agency-tier access activated. Welcome to Digital Studio beta — let's build something great.
+                Full Agency-tier access activated. Welcome to {BRAND.name} beta — let's build something great.
               </p>
               <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 mb-6 text-left space-y-2">
                 <p className="text-emerald-400 font-semibold text-sm">What's unlocked:</p>
