@@ -4,6 +4,7 @@ import { ArrowLeft, Upload, User, Lock, ArrowRight, Loader2, CheckCircle2, Spark
 import { base44 } from "@/api/base44Client";
 import { useSeo, SEO } from "@/lib/seo";
 import { planPrice } from "@/lib/geoPricing";
+import { BRAND } from "@/lib/brand";
 
 const M_LOGO = "/brand/icon.png";
 
