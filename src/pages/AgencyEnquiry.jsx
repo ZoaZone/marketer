@@ -58,7 +58,7 @@ export default function AgencyEnquiry() {
       {/* Nav */}
       <nav className="border-b border-white/8 px-6 h-16 flex items-center justify-between max-w-7xl mx-auto">
         <Link to="/" className="text-lg font-black bg-gradient-to-r from-fuchsia-400 to-purple-400 bg-clip-text text-transparent">
-          DigitalStudios.app
+          {BRAND.name}
         </Link>
         <div className="flex items-center gap-4">
           <Link to="/agent-program" className="text-sm text-fuchsia-400 hover:text-fuchsia-300 transition-colors font-medium">Agent Program →</Link>
