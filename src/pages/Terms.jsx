@@ -2,14 +2,15 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useSeo, SEO } from "@/lib/seo";
 import { FileText, ChevronRight } from "lucide-react";
+import { BRAND } from "@/lib/brand";
 
-// Public terms for DigitalStudios.app. India and non-India customers contract
-// with the respective entities named in section 2.
+// Public terms for DigitalStudios.app (Chitra on chitra.medha.io). India and
+// non-India customers contract with the respective entities named in section 2.
 
 const CO = {
   legalName: "Zoa Zone Services Pvt Ltd (India) / Zoa Zone Services LLC (USA)",
-  product: "DigitalStudios.app",
-  domain: "digitalstudios.app",
+  product: BRAND.name,
+  domain: BRAND.domain,
   supportEmail: "care@zoazoneservices.com",
   parentEmail: "care@zoazoneservices.com",
   legalEmail: "care@zoazoneservices.com",
