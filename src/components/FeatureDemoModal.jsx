@@ -32,7 +32,7 @@ export default function FeatureDemoModal({ onClose }) {
         <div className="flex items-center justify-between px-5 py-3 border-b border-white/8">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-fuchsia-400 animate-pulse" />
-            <span className="text-sm font-bold text-white">digitalstudios.app — Platform Demo</span>
+            <span className="text-sm font-bold text-white">{BRAND.domain} — Platform Demo</span>
           </div>
           <div className="flex items-center gap-2">
             <button
