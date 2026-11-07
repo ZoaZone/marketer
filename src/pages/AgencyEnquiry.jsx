@@ -6,6 +6,7 @@ import {
   Sparkles, BarChart3, Shield, Headphones, Zap, Star
 } from "lucide-react";
 import { useSeo, SEO } from "@/lib/seo";
+import { BRAND } from "@/lib/brand";
 import TurnstileWidget from "@/components/TurnstileWidget";
 
 const AGENCY_FEATURES = [
