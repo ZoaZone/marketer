@@ -6,6 +6,7 @@ import {
   ArrowRight, ArrowLeft, Loader2, Sparkles, Gift, ChevronRight
 } from "lucide-react";
 import { useSeo, SEO } from "@/lib/seo";
+import { BRAND } from "@/lib/brand";
 import TurnstileWidget from "@/components/TurnstileWidget";
 
 const BENEFITS = [
