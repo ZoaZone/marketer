@@ -285,7 +285,7 @@ export default function BetaOnboarding() {
             <span className="text-white font-black text-xl">A</span>
           </div>
           <span className="text-xl font-black bg-gradient-to-r from-fuchsia-400 to-purple-400 bg-clip-text text-transparent tracking-tight">
-            DigitalStudios.app
+            {BRAND.domain}
           </span>
         </div>
 
