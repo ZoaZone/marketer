@@ -5,10 +5,12 @@ import { ArrowLeft, Eye, EyeOff, Mail, Lock, User, Loader2, CheckCircle2, Refres
 import { useSeo, SEO } from "@/lib/seo";
 import GoogleLoginButton from "@/components/GoogleLoginButton";
 import TurnstileWidget from "@/components/TurnstileWidget";
+import { BRAND as BRAND_INFO } from "@/lib/brand";
 
+const ON_MEDHA = typeof window !== "undefined" && window.location.hostname === "chitra.medha.io";
 // Vertical lockup (icon over wordmark) — the right shape for a centred auth card.
-const LOGO = "/brand/lockup-v.png";
-const BRAND = "Digital Studio";
+const LOGO = ON_MEDHA ? "https://media.base44.com/images/public/6ae71c148cd6522784f9158f/93657ee90_generated_image.png" : "/brand/lockup-v.png";
+const BRAND = BRAND_INFO.name;
 const TAGLINE = "The all-in-one AI creative studio";
 const DASHBOARD = "/studio"; // post-login default landing — the creative hub
 
