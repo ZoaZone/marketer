@@ -190,7 +190,7 @@ export default function QuickCreate() {
   const qc = useQueryClient();
   // AppLayout supplies this via <Outlet context>. Defaults keep the page
   // usable if it is ever rendered outside that shell.
-  const { userTier = 0, isAdmin = false } = useOutletContext() || {};
+  const { userTier = 0, isAdmin = false, subscription } = useOutletContext() || {};
   // Base44 scene video is open to every account, free trial included (it is
   // metered in AI credits server-side). Only AI music stays tier-gated.
   const canMotion = true;
@@ -199,19 +199,38 @@ export default function QuickCreate() {
   // its own /movie-maker entry, admins exempt.
   const canMovieMaker = isAdmin || userTier >= MOVIE_MAKER_MIN_TIER;
 
-  // "motion" = real generative video (Kling, one clip per scene).
-  // "slideshow" = Studio visuals — the FFmpeg Ken Burns pan over stills
-  // generated on Base44 credits.
+  // Any real, paying subscription (any Lane 1 or Lane 2 tier). Distinct from
+  // userTier, which reads 0 for an account with no Subscription row at all —
+  // including one still drawing on the 25-credit, one-time free trial.
+  const isPayingSubscriber = isAdmin || (!!subscription && ["active", "trialing"].includes(subscription.status));
+
+  // "motion" = real generative video (Base44 first, Kling fallback — one
+  // clip per scene). "slideshow" = Studio visuals, an FFmpeg Ken Burns pan
+  // over stills generated on Base44 credits.
   //
-  // Studio visuals are the DEFAULT for everyone, including entitled users.
-  // A real AI clip costs two to three minutes per scene on top of paid
-  // credits, so defaulting to it made the primary path in Quick Create both
-  // the slowest and the most expensive one — a three-scene short spent the
-  // better part of ten minutes generating before it could be assembled.
-  // Real AI video is one click away at the storyboard step and clearly
-  // labelled there; it is a choice rather than the toll on the front door.
-  const [motionMode, setMotionMode] = useState("slideshow");
-  const useMotion = canMotion && motionMode === "motion";
+  // DEFAULT is now by account type, not one fixed choice for everyone:
+  //  - Paying subscribers default to real motion. A 3-scene quick video
+  //    costs ~21 AI credits (3 images + 3 x BASE44_VIDEO_CREDITS_PER_5S for
+  //    the video scenes) — a sliver of even the cheapest paid tier's
+  //    150/month — so there is no reason to default them into a
+  //    still-image slideshow and present that as the product. (This UI
+  //    used to describe that slideshow as having "a slow cinematic pan and
+  //    zoom" and label it "The default" below — precisely the "stuck with
+  //    a cinematic/basic video" complaint reported against the old Media
+  //    Studio tool, just relocated into this one.)
+  //  - Free-trial / no-subscription accounts still default to the
+  //    slideshow: the free trial is a ONE-TIME 25-credit pool shared across
+  //    every Lane 1 generation, and one motion quick video would spend
+  //    ~84% of it in a single click with no warning. They get a clearly
+  //    cost-labelled "Real AI video" option instead — an informed choice,
+  //    not a trap — rather than a silent default that quietly protects
+  //    their trial at the cost of looking like the free tier is all slideshows.
+  // Either default is only a starting point: once motionMode is set
+  // explicitly (by clicking either option), that choice always wins.
+  const [motionMode, setMotionMode] = useState(null);
+  const defaultMotionMode = isPayingSubscriber ? "motion" : "slideshow";
+  const effectiveMotionMode = motionMode || defaultMotionMode;
+  const useMotion = canMotion && effectiveMotionMode === "motion";
   const [motionProgress, setMotionProgress] = useState(0);
   const [clipGenerating, setClipGenerating] = useState({});
   // Live status of the clip currently generating: { status, elapsedMs,
