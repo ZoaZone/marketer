@@ -1,6 +1,5 @@
 import { useEffect, useRef } from "react";
 import { X, Maximize2 } from "lucide-react";
-import { BRAND } from "@/lib/brand";
 
 const VIDEO_URL = "https://media.base44.com/videos/public/69c3c2f5acaefc3a7afad5fd/913d0aa77_generated_video.mp4";
 
@@ -33,7 +32,7 @@ export default function FeatureDemoModal({ onClose }) {
         <div className="flex items-center justify-between px-5 py-3 border-b border-white/8">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-fuchsia-400 animate-pulse" />
-            <span className="text-sm font-bold text-white">{BRAND.domain} — Platform Demo</span>
+            <span className="text-sm font-bold text-white">digitalstudios.app — Platform Demo</span>
           </div>
           <div className="flex items-center gap-2">
             <button

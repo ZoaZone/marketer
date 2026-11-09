@@ -6,7 +6,6 @@ import {
   ArrowRight, ArrowLeft, Loader2, Sparkles, Gift, ChevronRight
 } from "lucide-react";
 import { useSeo, SEO } from "@/lib/seo";
-import { BRAND } from "@/lib/brand";
 import TurnstileWidget from "@/components/TurnstileWidget";
 
 const BENEFITS = [
@@ -73,7 +72,7 @@ export default function AgentProgram() {
       {/* Nav */}
       <nav className="border-b border-white/8 px-6 h-16 flex items-center justify-between max-w-7xl mx-auto">
         <Link to="/" className="text-lg font-black bg-gradient-to-r from-fuchsia-400 to-purple-400 bg-clip-text text-transparent">
-          {BRAND.name}
+          DigitalStudios.app
         </Link>
         <Link to="/dashboard" className="text-sm text-white/60 hover:text-white transition-colors">Sign In</Link>
       </nav>
@@ -92,7 +91,7 @@ export default function AgentProgram() {
             on every referral.
           </h1>
           <p className="text-lg text-white/50 mb-10 max-w-xl mx-auto leading-relaxed">
-            Become an approved {BRAND.name} Agent. Refer businesses and earn commission on every sale — your rate is set when you're approved, and you can bring on sub-affiliates of your own.
+            Become an approved DigitalStudios.app Agent. Refer businesses and earn commission on every sale — your rate is set when you're approved, and you can bring on sub-affiliates of your own.
           </p>
           <a href="#apply" className="inline-flex items-center gap-2 px-8 py-4 rounded-2xl bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white font-bold text-base hover:opacity-90 transition-opacity shadow-2xl shadow-fuchsia-500/30">
             Apply to Become an Agent <ArrowRight className="w-5 h-5" />
