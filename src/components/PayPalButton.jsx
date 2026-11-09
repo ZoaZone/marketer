@@ -1,17 +1,9 @@
-// PayPalButton.jsx — India-only PayPal payment button
-// Use alongside Stripe (international). Show this ONLY for INR / Indian billing.
-// Drop into any Pricing or Billing page.
-//
-// Usage:
-//   <PayPalButton amount={99} currency="INR" planName="Starter" sourceApp="hellobiz" userEmail={user.email} />
-
 import { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { Loader2 } from "lucide-react";
+import { getOrCreateCookieId } from "@/utils/affiliate";
 
-const PAYPAL_FUNCTION_URL = "https://aeva-91fddc64.base44.app/functions/paypalCheckout";
-
-export default function PayPalButton({ amount, currency = "INR", planName = "", sourceApp = "", userEmail = "", onError }) {
+export default function PayPalButton({ amount, currency = "INR", planName = "", planTier = "", userEmail = "", onError }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -19,35 +11,31 @@ export default function PayPalButton({ amount, currency = "INR", planName = "", 
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(PAYPAL_FUNCTION_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "create_order",
-          amount,
-          currency,
-          plan_name: planName,
-          source_app: sourceApp,
-          customer_email: userEmail,
-          description: planName ? `${planName} Plan` : "Payment",
-        }),
+      const res = await base44.functions.invoke("paypalCheckout", {
+        action: "create_order",
+        amount,
+        currency,
+        plan_name: planName,
+        plan_tier: planTier,
+        customer_email: userEmail,
+        cookie_id: getOrCreateCookieId(),
       });
-      const data = await res.json();
-      if (!data.success || !data.approve_url) {
-        throw new Error(data.error?.message || data.error || "PayPal order creation failed");
+      const data = res?.data;
+      if (!data?.success || !data?.approve_url) {
+        throw new Error(data?.error || "PayPal order creation failed");
       }
-      // Redirect to PayPal approval page
       window.location.href = data.approve_url;
     } catch (e) {
-      setError(e.message || "PayPal error. Please try again.");
-      if (onError) onError(e.message);
+      const msg = e?.response?.data?.error || e?.message || "PayPal error. Please try again.";
+      setError(msg);
+      if (onError) onError(msg);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex flex-col items-center gap-2">
+    <div className="flex flex-col items-center gap-1.5">
       <button
         onClick={handlePayPal}
         disabled={loading}
@@ -62,11 +50,11 @@ export default function PayPalButton({ amount, currency = "INR", planName = "", 
             className="h-5"
           />
         )}
-        {loading ? "Redirecting to PayPal..." : `Pay ₹${amount} with PayPal`}
+        <span>{loading ? "Redirecting…" : `Pay ${new Intl.NumberFormat(currency === "INR" ? "en-IN" : "en-US", { style: "currency", currency }).format(amount)} with PayPal`}</span>
       </button>
-      {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
-      <p className="text-[10px] text-muted-foreground">
-        🇮🇳 India payments via Zoa Zone Services Pvt Ltd · Secured by PayPal
+      {error && <p className="text-red-400 text-xs text-center">{error}</p>}
+      <p className="text-[10px] text-white/25 text-center">
+        Secured by PayPal
       </p>
     </div>
   );

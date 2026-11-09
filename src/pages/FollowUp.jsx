@@ -1,12 +1,15 @@
 import { useState } from "react";
+import { useOutletContext } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
+import { mine } from "@/utils/scope";
 import { MailCheck, Plus, Play, Pause, ChevronDown, ChevronUp, Clock, Loader2, X, Zap } from "lucide-react";
 
 const CHANNEL_COLORS={email:"bg-blue-500/10 text-blue-400",sms:"bg-emerald-500/10 text-emerald-400",whatsapp:"bg-amber-500/10 text-amber-400"};
 const TRIGGER_LABELS={new_lead:"New Lead",form_submit:"Form Submit",link_click:"Link Click",no_reply:"No Reply",stage_change:"Stage Change",manual:"Manual"};
 
 export default function FollowUp() {
+  const { user } = useOutletContext() || {};
   const qc = useQueryClient();
   const [expandedSeq, setExpandedSeq] = useState(null);
   const [showNewSeq, setShowNewSeq] = useState(false);
@@ -15,11 +18,11 @@ export default function FollowUp() {
   const [stepForm, setStepForm] = useState({delay_hours:24,channel:"email",message_template:""});
   const [saving, setSaving] = useState(false);
 
-  const {data:sequences=[],isLoading}=useQuery({queryKey:["sequences"],queryFn:()=>base44.entities.FollowUpSequence.list("-created_date",50)});
+  const {data:sequences=[],isLoading}=useQuery({queryKey:["sequences", user?.email],queryFn:()=>base44.entities.FollowUpSequence.filter(mine(user),"-created_date",50),enabled:!!user?.email});
   const {data:steps=[]}=useQuery({
-    queryKey:["steps",expandedSeq],
-    queryFn:()=>base44.entities.FollowUpStep.filter({sequence_id:expandedSeq},"step_order",20),
-    enabled:!!expandedSeq,
+    queryKey:["steps",expandedSeq, user?.email],
+    queryFn:()=>base44.entities.FollowUpStep.filter(mine(user, {sequence_id:expandedSeq}),"step_order",20),
+    enabled:!!expandedSeq && !!user?.email,
   });
 
   const saveSeq=async()=>{

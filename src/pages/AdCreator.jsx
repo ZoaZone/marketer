@@ -1,7 +1,11 @@
 import { useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { useOutletContext } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
-import { PenTool, Wand2, Copy, CheckCircle2, Loader2, Download } from "lucide-react";
+import { mine } from "@/utils/scope";
+import { generateText } from "@/utils/aiClient";
+import { LLM_MODELS } from "@/utils/llmModels";
+import { PenTool, Wand2, Loader2, Download, Send, Check, AlertCircle, Share2, Info } from "lucide-react";
 
 const PLATFORMS=[{v:"instagram",l:"Instagram",formats:["Story","Reel","Feed Post","Carousel"]},{v:"facebook",l:"Facebook",formats:["News Feed","Story","Video Ad","Carousel"]},{v:"tiktok",l:"TikTok",formats:["Video Ad","TopView"]},{v:"linkedin",l:"LinkedIn",formats:["Sponsored Post","Message Ad","Banner"]},{v:"youtube",l:"YouTube",formats:["Pre-roll","Bumper","Display"]},{v:"google",l:"Google",formats:["Search Ad","Display","Responsive"]}];
 const OBJECTIVES=["Brand Awareness","Lead Generation","Sales/Conversion","App Install","Website Traffic","Engagement"];
@@ -9,29 +13,52 @@ const TONES=["Professional","Urgent","Exciting","Trustworthy","Casual","Luxury"]
 
 export default function AdCreator() {
   const qc = useQueryClient();
+  const { user } = useOutletContext();
   const [platform, setPlatform] = useState("instagram");
   const [form, setForm] = useState({format:"Story",objective:"Lead Generation",tone:"Professional",product:"",audience:"",cta:"Learn More"});
   const [adResult, setAdResult] = useState(null);
   const [imageResult, setImageResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [selectedModel, setSelectedModel] = useState("");
+  const [modelFallbackNotice, setModelFallbackNotice] = useState(false);
   const [imgLoading, setImgLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [selectedAccountId, setSelectedAccountId] = useState("");
+  const [posting, setPosting] = useState(false);
+  const [postSuccess, setPostSuccess] = useState(false);
+  const [postError, setPostError] = useState("");
 
   const selectedPlatform = PLATFORMS.find(p=>p.v===platform);
 
+  const { data: socialAccounts = [] } = useQuery({
+    queryKey: ["social_accounts"],
+    queryFn: () => base44.entities.SocialAccount.list("-created_date", 50),
+  });
+
+  const platformAccounts = socialAccounts.filter(
+    a => a.platform?.toLowerCase() === platform && (a.status === "active" || a.status === "connected")
+  );
+
   const generate = async () => {
     if (!form.product) { alert("Describe your product/service"); return; }
-    setLoading(true); setAdResult(null);
+    setLoading(true); setAdResult(null); setPostSuccess(false); setPostError(""); setModelFallbackNotice(false);
     try {
       const prompt = `Create a ${form.tone.toLowerCase()} ${form.format} ad for ${selectedPlatform?.l} for: ${form.product}. Target: ${form.audience||"general"}. Objective: ${form.objective}. CTA: ${form.cta}. Format as:\nHEADLINE: ...\nBODY: ...\nCTA: ...\nHASHTAGS: ...`;
-      const res = await base44.functions.invoke("generateMediaContent",{type:"ad_copy",platform:selectedPlatform?.l,tone:form.tone,prompt});
-      setAdResult(res?.data?.text||res?.text||"Ad copy appears here.");
+      const text = await generateText({
+        type: "ad_copy",
+        platform: selectedPlatform?.l,
+        tone: form.tone,
+        prompt,
+        model: selectedModel || undefined,
+        onModelFallback: () => setModelFallbackNotice(true),
+      });
+      setAdResult(text || "Ad copy appears here.");
     } catch(e) { setAdResult("Error: "+e.message); }
     setLoading(false);
   };
 
-  const generateImage = async () => {
+  const generateAdImage = async () => {
     setImgLoading(true); setImageResult(null);
     try {
       const res = await base44.functions.invoke("generateImage",{prompt:`Professional ${form.format} ad for ${selectedPlatform?.l}: ${form.product}. ${form.tone} style.`,platform,dimensions:"1080x1080"});
@@ -44,21 +71,45 @@ export default function AdCreator() {
 
   const save = async () => {
     if (!adResult) return;
-    await base44.entities.AdCreative.create({platform,format:form.format,body_copy:adResult,media_url:imageResult||null,status:"draft",cta:form.cta});
+    await base44.entities.AdCreative.create({...mine(),platform,format:form.format,body_copy:adResult,media_url:imageResult||null,status:"draft",cta:form.cta});
     qc.invalidateQueries(["ad_creatives"]);
     setSaved(true); setTimeout(()=>setSaved(false),2000);
+  };
+
+  const postToAccount = async () => {
+    if (!adResult || !selectedAccountId) return;
+    setPosting(true); setPostError(""); setPostSuccess(false);
+    try {
+      const account = socialAccounts.find(a => a.id === selectedAccountId);
+      const post = await base44.entities.ScheduledPost.create({
+        ...mine(),
+        social_account_id: selectedAccountId,
+        platform: account?.platform || platform,
+        caption: adResult,
+        media_urls: imageResult ? [imageResult] : [],
+        status: "draft",
+        scheduled_at: new Date().toISOString(),
+      });
+      await base44.functions.invoke("publishScheduledPosts", { post_id: post.id });
+      setPostSuccess(true);
+      qc.invalidateQueries(["scheduled_posts"]);
+    } catch(e) {
+      setPostError(e?.message || "Posting failed. Please try again.");
+    }
+    setPosting(false);
   };
 
   return (
     <div className="max-w-5xl mx-auto space-y-5">
       <div>
         <h1 className="text-2xl font-black text-foreground flex items-center gap-2"><PenTool className="w-6 h-6 text-fuchsia-400"/>Ad Creator</h1>
-        <p className="text-muted-foreground text-sm mt-0.5">Build platform-ready ad creatives with AI-generated copy and visuals</p>
+        <p className="text-muted-foreground text-sm mt-0.5">Build platform-ready ad creatives with AI-generated copy and visuals — then post directly</p>
       </div>
 
+      {/* Platform selector */}
       <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
         {PLATFORMS.map(p=>(
-          <button key={p.v} onClick={()=>{setPlatform(p.v);setForm(prev=>({...prev,format:p.formats[0]}));}}
+          <button key={p.v} onClick={()=>{setPlatform(p.v);setForm(prev=>({...prev,format:p.formats[0]}));setSelectedAccountId("");}}
             className={`py-2.5 px-2 rounded-xl border text-xs font-semibold transition-all ${platform===p.v?"border-fuchsia-500/50 bg-fuchsia-500/10 text-fuchsia-400":"border-border bg-card text-muted-foreground hover:text-foreground"}`}>
             {p.l}
           </button>
@@ -66,6 +117,7 @@ export default function AdCreator() {
       </div>
 
       <div className="grid md:grid-cols-2 gap-5">
+        {/* Brief form */}
         <div className="bg-card border border-border rounded-2xl p-5 space-y-3">
           <h3 className="font-semibold text-foreground">Ad Brief</h3>
           <div className="grid grid-cols-2 gap-3">
@@ -89,27 +141,41 @@ export default function AdCreator() {
             <input value={form.product} onChange={e=>setForm(p=>({...p,product:e.target.value}))} placeholder="e.g. AI voice assistant for restaurants" className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"/></div>
             <div className="space-y-1.5 col-span-2"><label className="text-xs font-medium text-muted-foreground">Target Audience</label>
             <input value={form.audience} onChange={e=>setForm(p=>({...p,audience:e.target.value}))} placeholder="e.g. Restaurant owners 30-55, US" className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"/></div>
+            <div className="space-y-1.5 col-span-2"><label className="text-xs font-medium text-muted-foreground">Model (optional)</label>
+            <select value={selectedModel} onChange={e=>setSelectedModel(e.target.value)} className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none">
+              <option value="">Account default</option>
+              {LLM_MODELS.map(m=><option key={m.id} value={m.id}>{m.label}</option>)}
+            </select></div>
           </div>
           <button onClick={generate} disabled={loading||!form.product} className="w-full py-3 rounded-xl bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white font-semibold text-sm hover:opacity-90 disabled:opacity-60 flex items-center justify-center gap-2 shadow-lg">
             {loading?<><Loader2 className="w-4 h-4 animate-spin"/>Writing…</>:<><Wand2 className="w-4 h-4"/>Generate Ad Copy</>}
           </button>
+          {modelFallbackNotice && (
+            <div className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs">
+              <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              The selected model wasn't available for this generation — used the platform default instead.
+            </div>
+          )}
         </div>
 
+        {/* Creative output */}
         <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold text-foreground">Ad Creative</h3>
             {(adResult||imageResult)&&(
               <div className="flex gap-2">
                 {adResult&&<button onClick={copy} className={`text-xs px-2.5 py-1.5 rounded-lg font-medium ${copied?"bg-emerald-500/10 text-emerald-400":"bg-muted text-muted-foreground hover:text-foreground"}`}>{copied?"Copied!":"Copy"}</button>}
-                <button onClick={save} className={`text-xs px-2.5 py-1.5 rounded-lg font-medium ${saved?"bg-emerald-500/10 text-emerald-400":"bg-fuchsia-500/10 text-fuchsia-400"}`}>{saved?"Saved!":"Save"}</button>
+                <button onClick={save} className={`text-xs px-2.5 py-1.5 rounded-lg font-medium ${saved?"bg-emerald-500/10 text-emerald-400":"bg-fuchsia-500/10 text-fuchsia-400"}`}>{saved?"Saved!":"Save Draft"}</button>
               </div>
             )}
           </div>
           {!adResult&&!loading&&<div className="flex flex-col items-center justify-center h-32 text-center"><PenTool className="w-8 h-8 text-muted-foreground/20 mb-2"/><p className="text-muted-foreground text-sm">Ad copy appears here</p></div>}
           {loading&&<div className="flex flex-col items-center justify-center h-32"><Loader2 className="w-7 h-7 animate-spin text-fuchsia-400 mb-2"/><p className="text-muted-foreground text-sm">Generating…</p></div>}
-          {adResult&&<div className="bg-muted/20 rounded-xl p-4"><pre className="text-sm text-foreground whitespace-pre-wrap font-sans leading-relaxed">{adResult}</pre></div>}
+          {adResult&&<div className="bg-muted/20 rounded-xl p-4 max-h-48 overflow-y-auto"><pre className="text-sm text-foreground whitespace-pre-wrap font-sans leading-relaxed">{adResult}</pre></div>}
+
+          {/* Generate visual */}
           <div className="border-t border-border pt-4">
-            <button onClick={generateImage} disabled={imgLoading} className="w-full py-2.5 rounded-xl border border-fuchsia-500/30 bg-fuchsia-500/5 text-fuchsia-400 text-sm font-medium hover:bg-fuchsia-500/10 disabled:opacity-60 flex items-center justify-center gap-2">
+            <button onClick={generateAdImage} disabled={imgLoading} className="w-full py-2.5 rounded-xl border border-fuchsia-500/30 bg-fuchsia-500/5 text-fuchsia-400 text-sm font-medium hover:bg-fuchsia-500/10 disabled:opacity-60 flex items-center justify-center gap-2">
               {imgLoading?<><Loader2 className="w-4 h-4 animate-spin"/>Generating image…</>:<><Wand2 className="w-4 h-4"/>Generate Ad Visual</>}
             </button>
             {imageResult&&(
@@ -121,6 +187,53 @@ export default function AdCreator() {
           </div>
         </div>
       </div>
+
+      {/* Direct Post section — shown once ad is generated */}
+      {adResult && (
+        <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
+          <div className="flex items-center gap-2">
+            <Share2 className="w-4 h-4 text-fuchsia-400" />
+            <h3 className="font-semibold text-foreground">Post Directly to {selectedPlatform?.l}</h3>
+          </div>
+
+          {platformAccounts.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              No connected {selectedPlatform?.l} accounts found.{" "}
+              <a href="/settings" className="text-fuchsia-400 hover:underline">Connect an account in Settings → Social.</a>
+            </p>
+          ) : (
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground block mb-1.5">Select account to post from</label>
+                <select value={selectedAccountId} onChange={e => setSelectedAccountId(e.target.value)}
+                  className="w-full h-9 px-3 rounded-xl border border-border bg-background text-sm focus:outline-none focus:border-fuchsia-500/50">
+                  <option value="">Choose account…</option>
+                  {platformAccounts.map(a => (
+                    <option key={a.id} value={a.id}>{a.account_name || a.username || a.id}</option>
+                  ))}
+                </select>
+              </div>
+
+              {postError && (
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {postError}
+                </div>
+              )}
+              {postSuccess && (
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs">
+                  <Check className="w-3.5 h-3.5 shrink-0" /> Ad posted successfully to {selectedPlatform?.l}!
+                </div>
+              )}
+
+              <button onClick={postToAccount} disabled={posting || !selectedAccountId || postSuccess}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white text-sm font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity shadow-lg">
+                {posting ? <Loader2 className="w-4 h-4 animate-spin" /> : postSuccess ? <Check className="w-4 h-4" /> : <Send className="w-4 h-4" />}
+                {posting ? "Posting…" : postSuccess ? "Posted!" : `Post to ${selectedPlatform?.l} Now`}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

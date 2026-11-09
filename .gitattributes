@@ -1,0 +1,3 @@
+* merge=union
+*.json merge=ours
+*.jsonc merge=ours

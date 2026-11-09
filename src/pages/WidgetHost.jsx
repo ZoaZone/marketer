@@ -1,13 +1,14 @@
 import { useState, useRef, useEffect } from "react";
-import { Mic, MicOff, Send, X, MessageSquare, Volume2, VolumeX, Bot, Loader2 } from "lucide-react";
+import { localizePlanPrices } from "@/lib/geoPricing";
+import { Mic, MicOff, Send, Volume2, VolumeX, Bot, Loader2 } from "lucide-react";
 
 const SRI_FN     = "https://sreeagent.base44.app/functions/sriChat";
 const TTS_FN     = "https://sreeagent.base44.app/functions/ttsStream";
-const LOGO_URL   = "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/692b24a5bac54e3067972063/2e8a22a03_AevoiceLogo.JPG";
+const LOGO_URL   = "/brand/icon.png";
 const SITE_COLOR = "#d946ef";
 const SITE_NAME  = "MARKETER";
-const SITE_URL   = "https://media.aevoice.ai";
-const SYSTEM_PROMPT = `You are Sree, the AI marketing assistant for MARKETER at media.aevoice.ai. MARKETER is an AI marketing OS — generates content, schedules to 10+ social platforms, runs bulk SMS/WhatsApp/email campaigns, builds funnels, captures leads. Plans: Starter $49, Growth $149, Agency $399. Keep answers under 80 words.`;
+const SITE_URL   = "https://digitalstudios.app";
+const SYSTEM_PROMPT = `You are Sree, the AI marketing assistant for MARKETER at DigitalStudios.app. MARKETER is an AI marketing OS — generates content, schedules to 10+ social platforms, runs bulk SMS/WhatsApp/email campaigns, builds funnels, captures leads. Plans: Starter $49, Growth $149, Agency $399. Keep answers under 80 words.`;
 
 function getConfig() {
   const p = new URLSearchParams(window.location.search);
@@ -16,7 +17,7 @@ function getConfig() {
     color:   p.get("color")   || SITE_COLOR,
     logo:    p.get("logo")    || LOGO_URL,
     mode:    p.get("mode")    || "both",  // "text" | "voice" | "both"
-    prompt:  p.get("prompt")  || SYSTEM_PROMPT,
+    prompt:  p.get("prompt")  || localizePlanPrices(SYSTEM_PROMPT),
   };
 }
 
@@ -212,7 +213,7 @@ export default function WidgetHost() {
 
       {/* Powered by */}
       <div style={{ textAlign:"center", padding:"8px", fontSize:10, color:"#334155" }}>
-        Powered by Sree AI · <a href="https://aevoice.ai" style={{color:"#334155"}} target="_blank">AEVOICE.AI</a>
+        Powered by Sree AI · <a href="https://zoazoneservices.com" style={{color:"#334155"}} target="_blank">Zoa Zone Services LLC</a>
       </div>
     </div>
   );

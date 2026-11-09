@@ -1,5 +1,5 @@
 // paypalCheckout.ts — PayPal Live (India) payments
-// App: media.aevoice.ai (Base44 App ID: 69c3c2f5acaefc3a7afad5fd)
+// App: digitalstudios.app (Base44 App ID: 69c3c2f5acaefc3a7afad5fd)
 const PAYPAL_API_KEY    = Deno.env.get("PAYPAL_API_KEY") || "";
 const PAYPAL_API_SECRET = Deno.env.get("PAYPAL_API_SECRET") || "";
 const PAYPAL_ENV        = Deno.env.get("PAYPAL_ENV") || "live";
@@ -40,7 +40,7 @@ export default async function handler(req: Request) {
 
     if (action === "health") {
       const tk = await getAccessToken().then(t=>({"ok":true,"prefix":t.slice(0,10)+"..."})).catch(e=>({"ok":false,"error":e.message}));
-      return respond({ success: tk.ok, environment: PAYPAL_ENV, app: "media.aevoice.ai", supported_currencies: SUPPORTED_CURRENCIES, token: tk });
+      return respond({ success: tk.ok, environment: PAYPAL_ENV, app: "digitalstudios.app", supported_currencies: SUPPORTED_CURRENCIES, token: tk });
     }
 
     if (action === "create_order") {
@@ -51,8 +51,8 @@ export default async function handler(req: Request) {
         intent: "CAPTURE",
         purchase_units: [{ amount: { currency_code: currency, value: Number(amount).toFixed(2) }, description: plan_name ? `${description} — ${plan_name}` : description }],
         application_context: { brand_name: "Zoa Zone Services", locale: "en-IN", landing_page: "BILLING", shipping_preference: "NO_SHIPPING", user_action: "PAY_NOW",
-          return_url: return_url || `https://media.aevoice.ai/PaymentSuccess`,
-          cancel_url: cancel_url || `https://media.aevoice.ai/PaymentCancel` },
+          return_url: return_url || `https://digitalstudios.app/PaymentSuccess`,
+          cancel_url: cancel_url || `https://digitalstudios.app/PaymentCancel` },
         ...(customer_email ? { payer: { email_address: customer_email } } : {}),
       });
       if (!r.ok) return respond({ error: r.data }, r.status);

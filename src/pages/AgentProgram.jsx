@@ -3,34 +3,44 @@ import { Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import {
   Handshake, DollarSign, Users, TrendingUp, CheckCircle2,
-  ArrowRight, Loader2, Sparkles, Star, Zap, Gift, ChevronRight
+  ArrowRight, ArrowLeft, Loader2, Sparkles, Gift, ChevronRight
 } from "lucide-react";
+import { useSeo, SEO } from "@/lib/seo";
+import { BRAND } from "@/lib/brand";
+import TurnstileWidget from "@/components/TurnstileWidget";
 
 const BENEFITS = [
-  { icon: DollarSign, title: "50% Recurring Commission", desc: "Earn 50% of every subscription payment from clients you refer — every month, for life.", color: "from-emerald-500 to-teal-600" },
-  { icon: Users, title: "Unlimited Referrals", desc: "No cap on earnings. Refer as many businesses as you want and scale your income.", color: "from-fuchsia-500 to-purple-600" },
-  { icon: TrendingUp, title: "Real-Time Dashboard", desc: "Track your referrals, commissions, and payouts live in your Agent Dashboard.", color: "from-blue-500 to-indigo-600" },
+  { icon: DollarSign, title: "Real Commission, Set When You're Approved", desc: "Your commission rate is agreed with our team when you're approved — no vague tiers, a real % of every sale you refer.", color: "from-emerald-500 to-teal-600" },
+  { icon: Users, title: "Bring On Sub-Affiliates", desc: "Approved affiliates can invite their own sub-affiliates and share a slice of their rate — you keep an override on everything they refer.", color: "from-fuchsia-500 to-purple-600" },
+  { icon: TrendingUp, title: "Real-Time Dashboard", desc: "Track your clicks, conversions, commissions, and payouts live in your Affiliate Portal.", color: "from-blue-500 to-indigo-600" },
   { icon: Gift, title: "Free Agency-Tier Access", desc: "All approved agents receive full Agency-tier platform access at no cost.", color: "from-amber-500 to-orange-600" },
 ];
 
 const HOW_IT_WORKS = [
-  { step: "01", title: "Apply & Get Approved", desc: "Fill out the form below. Our team reviews and approves within 48 hours." },
-  { step: "02", title: "Get Your Unique Link", desc: "Receive a personalized referral link and marketing materials to share." },
-  { step: "03", title: "Refer Businesses", desc: "Share with marketers, agencies, brands — anyone who needs a marketing OS." },
-  { step: "04", title: "Earn 50% Forever", desc: "Collect 50% recurring commission every time your referral is billed." },
+  { step: "01", title: "Apply & Get Approved", desc: "Fill out the form below. Our team reviews applications and agrees your commission rate." },
+  { step: "02", title: "Get Your Unique Link", desc: "Receive a personalized referral link and code to share." },
+  { step: "03", title: "Refer Businesses — Or Recruit Sub-Affiliates", desc: "Share directly, or invite sub-affiliates and share a slice of your rate with them." },
+  { step: "04", title: "Get Paid", desc: "Commission is calculated automatically on every sale and paid out via Stripe or PayPal." },
 ];
 
+// Illustrative only — your actual commission rate is agreed with our team
+// when you're approved, not a fixed number. Shown here at a representative
+// 40% pool rate so applicants can gauge earning potential.
+const EXAMPLE_RATE = 0.4;
 const PLANS = [
-  { name: "Starter", price: 49, commission: 24.50 },
-  { name: "Growth", price: 149, commission: 74.50 },
-  { name: "Agency", price: 399, commission: 199.50 },
+  { name: "Starter", price: 49, commission: 49 * EXAMPLE_RATE },
+  { name: "Growth", price: 149, commission: 149 * EXAMPLE_RATE },
+  { name: "Agency", price: 399, commission: 399 * EXAMPLE_RATE },
 ];
 
 export default function AgentProgram() {
+  useSeo(SEO.agentProgram);
+
   const [form, setForm] = useState({ full_name: "", email: "", phone: "", company: "", audience: "", experience: "" });
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -38,14 +48,18 @@ export default function AgentProgram() {
     setError("");
     setLoading(true);
     try {
-      await base44.entities.BetaRequest.create({
+      // Via submitBetaRequest (asServiceRole) — BetaRequest.create is admin-only
+      // under RLS now. See the matching call in AgencyEnquiry.jsx.
+      const res = await base44.functions.invoke("submitBetaRequest", {
         full_name: form.full_name,
         email: form.email,
         company: form.company || "",
         use_case: `AGENT APPLICATION | Phone: ${form.phone} | Audience: ${form.audience} | Experience: ${form.experience}`,
-        status: "pending",
         note: "Agent program application",
+        turnstile_token: turnstileToken,
       });
+      const data = res?.data ?? res;
+      if (data?.error) throw new Error(data.error);
       setSubmitted(true);
     } catch (err) {
       setError(err.message || "Something went wrong. Please try again.");
@@ -55,10 +69,11 @@ export default function AgentProgram() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
+      <div className="max-w-7xl mx-auto px-6 pt-4"><Link to="/" className="inline-flex items-center gap-1.5 text-sm text-white/60 hover:text-white"><ArrowLeft className="w-4 h-4" /> Back to home</Link></div>
       {/* Nav */}
       <nav className="border-b border-white/8 px-6 h-16 flex items-center justify-between max-w-7xl mx-auto">
         <Link to="/" className="text-lg font-black bg-gradient-to-r from-fuchsia-400 to-purple-400 bg-clip-text text-transparent">
-          media.aevoice.ai
+          {BRAND.name}
         </Link>
         <Link to="/dashboard" className="text-sm text-white/60 hover:text-white transition-colors">Sign In</Link>
       </nav>
@@ -73,11 +88,11 @@ export default function AgentProgram() {
             <Handshake className="w-3.5 h-3.5" /> Agent Partner Program
           </div>
           <h1 className="text-5xl md:text-6xl font-black leading-tight mb-6">
-            Earn <span className="bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">50% commission</span><br />
+            Earn <span className="bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">real commission</span><br />
             on every referral.
           </h1>
           <p className="text-lg text-white/50 mb-10 max-w-xl mx-auto leading-relaxed">
-            Become an approved AEVOICE Agent. Refer businesses to media.aevoice.ai and earn 50% recurring commission — every month, for life.
+            Become an approved {BRAND.name} Agent. Refer businesses and earn commission on every sale — your rate is set when you're approved, and you can bring on sub-affiliates of your own.
           </p>
           <a href="#apply" className="inline-flex items-center gap-2 px-8 py-4 rounded-2xl bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white font-bold text-base hover:opacity-90 transition-opacity shadow-2xl shadow-fuchsia-500/30">
             Apply to Become an Agent <ArrowRight className="w-5 h-5" />
@@ -90,7 +105,7 @@ export default function AgentProgram() {
       <section className="py-16 px-6">
         <div className="max-w-4xl mx-auto">
           <h2 className="text-3xl font-black text-center mb-3">Your earnings potential</h2>
-          <p className="text-white/40 text-center text-sm mb-10">See how much you could earn per referral each month</p>
+          <p className="text-white/40 text-center text-sm mb-10">Illustrative example at a {(EXAMPLE_RATE * 100).toFixed(0)}% commission rate — your actual rate is agreed when you're approved</p>
           <div className="grid md:grid-cols-3 gap-4">
             {PLANS.map(plan => (
               <div key={plan.name} className="p-6 rounded-2xl border border-white/10 bg-white/3 text-center hover:border-fuchsia-500/30 transition-all">
@@ -213,6 +228,7 @@ export default function AgentProgram() {
                     <option value="pro" className="bg-[#1a1a2e]">Professional affiliate / full-time</option>
                   </select>
                 </div>
+                <TurnstileWidget onToken={setTurnstileToken} className="mb-1" />
                 <button type="submit" disabled={loading}
                   className="w-full py-4 bg-gradient-to-r from-fuchsia-600 to-purple-600 hover:from-fuchsia-500 hover:to-purple-500 disabled:opacity-60 text-white rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-fuchsia-500/20">
                   {loading ? <><Loader2 className="w-4 h-4 animate-spin" />Submitting…</> : <>Submit Agent Application <ArrowRight className="w-4 h-4" /></>}
@@ -223,10 +239,7 @@ export default function AgentProgram() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-white/8 py-8 px-6 text-center">
-        <p className="text-white/30 text-xs">© 2026 AEVOICE · <a href="mailto:partners@aevoice.ai" className="hover:text-white/50">partners@aevoice.ai</a> · <Link to="/" className="hover:text-white/50">media.aevoice.ai</Link></p>
-      </footer>
+
     </div>
   );
 }

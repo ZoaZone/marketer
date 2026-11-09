@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useOutletContext } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { Megaphone, Plus, Play, Pause, CheckCircle2, Clock, BarChart2, Loader2, X, Mail, Phone, MessageSquare, Share2, Filter, Search } from "lucide-react";
+import { mine } from "@/utils/scope";
+import { Megaphone, Plus, Play, Pause, Loader2, X, Mail, Phone, MessageSquare, Share2, Search } from "lucide-react";
 
 const CHANNEL_ICONS = { email: Mail, sms: Phone, whatsapp: MessageSquare, social: Share2, multi_channel: Megaphone };
 const STATUS_COLORS = {
@@ -21,13 +22,14 @@ export default function Campaigns() {
 
   const { data: campaigns = [], isLoading } = useQuery({
     queryKey: ["campaigns", user?.email],
-    queryFn: () => base44.entities.MarketingCampaign.list("-created_date", 100),
+    queryFn: () => base44.entities.MarketingCampaign.filter(mine(user), "-created_date", 100),
     enabled: !!user?.email,
   });
 
   const { data: contacts = [] } = useQuery({
-    queryKey: ["contacts_count"],
-    queryFn: () => base44.entities.MarketingContact.list(null, 500),
+    queryKey: ["contacts_count", user?.email],
+    queryFn: () => base44.entities.MarketingContact.filter(mine(user), null, 500),
+    enabled: !!user?.email,
   });
 
   const create = async () => {

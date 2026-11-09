@@ -9,6 +9,27 @@
   Cache-Control: public, max-age=31536000, immutable
   Content-Language: en
 
+# Static brand art is content-addressed by filename and changes rarely.
+# It was inheriting no-cache from /*, so every page load re-fetched the
+# logo — a needless request on the hero and on every sidebar render.
+/brand/*
+  Cache-Control: public, max-age=604800
+
+/favicon.png
+  Cache-Control: public, max-age=604800
+
+/logo.png
+  Cache-Control: public, max-age=604800
+
+# Crawler files: let Google re-read them daily without hammering origin.
+/robots.txt
+  Cache-Control: public, max-age=86400
+  Content-Type: text/plain; charset=utf-8
+
+/sitemap.xml
+  Cache-Control: public, max-age=86400
+  Content-Type: application/xml; charset=utf-8
+
 /index.html
   Cache-Control: no-cache, no-store, must-revalidate
   Content-Language: en

@@ -1,20 +1,23 @@
 import { useState } from "react";
+import { useOutletContext } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
+import { mine } from "@/utils/scope";
 import { Globe, Plus, Loader2, X, ExternalLink, Monitor, Smartphone } from "lucide-react";
 
 const STATUS_STEPS=["brief","design","development","review","launched"];
 const STATUS_COLORS={brief:"bg-muted text-muted-foreground",design:"bg-blue-500/10 text-blue-400",development:"bg-amber-500/10 text-amber-400",review:"bg-purple-500/10 text-purple-400",launched:"bg-emerald-500/10 text-emerald-400"};
 
 export default function WebProjects() {
+  const { user } = useOutletContext() || {};
   const qc = useQueryClient();
   const [showNew, setShowNew] = useState(false);
   const [projectType, setProjectType] = useState("website");
   const [form, setForm] = useState({project_name:"",domain:"",brief:"",style_direction:"",tech_stack:"",pages_list:""});
   const [saving, setSaving] = useState(false);
 
-  const {data:projects=[],isLoading}=useQuery({queryKey:["web_projects"],queryFn:()=>base44.entities.WebsiteProject.list("-created_date",50)});
-  const {data:appProjects=[]}=useQuery({queryKey:["app_projects"],queryFn:()=>base44.entities.AppProject.list("-created_date",50)});
+  const {data:projects=[],isLoading}=useQuery({queryKey:["web_projects", user?.email],queryFn:()=>base44.entities.WebsiteProject.filter(mine(user),"-created_date",50),enabled:!!user?.email});
+  const {data:appProjects=[]}=useQuery({queryKey:["app_projects", user?.email],queryFn:()=>base44.entities.AppProject.filter(mine(user),"-created_date",50),enabled:!!user?.email});
 
   const allProjects=[...projects.map(p=>({...p,ptype:"website"})),...appProjects.map(p=>({...p,ptype:"app"}))].sort((a,b)=>new Date(b.created_date)-new Date(a.created_date));
 

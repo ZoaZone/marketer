@@ -1,0 +1,247 @@
+{
+  "name": "DubbingProject",
+  "type": "object",
+  "description": "A commercial dubbing job: one source film/track dubbed into one or more target languages, with per-speaker voice mapping and a locked terminology glossary. One project fans out to one output per target language, each backed by its own render-worker job.",
+  "properties": {
+    "owner_email": {
+      "type": "string",
+      "description": "Owning user's email \u2014 this app's user identity key (same convention as Subscription.owner_email)."
+    },
+    "title": {
+      "type": "string",
+      "description": "Human name for the project, e.g. 'Feature A \u2014 Hindi + Tamil'."
+    },
+    "source_url": {
+      "type": "string",
+      "description": "URL of the source media to dub."
+    },
+    "source_kind": {
+      "type": "string",
+      "enum": [
+        "video",
+        "audio"
+      ],
+      "default": "video"
+    },
+    "source_filename": {
+      "type": "string"
+    },
+    "source_seconds": {
+      "type": "number",
+      "description": "Source duration in seconds. Drives both the poll-timeout budget (server-render/dub.js pollTimeoutFor) and the cost estimate \u2014 always store it when known."
+    },
+    "source_lang": {
+      "type": "string",
+      "description": "BCP-47-ish source language code, or empty to let the provider auto-detect."
+    },
+    "target_langs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "One output is produced per entry. This is what makes the project a batch."
+    },
+    "num_speakers": {
+      "type": "number",
+      "description": "Speaker count hint passed to the provider. 0/absent = auto-detect."
+    },
+    "preserve_background_audio": {
+      "type": "boolean",
+      "default": true,
+      "description": "True keeps the original music bed and effects under the dubbed dialogue \u2014 the default for commercial work. Maps to the INVERSE of the provider's drop_background_audio."
+    },
+    "voice_cloning": {
+      "type": "boolean",
+      "default": true,
+      "description": "True carries each original speaker's voice and tone into the target language. Maps to the INVERSE of the provider's disable_voice_cloning."
+    },
+    "lip_sync": {
+      "type": "boolean",
+      "default": false,
+      "description": "Re-render mouth movement to match the dub. Video only, adds a paid Replicate pass and significant time."
+    },
+    "burn_captions": {
+      "type": "boolean",
+      "default": false,
+      "description": "Burn translated captions into the output rather than shipping a sidecar SRT."
+    },
+    "highest_resolution": {
+      "type": "boolean",
+      "default": true,
+      "description": "Request the provider's highest-quality render \u2014 the norm for commercial delivery."
+    },
+    "speaker_map": {
+      "type": "array",
+      "description": "Per-speaker casting. Lets a studio pin a specific target-language voice to each detected speaker instead of accepting the provider's default assignment.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "speaker_label": {
+            "type": "string",
+            "description": "Provider's speaker label, e.g. 'speaker_0'."
+          },
+          "character_name": {
+            "type": "string",
+            "description": "Human name for the role, for the operator's benefit."
+          },
+          "voice_id": {
+            "type": "string",
+            "description": "Target-language voice id to cast for this speaker."
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "glossary": {
+      "type": "array",
+      "description": "Terminology locking: names, brands and domain terms that must translate a fixed way (or not at all) across the whole film. Applied as translation guidance so a character or product name stays consistent reel to reel.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "term": {
+            "type": "string"
+          },
+          "translation": {
+            "type": "string",
+            "description": "Required rendering in the target language. Equal to term = leave untranslated."
+          },
+          "target_lang": {
+            "type": "string",
+            "description": "Empty applies the rule to every target language."
+          },
+          "do_not_translate": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      }
+    },
+    "outputs": {
+      "type": "array",
+      "description": "One entry per target language. job_id and provider_ref are what make a long run recoverable: provider_ref is the ElevenLabs dubbing_id, so an interrupted job can be reattached instead of re-billed.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "target_lang": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "queued",
+              "processing",
+              "done",
+              "failed",
+              "cancelled"
+            ],
+            "default": "pending"
+          },
+          "job_id": {
+            "type": "string",
+            "description": "Render-worker job id."
+          },
+          "provider_ref": {
+            "type": "string",
+            "description": "ElevenLabs dubbing_id \u2014 the reattachment handle."
+          },
+          "url": {
+            "type": "string"
+          },
+          "captions_url": {
+            "type": "string"
+          },
+          "progress": {
+            "type": "number",
+            "default": 0
+          },
+          "error": {
+            "type": "string"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finished_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "queued",
+        "processing",
+        "review",
+        "done",
+        "failed",
+        "cancelled"
+      ],
+      "default": "draft",
+      "description": "Rolled up from outputs[]. 'review' = every output finished and is awaiting operator QC before delivery."
+    },
+    "estimated_cost_usd": {
+      "type": "number",
+      "description": "Computed at submit time from source_seconds x target_langs x the configured rate. Stored so the operator sees what a run committed them to, and so an estimate can be compared against the invoice later."
+    },
+    "actual_cost_usd": {
+      "type": "number",
+      "description": "Filled in from provider billing when known. Left absent rather than guessed."
+    },
+    "notes": {
+      "type": "string",
+      "maxLength": 2000
+    }
+  },
+  "required": [
+    "owner_email",
+    "source_url",
+    "target_langs"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "data.owner_email": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {
+      "data.owner_email": "{{user.email}}"
+    },
+    "update": {
+      "$or": [
+        {
+          "data.owner_email": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "data.owner_email": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}

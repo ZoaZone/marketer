@@ -1,0 +1,65 @@
+{
+  "name": "UsageCost",
+  "type": "object",
+  "description": "ADMIN ONLY \u2014 internal COGS ledger. Holds the raw provider cost and the platform margin for each UsageEvent. RLS denies read to every non-admin: the customer-facing side of the same job is UsageEvent, which carries units only. The margin percentage must never appear in any response a customer can reach. See base44/PRICING_INTERNAL.md.",
+  "properties": {
+    "usage_event_id": {
+      "type": "string"
+    },
+    "owner_email": {
+      "type": "string"
+    },
+    "kind": {
+      "type": "string"
+    },
+    "units": {
+      "type": "number"
+    },
+    "raw_provider_cost_usd": {
+      "type": "number",
+      "description": "What the provider actually bills the platform for this job."
+    },
+    "platform_margin_usd": {
+      "type": "number",
+      "description": "raw_provider_cost_usd * PLATFORM_MARGIN_PCT."
+    },
+    "charged_cost_usd": {
+      "type": "number",
+      "description": "raw + margin \u2014 the platform-priced cost the credit weights were derived from."
+    },
+    "rate_source": {
+      "type": "string",
+      "description": "verified | estimated | env_override \u2014 how the raw rate used here was obtained, so a margin report can flag figures resting on an unconfirmed provider price."
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000
+    }
+  },
+  "required": [
+    "owner_email",
+    "kind"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

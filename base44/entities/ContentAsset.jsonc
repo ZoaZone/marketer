@@ -1,0 +1,111 @@
+{
+  "name": "ContentAsset",
+  "type": "object",
+  "properties": {
+    "client_id": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "image",
+        "video",
+        "script",
+        "theme",
+        "ad_copy",
+        "email_template",
+        "sms_template",
+        "caption",
+        "hashtag_set",
+        "brand_kit"
+      ]
+    },
+    "title": {
+      "type": "string"
+    },
+    "content": {
+      "type": "string"
+    },
+    "file_url": {
+      "type": "string"
+    },
+    "voiceover_url": {
+      "type": "string",
+      "description": "Separate voice-over audio file belonging to this item, kept for later editing or reference."
+    },
+    "music_url": {
+      "type": "string",
+      "description": "Separate background music file belonging to this item."
+    },
+    "dubbing_url": {
+      "type": "string",
+      "description": "Separate dubbed audio file belonging to this item."
+    },
+    "platform": {
+      "type": "string"
+    },
+    "dimensions": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "ready",
+        "archived"
+      ],
+      "default": "ready"
+    },
+    "ai_generated": {
+      "type": "boolean",
+      "default": false
+    },
+    "prompt_used": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "title"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {
+      "created_by": "{{user.email}}"
+    },
+    "update": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}

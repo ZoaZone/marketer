@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
+import { mine } from "@/utils/scope";
 import { Users, Plus, Search, Mail, Phone, MessageSquare, Loader2, X, Download } from "lucide-react";
 
 const SOURCE_COLORS = { website:"bg-blue-500/10 text-blue-400", social:"bg-pink-500/10 text-pink-400", ad:"bg-amber-500/10 text-amber-400", referral:"bg-emerald-500/10 text-emerald-400", manual:"bg-muted text-muted-foreground", qr_code:"bg-purple-500/10 text-purple-400" };
@@ -16,8 +17,9 @@ export default function Contacts() {
   const [saving, setSaving] = useState(false);
 
   const { data: contacts = [], isLoading } = useQuery({
-    queryKey: ["contacts"],
-    queryFn: () => base44.entities.MarketingContact.list("-created_date", 500),
+    queryKey: ["contacts", user?.email],
+    queryFn: () => base44.entities.MarketingContact.filter(mine(user), "-created_date", 500),
+    enabled: !!user?.email,
   });
 
   const filtered = contacts.filter(c => {

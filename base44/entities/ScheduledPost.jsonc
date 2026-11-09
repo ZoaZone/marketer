@@ -1,0 +1,123 @@
+{
+  "name": "ScheduledPost",
+  "type": "object",
+  "properties": {
+    "client_id": {
+      "type": "string"
+    },
+    "social_account_id": {
+      "type": "string"
+    },
+    "platform": {
+      "type": "string",
+      "enum": [
+        "instagram",
+        "facebook",
+        "tiktok",
+        "linkedin",
+        "youtube",
+        "twitter_x",
+        "pinterest"
+      ]
+    },
+    "caption": {
+      "type": "string"
+    },
+    "media_url": {
+      "type": "string"
+    },
+    "media_type": {
+      "type": "string",
+      "enum": [
+        "image",
+        "video",
+        "reel",
+        "story",
+        "carousel"
+      ],
+      "default": "image"
+    },
+    "scheduled_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "scheduled",
+        "posted",
+        "failed"
+      ],
+      "default": "draft"
+    },
+    "post_url": {
+      "type": "string"
+    },
+    "failure_reason": {
+      "type": "string",
+      "description": "Why this post failed to publish (set by publishScheduledPosts), so the reason is visible after the fact and not just in transient logs."
+    },
+    "engagement_likes": {
+      "type": "number",
+      "default": 0
+    },
+    "engagement_comments": {
+      "type": "number",
+      "default": 0
+    },
+    "engagement_shares": {
+      "type": "number",
+      "default": 0
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000
+    }
+  },
+  "required": [
+    "platform",
+    "caption"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {
+      "created_by": "{{user.email}}"
+    },
+    "update": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}

@@ -5,8 +5,9 @@ import {
   CheckCircle2, Loader2, ArrowRight,
   Gift, User, Mail, Lock
 } from "lucide-react";
+import { BRAND } from "@/lib/brand";
 
-const APP_URL = "https://media.aevoice.ai";
+const APP_URL = typeof window !== "undefined" && window.location.hostname === "chitra.medha.io" ? "https://chitra.medha.io" : "https://digitalstudios.app";
 
 const STEPS = [
   { id: 1, label: "Verify Invite" },
@@ -51,19 +52,25 @@ export default function BetaOnboarding() {
     setLoading(true);
     setError("");
     try {
-      const results = await base44.entities.BetaRequest.filter({ invite_token: tok });
-      if (!results || results.length === 0) {
+      // Resolved server-side via lookupBetaInvite. This used to read
+      // BetaRequest directly from the browser, which required the entity to be
+      // world-readable — and that exposed every row's invite_token, i.e. live
+      // redeemable invites, to anyone who cared to list them.
+      const res = await base44.functions.invoke("lookupBetaInvite", { token: tok });
+      const data = res?.data ?? res;
+      if (data?.error) throw new Error(data.error);
+      if (!data?.found) {
         setError("This invite link is invalid or has already been used.");
         setLoading(false);
         return;
       }
-      const inv = results[0];
+      const inv = data.invite;
       if (inv.status === "registered") {
         setError("This invite has already been used. Please log in instead.");
         setLoading(false);
         return;
       }
-      if (inv.invite_expires_at && new Date(inv.invite_expires_at) < new Date()) {
+      if (data.expired) {
         setError("This invite link has expired. Please contact the team for a new one.");
         setLoading(false);
         return;
@@ -85,12 +92,16 @@ export default function BetaOnboarding() {
     setLookingUp(true);
     setError("");
     try {
-      // Code is first 6 chars of token uppercased
-      const results = await base44.entities.BetaRequest.filter({ email: manualEmail.trim().toLowerCase() });
-      const match = results?.find(r =>
-        r.invite_token &&
-        r.invite_token.slice(0, 6).toUpperCase() === manualCode.trim().toUpperCase()
-      );
+      // The code is the first 6 characters of the token, but that comparison
+      // now happens server-side in lookupBetaInvite — the token never reaches
+      // the browser, so this fallback can't be used to harvest one.
+      const res = await base44.functions.invoke("lookupBetaInvite", {
+        email: manualEmail.trim().toLowerCase(),
+        code: manualCode.trim(),
+      });
+      const data = res?.data ?? res;
+      if (data?.error) throw new Error(data.error);
+      const match = data?.found ? data.invite : null;
       if (!match) {
         setError("Code not found for this email. Please check and try again.");
         setLookingUp(false);
@@ -137,28 +148,21 @@ export default function BetaOnboarding() {
     setError("");
     setSavingProfile(true);
     try {
-      // Activate Agency-tier subscription
-      await base44.asServiceRole?.entities?.Subscription?.create?.({
-        owner_email: invite.email,
-        plan_name: "Beta Pro",
-        plan_tier: "agency",
-        status: "active",
-        current_period_end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-      }) ?? await base44.entities.Subscription.create({
-        owner_email: invite.email,
-        plan_name: "Beta Pro",
-        plan_tier: "agency",
-        status: "active",
-        current_period_end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-      });
-
-      // Mark invite as registered
-      await base44.entities.BetaRequest.update(invite.id, {
-        status: "registered",
+      // Activation (mark invite registered + create the Agency subscription)
+      // now runs server-side via activateBetaInvite. BetaRequest is admin-only
+      // writable under its RLS, so the old client-side update would be
+      // rejected; routing the Subscription creation through asServiceRole here
+      // also avoids a case mismatch between the invite email and the logged-in
+      // user's email.
+      const res = await base44.functions.invoke("activateBetaInvite", {
+        invite_id: invite.id,
+        token: invite.invite_token || "",
         full_name: fullName,
         company: company || invite.company || "",
         use_case: useCase || invite.use_case || "",
       });
+      const data = res?.data ?? res;
+      if (!data?.success) throw new Error(data?.error || "Could not activate your access. Please try again.");
 
       setSavingProfile(false);
       setStep(4);
@@ -189,8 +193,8 @@ export default function BetaOnboarding() {
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-fuchsia-500 to-purple-600 flex items-center justify-center shadow-lg shadow-fuchsia-500/30 mb-3">
             <span className="text-white font-black text-2xl">A</span>
           </div>
-          <h1 className="text-2xl font-black bg-gradient-to-r from-fuchsia-400 to-purple-400 bg-clip-text text-transparent">AEVOICE</h1>
-          <p className="text-white/40 text-xs mt-1">media.aevoice.ai</p>
+          <h1 className="text-2xl font-black bg-gradient-to-r from-fuchsia-400 to-purple-400 bg-clip-text text-transparent">{BRAND.name}</h1>
+          <p className="text-white/40 text-xs mt-1">{BRAND.domain}</p>
         </div>
 
         <div className="bg-white/5 border border-white/10 rounded-3xl p-8">
@@ -242,7 +246,7 @@ export default function BetaOnboarding() {
           </button>
 
           <p className="text-center text-white/20 text-xs mt-5">
-            No code? <a href="/beta" className="text-fuchsia-400 hover:text-fuchsia-300">Request beta access</a> · <a href="/login" className="text-white/30 hover:text-white/50">Sign in</a>
+            No code? <a href="/beta" className="text-fuchsia-400 hover:text-fuchsia-300">Request beta access</a> · <a href="/auth" className="text-white/30 hover:text-white/50">Sign in</a>
           </p>
         </div>
       </div>
@@ -262,7 +266,7 @@ export default function BetaOnboarding() {
           <a href="/invite" className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-fuchsia-500/10 border border-fuchsia-500/20 text-fuchsia-400 rounded-xl font-semibold text-sm hover:bg-fuchsia-500/20 transition-colors">
             Enter Code Manually <ArrowRight className="w-4 h-4" />
           </a>
-          <a href="/login" className="inline-block px-6 py-3 border border-white/10 text-white/50 rounded-xl font-semibold text-sm hover:border-white/20 transition-colors">
+          <a href="/auth" className="inline-block px-6 py-3 border border-white/10 text-white/50 rounded-xl font-semibold text-sm hover:border-white/20 transition-colors">
             Sign In Instead
           </a>
         </div>
@@ -281,7 +285,7 @@ export default function BetaOnboarding() {
             <span className="text-white font-black text-xl">A</span>
           </div>
           <span className="text-xl font-black bg-gradient-to-r from-fuchsia-400 to-purple-400 bg-clip-text text-transparent tracking-tight">
-            media.aevoice.ai
+            {BRAND.domain}
           </span>
         </div>
 
@@ -318,7 +322,7 @@ export default function BetaOnboarding() {
               <h1 className="text-2xl font-black text-white mb-2">
                 You're approved!<br />
                 <span className="bg-gradient-to-r from-fuchsia-400 to-purple-400 bg-clip-text text-transparent">
-                  Welcome to AEVOICE Beta
+                  Welcome to {BRAND.name} Beta
                 </span>
               </h1>
               <p className="text-white/50 text-sm mb-1">Invite reserved for</p>
@@ -373,7 +377,7 @@ export default function BetaOnboarding() {
               </button>
 
               <p className="text-center text-white/20 text-xs mt-4">
-                Already have an account? <a href="/login" className="text-fuchsia-400 hover:text-fuchsia-300">Sign in</a>
+                Already have an account? <a href="/auth" className="text-fuchsia-400 hover:text-fuchsia-300">Sign in</a>
               </p>
             </div>
           )}
@@ -387,7 +391,7 @@ export default function BetaOnboarding() {
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-white">Tell Us About You</h2>
-                  <p className="text-white/40 text-xs">Personalise your AEVOICE experience</p>
+                  <p className="text-white/40 text-xs">Personalise your {BRAND.name} experience</p>
                 </div>
               </div>
 
@@ -455,7 +459,7 @@ export default function BetaOnboarding() {
                 You're in{fullName ? ", " + fullName.split(" ")[0] : ""}! 🎉
               </h2>
               <p className="text-white/50 text-sm mb-6">
-                Full Agency-tier access activated. Welcome to AEVOICE beta — let's build something great.
+                Full Agency-tier access activated. Welcome to {BRAND.name} beta — let's build something great.
               </p>
               <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 mb-6 text-left space-y-2">
                 <p className="text-emerald-400 font-semibold text-sm">What's unlocked:</p>
@@ -469,18 +473,16 @@ export default function BetaOnboarding() {
                 ))}
               </div>
               <button
-                onClick={() => navigate("/dashboard")}
+                onClick={() => navigate("/studio")}
                 className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/20"
               >
-                Go to Dashboard <ArrowRight className="w-4 h-4" />
+                Go to Studio <ArrowRight className="w-4 h-4" />
               </button>
             </div>
           )}
         </div>
 
-        <p className="text-center text-white/20 text-xs mt-6">
-          © 2026 AEVOICE · media.aevoice.ai · Questions? <a href="mailto:hello@aevoice.ai" className="hover:text-white/40 transition-colors">hello@aevoice.ai</a>
-        </p>
+
       </div>
     </div>
   );

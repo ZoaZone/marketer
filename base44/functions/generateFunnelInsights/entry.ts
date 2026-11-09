@@ -13,13 +13,13 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'funnel_id is required' }, { status: 400 });
     }
 
-    const funnels = await base44.entities.Funnel.filter({ id: funnel_id });
+    const funnels = await base44.entities.Funnel.filter({ id: funnel_id, created_by: user.email });
     if (funnels.length === 0) {
       return Response.json({ error: 'Funnel not found' }, { status: 404 });
     }
     const funnel = funnels[0];
 
-    const stages = await base44.entities.FunnelStage.filter({ funnel_id });
+    const stages = await base44.entities.FunnelStage.filter({ funnel_id, created_by: user.email });
 
     const stageData = stages.map(s => ({
       name: s.name,

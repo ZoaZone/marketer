@@ -1,0 +1,96 @@
+{
+  "name": "WebsiteProject",
+  "type": "object",
+  "properties": {
+    "client_id": {
+      "type": "string"
+    },
+    "project_name": {
+      "type": "string"
+    },
+    "domain": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "brief",
+        "design",
+        "development",
+        "review",
+        "launched"
+      ],
+      "default": "brief"
+    },
+    "brief": {
+      "type": "string"
+    },
+    "style_direction": {
+      "type": "string"
+    },
+    "pages_list": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "tech_stack": {
+      "type": "string"
+    },
+    "designer_notes": {
+      "type": "string"
+    },
+    "launched_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000
+    }
+  },
+  "required": [
+    "project_name"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {
+      "created_by": "{{user.email}}"
+    },
+    "update": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}

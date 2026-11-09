@@ -1,0 +1,452 @@
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { useSeo, SEO } from "@/lib/seo";
+import { FileText, ChevronRight } from "lucide-react";
+import { BRAND } from "@/lib/brand";
+
+// Public terms for DigitalStudios.app (Chitra on chitra.medha.io). India and
+// non-India customers contract with the respective entities named in section 2.
+
+const CO = {
+  legalName: "Zoa Zone Services Pvt Ltd (India) / Zoa Zone Services LLC (USA)",
+  product: BRAND.name,
+  domain: BRAND.domain,
+  supportEmail: "care@zoazoneservices.com",
+  parentEmail: "care@zoazoneservices.com",
+  legalEmail: "care@zoazoneservices.com",
+  phone: "care@zoazoneservices.com",
+  state: "New York",
+  address: "1770 Grand Concourse 12A, Bronx, NY 10457, USA",
+  indiaAddress: "376, G3, Road No 82, Film Nagar, Jubilee Hills, Hyderabad, Telangana 500096, India",
+  effective: "28 September 2026",
+};
+
+const SECTIONS = [
+  { id: "acceptance", n: "1", label: "Acceptance" },
+  { id: "who-we-are", n: "2", label: "Who we are" },
+  { id: "eligibility", n: "3", label: "Eligibility & accounts" },
+  { id: "licence", n: "4", label: "Your licence to use the Service" },
+  { id: "acceptable-use", n: "5", label: "Acceptable use" },
+  { id: "ai-content", n: "6", label: "AI content, voice & dubbing" },
+  { id: "billing", n: "7", label: "Plans, billing & refunds" },
+  { id: "credits", n: "8", label: "Credits & fair use" },
+  { id: "affiliates", n: "9", label: "Affiliate & partner programme" },
+  { id: "ip", n: "10", label: "Intellectual property" },
+  { id: "third-party", n: "11", label: "Third-party services" },
+  { id: "availability", n: "12", label: "Availability & support" },
+  { id: "termination", n: "13", label: "Suspension & termination" },
+  { id: "disclaimers", n: "14", label: "Disclaimers" },
+  { id: "liability", n: "15", label: "Limitation of liability" },
+  { id: "indemnity", n: "16", label: "Indemnity" },
+  { id: "changes", n: "17", label: "Changes to these terms" },
+  { id: "law", n: "18", label: "Governing law & disputes" },
+  { id: "general", n: "19", label: "General" },
+  { id: "contact", n: "20", label: "Contact" },
+];
+
+const H = ({ id, n, children }) => (
+  <h2 id={id} className="scroll-mt-24 text-lg font-bold text-foreground mt-10 mb-3 flex gap-2.5">
+    <span className="text-fuchsia-400 font-mono text-sm mt-1 flex-shrink-0">{n}.</span>
+    <span>{children}</span>
+  </h2>
+);
+const P = ({ children }) => <p className="text-sm text-muted-foreground leading-relaxed mb-3">{children}</p>;
+const L = ({ children }) => <li className="text-sm text-muted-foreground leading-relaxed mb-1.5">{children}</li>;
+const UL = ({ children }) => <ul className="list-disc pl-5 mb-3 space-y-0.5">{children}</ul>;
+const Strong = ({ children }) => <strong className="text-foreground font-semibold">{children}</strong>;
+
+export default function Terms() {
+  useSeo(SEO.terms);
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="min-h-screen bg-background">
+      <div className="max-w-4xl mx-auto px-5 py-12">
+
+        <header className="mb-8 pb-6 border-b border-border">
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-fuchsia-400 mb-3">
+            <FileText className="w-3.5 h-3.5" /> Legal
+          </div>
+          <h1 className="text-3xl md:text-4xl font-black text-foreground tracking-tight mb-3">
+            Terms & Conditions
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {CO.product} — operated by {CO.legalName}. Last updated {CO.effective}.
+          </p>
+          <Link to="/privacy" className="inline-flex items-center gap-1 text-sm text-fuchsia-400 hover:underline mt-3">
+            Privacy Policy <ChevronRight className="w-3.5 h-3.5" />
+          </Link>
+        </header>
+
+        {/* Contents */}
+        <nav className="mb-10 rounded-2xl border border-border p-4">
+          <button onClick={() => setOpen(o => !o)}
+            className="flex items-center justify-between w-full text-sm font-bold text-foreground">
+            Contents
+            <ChevronRight className={`w-4 h-4 transition-transform ${open ? "rotate-90" : ""}`} />
+          </button>
+          {open && (
+            <ol className="mt-3 grid sm:grid-cols-2 gap-x-6 gap-y-1">
+              {SECTIONS.map(s => (
+                <li key={s.id}>
+                  <a href={`#${s.id}`} className="text-xs text-muted-foreground hover:text-fuchsia-400 transition-colors">
+                    {s.n}. {s.label}
+                  </a>
+                </li>
+              ))}
+            </ol>
+          )}
+        </nav>
+
+        <article>
+          <H id="acceptance" n="1">Acceptance of these terms</H>
+          <P>
+            These Terms & Conditions (the <Strong>&ldquo;Terms&rdquo;</Strong>) form a binding agreement between you
+            and the contracting entity identified in §2 governing your use of {CO.product} at {CO.domain}, together with any
+            related applications, APIs, workers and services we operate (the <Strong>&ldquo;Service&rdquo;</Strong>).
+          </P>
+          <P>
+            By creating an account, accessing the Service, or paying for a plan, you accept these
+            Terms. If you do not accept them, do not use the Service. If you are accepting on behalf
+            of a company or other organisation, you confirm you are authorised to bind it, and
+            &ldquo;you&rdquo; means that organisation.
+          </P>
+
+          <H id="who-we-are" n="2">Who we are</H>
+          <P>
+            For customers in India, your contracting entity is <Strong>Zoa Zone Services Pvt Ltd</Strong>, of {CO.indiaAddress}. For customers outside India, your contracting entity is <Strong>Zoa Zone Services LLC</Strong>, of {CO.address}. The applicable entity is referred to as &ldquo;we&rdquo;, &ldquo;us&rdquo; or &ldquo;our&rdquo; in these Terms.
+          </P>
+          <P>
+            {CO.legalName} and its affiliates own and operate {CO.product} and the other applications
+            published under the ZoaZone name. We may perform our obligations, and exercise our rights,
+            through affiliates, official partners, resellers, agents and authorised platform
+            administrators, and we may assign or transfer this agreement to any of them or in
+            connection with a merger, acquisition or sale of assets.
+          </P>
+
+          <H id="eligibility" n="3">Eligibility and your account</H>
+          <UL>
+            <L>You must be at least 18 years old, or the age of majority where you live, whichever is greater.</L>
+            <L>You must provide accurate registration details and keep them current.</L>
+            <L>You are responsible for all activity under your account and for keeping your credentials secure. Tell us promptly at {CO.supportEmail} if you suspect unauthorised access.</L>
+            <L>Accounts are for you or your organisation. Do not share, sell or transfer an account without our written consent.</L>
+            <L>You may not use the Service if we have previously terminated your account, or if applicable sanctions or export-control laws prohibit it.</L>
+          </UL>
+
+          <H id="licence" n="4">Your licence to use the Service</H>
+          <P>
+            Subject to these Terms and to your plan, we grant you a limited, non-exclusive,
+            non-transferable, revocable licence to access and use the Service.
+          </P>
+          <P>
+            <Strong>Permitted use is personal or commercial.</Strong> You may use the Service, and the
+            output you generate with it, for your own purposes and for the purposes of clients you
+            serve, including commercial exploitation of that output, subject to §5 and §6 and to your
+            holding all necessary rights in what you upload.
+          </P>
+
+          <H id="acceptable-use" n="5">Acceptable use</H>
+          <P>You must not use the Service for any unlawful purpose. Specifically, you must not:</P>
+          <UL>
+            <L>break any applicable law or regulation, or infringe anyone&rsquo;s intellectual property, privacy, publicity or personality rights;</L>
+            <L>upload or generate material that is defamatory, obscene, or that sexualises or endangers minors;</L>
+            <L>create content that impersonates a real person or organisation in order to deceive, including synthetic voice or likeness used to mislead;</L>
+            <L>produce fraudulent, deceptive or misleading content — fake endorsements, fabricated records, disinformation, or material designed to manipulate an election;</L>
+            <L>send unsolicited bulk messages, or messages that breach anti-spam or telecoms law (including TCPA, CAN-SPAM, GDPR/ePrivacy and equivalent rules) or a platform&rsquo;s own policies;</L>
+            <L>harass, threaten, or incite violence or hatred against any person or group;</L>
+            <L>reverse engineer, decompile, scrape, or attempt to derive our source code or models, or circumvent quotas, plan limits or security controls;</L>
+            <L>resell or sublicense raw access to the Service, or use it to build a competing product;</L>
+            <L>overload or disrupt the Service or the third-party providers it depends on.</L>
+          </UL>
+          <P>
+            We may investigate suspected breaches and cooperate with law enforcement where legally
+            required. Breach of this section may result in immediate suspension without refund, to the
+            extent permitted by law.
+          </P>
+
+          <H id="ai-content" n="6">AI-generated content, voice and dubbing</H>
+          <P>
+            The Service generates video, images, music, speech and translated dubs using artificial
+            intelligence, including third-party models. You should understand the following before
+            relying on any output.
+          </P>
+          <UL>
+            <L><Strong>Output is not guaranteed to be unique.</Strong> Generative models may produce similar results for different users. We do not warrant that output is original, novel or free of third-party rights.</L>
+            <L><Strong>Copyright in AI output is uncertain and varies by country.</Strong> In some jurisdictions material generated without sufficient human authorship may not be protectable at all. We make no representation about the protectability of what you generate.</L>
+            <L><Strong>Output may be inaccurate.</Strong> Translations, dubs, subtitles and generated text may contain errors. Check anything you intend to publish, broadcast or rely on commercially.</L>
+          </UL>
+          <P>
+            <Strong>Rights in what you upload.</Strong> You represent and warrant that you own, or hold
+            all necessary licences, consents and permissions in, every file you upload — including the
+            underlying film, script, music and any performances embodied in it — and that our
+            processing of it will not infringe anyone&rsquo;s rights.
+          </P>
+          <P>
+            <Strong>Voice, likeness and dubbing.</Strong> Where you use features that reproduce,
+            clone or translate a person&rsquo;s voice or likeness, you represent and warrant that you have
+            each identifiable person&rsquo;s express, informed and documented consent for that use, in the
+            territories where you will distribute the result, and that the use complies with all laws
+            governing voice, likeness, publicity and synthetic media in those territories. You are
+            solely responsible for obtaining and retaining evidence of that consent, and you must
+            provide it to us on request. We may refuse, suspend or remove any dub where we reasonably
+            believe consent is absent.
+          </P>
+          <P>
+            <Strong>Written releases from performers.</Strong> Before you dub or clone the voice of a
+            performer &mdash; an actor, narrator, singer or other voice artist &mdash; you must obtain a
+            signed release from that performer, or from the party that lawfully controls those rights
+            under their engagement, covering the specific project and each target language.
+          </P>
+          <P>
+            <Strong>
+              Where the voice belongs to a celebrity, recording artist, public figure or any other
+              widely recognisable person, a documented written agreement is mandatory in every case.
+            </Strong>{" "}
+            There is no exception to this requirement, and it must be signed and in your possession
+            <em> before</em> you begin the dub — not obtained afterwards. Obtain these releases through
+            your own production or workplace process and retain them for as long as the dubbed work is
+            distributed anywhere. Using these features on such a voice without that agreement is a
+            material breach of these Terms and grounds for immediate termination under §13.
+          </P>
+          <P>
+            <Strong>Copyright and neighbouring rights.</Strong> You must comply with all copyright,
+            performers&rsquo; and moral-rights rules that apply to the source work and to the dubbed
+            versions you create, in every territory where you distribute them. Clearing the underlying
+            film, script, score and performances is your responsibility, not ours.
+          </P>
+          <P>
+            <Strong>Consequences and enforcement.</Strong> You accept full responsibility for any
+            unlawful, infringing or non-consensual use of these features, and for all resulting
+            claims, penalties, damages and losses. Where such a use causes a claim against us, our
+            affiliates or our providers, {CO.legalName} reserves the right to pursue its remedies
+            against you and, to the extent permitted by law, against any client, agency or other party
+            on whose instructions or behalf you acted &mdash; jointly or separately &mdash; in addition
+            to the indemnity in §16. We may also disclose relevant account and job records where
+            legally required or where reasonably necessary to defend such a claim.
+          </P>
+          <P>
+            How we actually handle the media, speech and voice data behind these features — which
+            providers receive it, where it is processed, how long it is kept, and how a performer can
+            ask about or object to material someone has uploaded — is set out in{" "}
+            <Link to="/privacy" className="text-fuchsia-400 hover:underline">
+              §14 of our Privacy Policy
+            </Link>.
+          </P>
+
+          <H id="billing" n="7">Plans, billing and refunds</H>
+          <UL>
+            <L>Paid plans are billed in advance on a monthly or annual basis. Indian customers are shown INR prices with GST identified at checkout; payments in INR through Cashfree Payments, when offered, are processed securely by Cashfree. Prices exclude applicable taxes unless stated otherwise.</L>
+            <L><Strong>Subscriptions renew automatically</Strong> at the then-current price until cancelled. For Indian customers, recurring payments may use UPI AutoPay, eNACH or card mandates where available and authorised by you. You may cancel anytime from account settings under Billing; cancellation takes effect at the end of the current billing cycle, and you keep access until then.</L>
+            <L>You authorise us and our processors to charge your payment method for all amounts due, including applicable taxes and any overage or usage charges described on the pricing page.</L>
+            <L>We may change prices on reasonable notice. Changes apply from your next renewal.</L>
+            <L>You are responsible for any taxes, duties or withholdings arising from your use, other than taxes on our income.</L>
+          </UL>
+          <P>
+            <Strong>Refunds.</Strong> Cancellation does not normally prorate a current billing cycle, except where required by applicable law. Eligible refunds are processed within 5–7 business days to the original payment method after approval; bank posting may take longer. Failed or duplicate debits are automatically refunded after confirmation. Already-consumed AI generation, render and dubbing usage is generally not refundable except where law requires otherwise. To request a refund, email {CO.supportEmail} with your transaction reference. See our <Link to="/refund-policy" className="text-fuchsia-400 hover:underline">Refund & Cancellation Policy</Link>.
+          </P>
+          <P>
+            <Strong>Who is paid.</Strong> All amounts payable under these Terms are payable to{" "}
+            {CO.legalName}, or to such affiliate, official partner, authorised reseller or platform
+            administrator as we may direct, and payment to any of them discharges your obligation.
+          </P>
+          <P>
+            <Strong>Chargebacks.</Strong> If you initiate a chargeback or payment dispute instead of
+            contacting us first, we may suspend your account pending resolution. Please write to{" "}
+            {CO.supportEmail} — most billing issues are resolved quickly.
+          </P>
+
+          <H id="credits" n="8">Credits, quotas and fair use</H>
+          <P>
+            Plans include allowances for AI generation, rendering, dubbing minutes and messaging.
+            Allowances reset each billing period and, unless your plan says otherwise, do not roll
+            over and have no cash value. Purchased credits are consumed before or after plan
+            allowances as described on the pricing page.
+          </P>
+          <P>
+            Where you supply your own third-party API keys (&ldquo;BYOK&rdquo;), you remain responsible for
+            your own usage and charges with that provider, and for complying with its terms. We store
+            such keys encrypted but do not control the provider&rsquo;s pricing, availability or policies.
+          </P>
+          <P>
+            We may apply reasonable rate limits, and may contact you where usage materially exceeds
+            normal patterns for your plan.
+          </P>
+
+          <H id="affiliates" n="9">Affiliate and partner programme</H>
+          <P>
+            If you take part in our affiliate or partner programme, commission rates, tiers and payout
+            terms are as set out in the programme materials and in your account. Commission is earned
+            on qualifying completed payments that are not later refunded, charged back or reversed;
+            commission on a reversed payment may be clawed back against your balance.
+          </P>
+          <P>
+            Affiliates must promote the Service honestly, must not bid on our trademarks in paid search
+            without written permission, must not spam, and{" "}
+            <Strong>must clearly disclose the affiliate relationship</Strong> wherever required by law
+            (including FTC endorsement rules in the United States). We may withhold payouts, suspend or
+            remove any affiliate for breach, fraud or self-referral.
+          </P>
+
+          <H id="ip" n="10">Intellectual property</H>
+          <P>
+            <Strong>Ours.</Strong> The Service, including its software, interfaces, models we own,
+            branding and documentation, belongs to {CO.legalName} and its licensors. Nothing here
+            transfers ownership of it to you.
+          </P>
+          <P>
+            <Strong>Yours.</Strong> You keep whatever rights you hold in the content you upload
+            (<Strong>&ldquo;Input&rdquo;</Strong>). As between you and us, and subject to your compliance with
+            these Terms and payment of applicable fees, we do not claim ownership of the content you
+            generate (<Strong>&ldquo;Output&rdquo;</Strong>), and you may use it for personal or commercial
+            purposes — subject to §6, which explains what we cannot warrant about it.
+          </P>
+          <P>
+            <Strong>Licence to us.</Strong> You grant us a worldwide, non-exclusive, royalty-free
+            licence to host, store, transmit, reproduce and process your Input and Output solely to
+            operate, secure, support and improve the Service, and to route it to the third-party
+            providers needed to fulfil your requests. This licence ends when you delete the relevant
+            content, except for copies retained in backups for a limited period or as law requires.
+          </P>
+          <P>
+            <Strong>Feedback.</Strong> If you send us suggestions, we may use them without obligation
+            or compensation.
+          </P>
+          <P>
+            <Strong>Complaints.</Strong> If you believe material on the Service infringes your rights,
+            write to {CO.legalEmail} with enough detail to identify the material and your rights in it.
+            We may remove content and terminate repeat infringers.
+          </P>
+
+          <H id="third-party" n="11">Third-party services</H>
+          <P>
+            The Service integrates third-party providers — including AI model providers, payment
+            processors, email and messaging providers, and social platforms you choose to connect.
+            Your use of those services is governed by their terms, and their acts and omissions
+            (including outages, model changes, pricing changes and content policies) are outside our
+            control. Connecting an account authorises us to act on that platform on your behalf, and
+            you must comply with that platform&rsquo;s rules.
+          </P>
+
+          <H id="availability" n="12">Availability and support</H>
+          <P>
+            We aim to keep the Service available and to process jobs promptly, but we do not commit to
+            any specific uptime, turnaround time or output quality unless we have agreed a separate
+            written service-level agreement with you. Long-running work — feature-length renders and
+            dubs in particular — depends on third-party capacity and may queue, take longer than
+            estimated, or fail and need resubmitting. Support is provided at {CO.supportEmail} on the
+            terms applicable to your plan.
+          </P>
+          <P>
+            We may modify, add or discontinue features. Where a change materially reduces core
+            functionality of a paid plan, we will give reasonable notice.
+          </P>
+
+          <H id="termination" n="13">Suspension and termination</H>
+          <UL>
+            <L>You may stop using the Service and cancel at any time from Billing.</L>
+            <L>We may suspend or terminate your access immediately where you breach these Terms — in particular §5 or §6 — where required by law, where necessary to protect the Service or other users, or for non-payment.</L>
+            <L>We may terminate for convenience on reasonable notice, in which case we will refund any prepaid fees covering the unused remainder of your term.</L>
+            <L>On termination, your licence ends. We may delete your content after a reasonable period; export anything you want to keep before cancelling.</L>
+            <L>Sections that by their nature should survive termination do so, including §6, §10, §14, §15, §16 and §18.</L>
+          </UL>
+
+          <H id="disclaimers" n="14">Disclaimers</H>
+          <P className="uppercase">
+            <Strong>
+              The Service and all output are provided &ldquo;as is&rdquo; and &ldquo;as available&rdquo;, without
+              warranties of any kind, whether express, implied or statutory, including implied
+              warranties of merchantability, fitness for a particular purpose, title,
+              non-infringement, accuracy, or uninterrupted or error-free operation, to the maximum
+              extent permitted by law.
+            </Strong>
+          </P>
+          <P>
+            Nothing in these Terms excludes or limits any liability or right that cannot lawfully be
+            excluded or limited, including consumer rights you may have where you live.
+          </P>
+
+          <H id="liability" n="15">Limitation of liability</H>
+          <P>
+            To the maximum extent permitted by law, neither party is liable for indirect, incidental,
+            special, consequential, exemplary or punitive damages, or for lost profits, revenue,
+            goodwill, or data, however caused and on any theory of liability.
+          </P>
+          <P>
+            To the maximum extent permitted by law, our total aggregate liability arising out of or
+            relating to the Service or these Terms will not exceed the total amounts you actually paid
+            us for the Service in the twelve (12) months immediately preceding the event giving rise
+            to the claim, and in no event more than the maximum annual value of your plan.
+          </P>
+          <P>
+            These limits do not apply to liability that cannot lawfully be limited, and they apply
+            even if a limited remedy fails of its essential purpose.
+          </P>
+
+          <H id="indemnity" n="16">Indemnity</H>
+          <P>
+            You will defend, indemnify and hold harmless {CO.legalName}, its affiliates, partners and
+            their officers, employees and agents from any claim, demand, loss, liability or expense
+            (including reasonable legal fees) arising from: your Input or Output; your use of the
+            Service; your breach of these Terms; your breach of §6 (including any claim that you
+            lacked rights or consent in source material, a voice or a likeness); or your violation of
+            any law or third-party right.
+          </P>
+          <P>
+            This obligation applies whether you acted on your own account or on the instructions of a
+            client or other third party, and it survives termination. We will notify you of any claim
+            we seek indemnity for and may, at our option, take control of its defence.
+          </P>
+
+          <H id="changes" n="17">Changes to these terms</H>
+          <P>
+            We may update these Terms from time to time. Where a change is material we will give
+            reasonable notice, by email or in the Service, before it takes effect. Continuing to use
+            the Service after the effective date means you accept the updated Terms; if you do not
+            accept them, cancel before that date. The current version is always at {CO.domain}/terms.
+          </P>
+
+          <H id="law" n="18">Governing law and disputes</H>
+          <P>
+            For customers in India, these Terms are governed by Indian law, and disputes are subject to the courts at Hyderabad, Telangana, India. For customers outside India, these Terms are governed by the laws of New York, USA, without regard to its conflict-of-laws rules. The United Nations Convention on Contracts for the International Sale of Goods does not apply.
+          </P>
+          <P>
+            Before filing any claim, you agree to contact us at {CO.legalEmail} and attempt to resolve it informally for at least thirty (30) days. An unresolved dispute involving an Indian customer will be brought before courts at Hyderabad, India; for a customer outside India, before state or federal courts in New York, USA, subject to mandatory consumer protections.
+          </P>
+          <P>
+            Where you are a consumer, this section does not deprive you of the protection of mandatory
+            provisions of the law of your country of residence, including any right to bring
+            proceedings in your local courts.
+          </P>
+
+          <H id="general" n="19">General</H>
+          <UL>
+            <L><Strong>Entire agreement.</Strong> These Terms and our Privacy Policy are the whole agreement between us about the Service and replace any earlier understanding.</L>
+            <L><Strong>Severability.</Strong> If a provision is held unenforceable, it is modified to the minimum extent necessary, or severed, and the rest stays in force.</L>
+            <L><Strong>No waiver.</Strong> Not enforcing a right is not a waiver of it.</L>
+            <L><Strong>Assignment.</Strong> You may not assign these Terms without our written consent. We may assign them to an affiliate or in connection with a merger, acquisition or sale of assets.</L>
+            <L><Strong>Force majeure.</Strong> Neither party is liable for delay or failure caused by events beyond its reasonable control, including third-party provider outages.</L>
+            <L><Strong>No third-party beneficiaries</Strong>, except that our affiliates and partners may enforce provisions expressly benefiting them.</L>
+            <L><Strong>Notices</Strong> to us go to {CO.legalEmail}; notices to you go to the email on your account.</L>
+          </UL>
+
+          <H id="contact" n="20">Contact</H>
+          <P>
+            <Strong>Zoa Zone Services Pvt Ltd (India)</Strong><br />
+            {CO.indiaAddress}<br />
+            <Strong>Zoa Zone Services LLC (outside India)</Strong><br />
+            {CO.address}<br />
+            Telephone: {CO.phone}<br />
+            {CO.product} support: {CO.supportEmail}<br />
+            Company / legal notices: {CO.legalEmail}
+          </P>
+
+          <p className="text-xs text-muted-foreground mt-10 pt-6 border-t border-border">
+            Last updated {CO.effective}. Please also read our{" "}
+            <Link to="/privacy" className="text-fuchsia-400 hover:underline">Privacy Policy</Link>,
+            which explains how we handle your data.
+          </p>
+        </article>
+      </div>
+    </div>
+  );
+}

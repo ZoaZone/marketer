@@ -1,5 +1,7 @@
+import { useOutletContext } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
+import { mine } from "@/utils/scope";
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, Tooltip, ResponsiveContainer, Legend
@@ -40,13 +42,15 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 export default function Analytics() {
-  const { data: campaigns = [] } = useQuery({ queryKey: ["campaigns_a"], queryFn: () => base44.entities.MarketingCampaign.list(null, 200) });
-  const { data: contacts = [] } = useQuery({ queryKey: ["contacts_a"], queryFn: () => base44.entities.MarketingContact.list(null, 500) });
-  const { data: leads = [] } = useQuery({ queryKey: ["leads_a"], queryFn: () => base44.entities.LeadCapture.list("-captured_at", 500) });
-  const { data: posts = [] } = useQuery({ queryKey: ["posts_a"], queryFn: () => base44.entities.ScheduledPost.list(null, 200) });
-  const { data: funnels = [] } = useQuery({ queryKey: ["funnels_a"], queryFn: () => base44.entities.Funnel.list(null, 50) });
-  const { data: assets = [] } = useQuery({ queryKey: ["assets_a"], queryFn: () => base44.entities.ContentAsset.list(null, 200) });
-  const { data: messages = [] } = useQuery({ queryKey: ["messages_a"], queryFn: () => base44.entities.BulkMessage.list(null, 500) });
+  const { user } = useOutletContext() || {};
+  const enabled = !!user?.email;
+  const { data: campaigns = [] } = useQuery({ queryKey: ["campaigns_a", user?.email], queryFn: () => base44.entities.MarketingCampaign.filter(mine(user), null, 200), enabled });
+  const { data: contacts = [] } = useQuery({ queryKey: ["contacts_a", user?.email], queryFn: () => base44.entities.MarketingContact.filter(mine(user), null, 500), enabled });
+  const { data: leads = [] } = useQuery({ queryKey: ["leads_a", user?.email], queryFn: () => base44.entities.LeadCapture.filter(mine(user), "-captured_at", 500), enabled });
+  const { data: posts = [] } = useQuery({ queryKey: ["posts_a", user?.email], queryFn: () => base44.entities.ScheduledPost.filter(mine(user), null, 200), enabled });
+  const { data: funnels = [] } = useQuery({ queryKey: ["funnels_a", user?.email], queryFn: () => base44.entities.Funnel.filter(mine(user), null, 50), enabled });
+  const { data: assets = [] } = useQuery({ queryKey: ["assets_a", user?.email], queryFn: () => base44.entities.ContentAsset.filter(mine(user), null, 200), enabled });
+  const { data: messages = [] } = useQuery({ queryKey: ["messages_a", user?.email], queryFn: () => base44.entities.BulkMessage.filter(mine(user), null, 500), enabled });
 
   // Aggregates
   const totalSent = campaigns.reduce((s, c) => s + (c.sent_count || 0), 0);

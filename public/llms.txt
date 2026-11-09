@@ -1,0 +1,29 @@
+# Digital Studio (digitalstudios.app)
+
+> One AI studio for creators, agencies, film studios and dubbing houses: ad
+> creatives, marketing campaigns, feature-length films built scene by scene,
+> and dubbing into 22 languages that keeps the original voice and score.
+
+Digital Studio combines two product lanes on one account: an AI marketing
+studio (ad creatives, social scheduling, funnels, bulk SMS/WhatsApp/email
+campaigns, lead capture) and Movie Maker Pro (AI film generation, a Song
+Creator, an AI media editor, and commercial dubbing/lip-sync). Plans and
+pricing are usage-metered — see /pricing for the current catalog.
+
+## Pages
+
+- [Home](https://digitalstudios.app/): Product overview, feature tour, and plan comparison.
+- [Pricing](https://digitalstudios.app/pricing): Full plan catalog for both product lanes, billed monthly or yearly.
+- [Free Trial](https://digitalstudios.app/free-trial): Start a free trial account.
+- [Agent Program](https://digitalstudios.app/agent-program): Affiliate / referral program details.
+- [Agency Enquiry](https://digitalstudios.app/agency-enquiry): Contact form for agency and enterprise volume deals.
+- [Beta](https://digitalstudios.app/beta): Request beta access.
+- [Privacy Policy](https://digitalstudios.app/privacy)
+- [Terms of Service](https://digitalstudios.app/terms)
+
+## Notes
+
+Everything else on this domain (the app itself — dashboard, studio tools,
+billing, settings, and so on) requires an authenticated account and is
+intentionally excluded here and in /robots.txt, since it has no standalone
+value to a crawler or an LLM without a logged-in session.

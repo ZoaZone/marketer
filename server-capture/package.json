@@ -1,0 +1,13 @@
+{
+  "name": "studio-capture-worker",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": { "start": "node index.js", "test": "node --test test/*.test.js" },
+  "dependencies": {
+    "express": "^4.19.2",
+    "cors": "^2.8.5",
+    "nanoid": "^5.0.7",
+    "playwright": "1.48.2"
+  }
+}

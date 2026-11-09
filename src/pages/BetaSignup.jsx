@@ -1,12 +1,19 @@
 import { useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { Sparkles, Send, CheckCircle2, Loader2 } from "lucide-react";
+import { Sparkles, Send, CheckCircle2, Loader2, ArrowLeft } from "lucide-react";
+import { Link } from "react-router-dom";
+import { BRAND } from "@/lib/brand";
+import { useSeo, SEO } from "@/lib/seo";
+import TurnstileWidget from "@/components/TurnstileWidget";
 
 export default function BetaSignup() {
+  useSeo(SEO.beta);
+
   const [form, setForm] = useState({ full_name: "", email: "", company: "", use_case: "" });
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -15,10 +22,10 @@ export default function BetaSignup() {
     setError("");
     try {
       // Use the public backend function — no auth required
-      await base44.functions.invoke("submitBetaRequest", { ...form });
+      await base44.functions.invoke("submitBetaRequest", { ...form, turnstile_token: turnstileToken });
       setDone(true);
     } catch (err) {
-      setError("Something went wrong. Please try again.");
+      setError(err?.response?.data?.error || "Something went wrong. Please try again.");
     }
     setSubmitting(false);
   };
@@ -26,13 +33,14 @@ export default function BetaSignup() {
   return (
     <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
+        <Link to="/" className="mb-4 inline-flex items-center gap-1.5 text-sm text-white/60 hover:text-white"><ArrowLeft className="w-4 h-4" /> Back to home</Link>
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-fuchsia-500 to-purple-600 flex items-center justify-center shadow-lg shadow-fuchsia-500/30 mb-3">
             <span className="text-white font-black text-2xl tracking-tight">A</span>
           </div>
-          <h1 className="text-2xl font-black bg-gradient-to-r from-fuchsia-400 to-purple-400 bg-clip-text text-transparent">AEVOICE</h1>
-          <p className="text-muted-foreground text-sm mt-1">AI Marketing OS</p>
+          <h1 className="text-2xl font-black bg-gradient-to-r from-fuchsia-400 to-purple-400 bg-clip-text text-transparent">{BRAND.name}</h1>
+          <p className="text-muted-foreground text-sm mt-1">{BRAND.tagline}</p>
         </div>
 
         {done ? (
@@ -52,7 +60,7 @@ export default function BetaSignup() {
           <div className="bg-card border border-border rounded-2xl p-6 space-y-5">
             <div>
               <h2 className="text-lg font-bold text-foreground">Request Free Beta Access</h2>
-              <p className="text-muted-foreground text-sm mt-1">Get full access to all AEVOICE features — free for early beta users. Our team will review and send your invite.</p>
+              <p className="text-muted-foreground text-sm mt-1">Get full access to all Digital Studio features — free for early beta users. Our team will review and send your invite.</p>
             </div>
 
             <div className="bg-gradient-to-r from-fuchsia-500/10 to-purple-500/10 border border-fuchsia-500/20 rounded-xl px-4 py-3 flex items-center gap-2">
@@ -92,7 +100,7 @@ export default function BetaSignup() {
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">How will you use AEVOICE? (optional)</label>
+                <label className="text-xs font-medium text-muted-foreground">How will you use Digital Studio? (optional)</label>
                 <textarea
                   value={form.use_case}
                   onChange={e => setForm(p => ({ ...p, use_case: e.target.value }))}
@@ -101,6 +109,8 @@ export default function BetaSignup() {
                   className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none"
                 />
               </div>
+
+              <TurnstileWidget onToken={setTurnstileToken} />
 
               {error && <p className="text-xs text-red-400">{error}</p>}
 
