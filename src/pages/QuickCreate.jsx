@@ -963,8 +963,8 @@ export default function QuickCreate() {
                     were later panned by FFmpeg, so "Short Video" returned what
                     reads as a slideshow with no way to say otherwise. Both
                     options are explicit, and both costs — credits AND minutes —
-                    are stated rather than discovered. Studio visuals are the
-                    default: see the motionMode initialiser. */}
+                    are stated rather than discovered. The default depends on
+                    account type: see isPayingSubscriber/defaultMotionMode above. */}
                 <div className="rounded-xl border border-border p-3 space-y-2">
                   <label className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Output</label>
                   <div className="grid sm:grid-cols-2 gap-2">
@@ -979,7 +979,11 @@ export default function QuickCreate() {
                       </span>
                       <span className="block text-[11px] text-muted-foreground mt-1">
                         A genuinely moving clip per scene, made with Base44 video. Uses {BASE44_VIDEO_CREDITS_PER_5S} AI credits per scene (free accounts included) and takes about 1-3 minutes per scene.
+                        {!isPayingSubscriber && ` A ${sceneCount}-scene video uses about ${sceneCount * (BASE44_VIDEO_CREDITS_PER_5S + 1)} of your 25 free-trial credits.`}
                       </span>
+                      {defaultMotionMode === "motion" && (
+                        <span className="block text-[10px] font-semibold text-fuchsia-400/80 mt-1">Default on your plan</span>
+                      )}
                     </button>
                     <button
                       type="button"
@@ -991,8 +995,11 @@ export default function QuickCreate() {
                         <ImageIcon className="w-3.5 h-3.5" /> Studio visuals
                       </span>
                       <span className="block text-[11px] text-muted-foreground mt-1">
-                        Generated stills with a slow cinematic pan and zoom, on your plan&apos;s AI credits. Ready in seconds. The default.
+                        Still images with a pan-and-zoom effect, on your plan&apos;s AI credits. Ready in seconds.
                       </span>
+                      {defaultMotionMode === "slideshow" && (
+                        <span className="block text-[10px] font-semibold text-fuchsia-400/80 mt-1">Default on the free trial — protects your 25 free credits</span>
+                      )}
                     </button>
                   </div>
                   {!canMotion && (
