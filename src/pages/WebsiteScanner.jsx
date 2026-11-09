@@ -1,12 +1,9 @@
 import { useState } from "react";
-import { useOutletContext } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { mine } from "@/utils/scope";
-import { Globe, Zap, Sparkles, Loader2, ArrowRight } from "lucide-react";
+import { Globe, Zap, Sparkles, Loader2, ArrowRight, Tag, TrendingUp, Building2 } from "lucide-react";
 
 export default function WebsiteScanner() {
-  const { user } = useOutletContext() || {};
   const qc = useQueryClient();
   const [url, setUrl] = useState("");
   const [scanning, setScanning] = useState(false);
@@ -14,7 +11,7 @@ export default function WebsiteScanner() {
   const [generating, setGenerating] = useState(null);
   const [generated, setGenerated] = useState({});
 
-  const {data:scans=[],isLoading}=useQuery({queryKey:["scans", user?.email],queryFn:()=>base44.entities.WebsiteScan.filter(mine(user),"-created_date",20),enabled:!!user?.email});
+  const {data:scans=[],isLoading}=useQuery({queryKey:["scans"],queryFn:()=>base44.entities.WebsiteScan.list("-created_date",20)});
 
   const scan = async () => {
     if (!url) return;
@@ -58,7 +55,7 @@ export default function WebsiteScanner() {
         <div className="flex gap-3">
           <div className="relative flex-1">
             <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"/>
-            <input value={url} onChange={e=>setUrl(e.target.value)} onKeyDown={e=>e.key==="Enter"&&scan()} placeholder="digitalstudios.app or https://client-site.com" className="w-full h-10 pl-9 pr-3 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"/>
+            <input value={url} onChange={e=>setUrl(e.target.value)} onKeyDown={e=>e.key==="Enter"&&scan()} placeholder="aevoice.ai or https://client-site.com" className="w-full h-10 pl-9 pr-3 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"/>
           </div>
           <button onClick={scan} disabled={scanning||!url} className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white text-sm font-semibold hover:opacity-90 disabled:opacity-60 shadow-lg">
             {scanning?<><Loader2 className="w-4 h-4 animate-spin"/>Scanning…</>:<><Zap className="w-4 h-4"/>Scan</>}

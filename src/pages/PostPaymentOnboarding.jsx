@@ -1,16 +1,14 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
-import { CheckCircle2, Globe, Megaphone, Share2, ArrowRight, Loader2, Sparkles, AlertCircle } from "lucide-react";
-import { BRAND } from "@/lib/brand";
-import { recordCommissionFor } from "@/utils/affiliate";
+import { CheckCircle2, Globe, Megaphone, Share2, ArrowRight, Loader2, Sparkles } from "lucide-react";
 
-const M_LOGO="/brand/icon.png";
+const M_LOGO="https://media.base44.com/images/public/69b1f1d60b1fb9d791fddc64/d1aa347a6_generated_image.png";
 const STEPS=[
   {id:1,Icon:Globe,title:"Scan Your Website",desc:"Let AI learn about your business — auto-generates content concepts",color:"from-fuchsia-500 to-purple-600"},
   {id:2,Icon:Share2,title:"Connect Social Accounts",desc:"Link Instagram, TikTok, LinkedIn and more to start scheduling",color:"from-pink-500 to-rose-600"},
   {id:3,Icon:Megaphone,title:"Create Your First Campaign",desc:"Set up your first email, SMS, or WhatsApp campaign in 2 minutes",color:"from-amber-500 to-orange-600"},
-  {id:4,Icon:Sparkles,title:"You're Ready!",desc:`${BRAND.name} is fully set up. Explore the studio to get started.`,color:"from-emerald-500 to-teal-600"},
+  {id:4,Icon:Sparkles,title:"You're Ready!",desc:"media.aevoice.ai is fully set up. Explore the dashboard to get started.",color:"from-emerald-500 to-teal-600"},
 ];
 
 export default function PostPaymentOnboarding() {
@@ -19,35 +17,6 @@ export default function PostPaymentOnboarding() {
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [scanning, setScanning] = useState(false);
   const [scanDone, setScanDone] = useState(false);
-  const [paypalStatus, setPaypalStatus] = useState(null); // "capturing" | "success" | "error"
-
-  // PayPal redirects here with ?token=<order_id> after the user approves on
-  // PayPal's site — this is the only place that ever calls capture_order,
-  // which is what actually collects the payment and (previously) the only
-  // step missing from the whole PayPal flow: without it, no Subscription
-  // was ever created for a PayPal purchase.
-  const capturedRef = useRef(false);
-  useEffect(() => {
-    const orderId = new URLSearchParams(window.location.search).get("token");
-    if (!orderId || capturedRef.current) return;
-    capturedRef.current = true;
-    setPaypalStatus("capturing");
-    (async () => {
-      try {
-        const res = await base44.functions.invoke("paypalCheckout", { action: "capture_order", order_id: orderId });
-        const data = res?.data ?? res;
-        if (data?.success && data?.status === "COMPLETED") {
-          if (data.subscription_id) await recordCommissionFor(data.subscription_id);
-          setPaypalStatus("success");
-        } else {
-          setPaypalStatus("error");
-        }
-      } catch (_) {
-        setPaypalStatus("error");
-      }
-      window.history.replaceState({}, "", window.location.pathname);
-    })();
-  }, []);
 
   const scanWebsite=async()=>{
     if(!websiteUrl)return;
@@ -69,7 +38,7 @@ export default function PostPaymentOnboarding() {
       <div className="w-full max-w-lg">
         <div className="flex items-center justify-center gap-2 mb-8">
           <img src={M_LOGO} alt="" className="w-9 h-9 rounded-xl" onError={e=>e.target.style.display="none"}/>
-          <span className="text-xl font-black bg-gradient-to-r from-fuchsia-400 to-purple-400 bg-clip-text text-transparent">{BRAND.name}</span>
+          <span className="text-xl font-black bg-gradient-to-r from-fuchsia-400 to-purple-400 bg-clip-text text-transparent">media.aevoice.ai</span>
         </div>
 
         <div className="flex items-center gap-2 mb-8">
@@ -82,18 +51,6 @@ export default function PostPaymentOnboarding() {
             </div>
           ))}
         </div>
-
-        {paypalStatus && (
-          <div className={`flex items-center gap-2 rounded-xl px-4 py-3 mb-4 text-sm ${
-            paypalStatus === "success" ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"
-            : paypalStatus === "error" ? "bg-red-500/10 border border-red-500/20 text-red-400"
-            : "bg-white/5 border border-white/10 text-white/60"
-          }`}>
-            {paypalStatus === "capturing" && <><Loader2 className="w-4 h-4 animate-spin" /> Confirming your PayPal payment…</>}
-            {paypalStatus === "success" && <><CheckCircle2 className="w-4 h-4" /> Payment confirmed — your plan is now active.</>}
-            {paypalStatus === "error" && <><AlertCircle className="w-4 h-4" /> We couldn't confirm that PayPal payment. Contact care@digitalstudios.app if you were charged.</>}
-          </div>
-        )}
 
         <div className="bg-white/5 border border-white/10 rounded-3xl p-8 text-center">
           <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${s.color} flex items-center justify-center mx-auto mb-5 shadow-2xl`}>
@@ -141,8 +98,8 @@ export default function PostPaymentOnboarding() {
 
           <div className="flex gap-3 mt-6">
             {step<4&&step!==1&&<button onClick={()=>setStep(s=>Math.min(s+1,4))} className="flex-1 py-3 rounded-xl border border-white/15 text-white/60 text-sm font-medium hover:border-white/30">Skip</button>}
-            <button onClick={()=>step<4?setStep(s=>s+1):navigate("/studio")} className={`py-3 rounded-xl bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white text-sm font-semibold hover:opacity-90 flex items-center justify-center gap-2 shadow-lg ${step<4&&step!==1?"flex-1":"w-full"}`}>
-              {step===4?"Go to Studio":"Continue"}<ArrowRight className="w-4 h-4"/>
+            <button onClick={()=>step<4?setStep(s=>s+1):navigate("/dashboard")} className={`py-3 rounded-xl bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white text-sm font-semibold hover:opacity-90 flex items-center justify-center gap-2 shadow-lg ${step<4&&step!==1?"flex-1":"w-full"}`}>
+              {step===4?"Go to Dashboard":"Continue"}<ArrowRight className="w-4 h-4"/>
             </button>
           </div>
         </div>

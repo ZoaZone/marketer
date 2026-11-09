@@ -6,7 +6,7 @@ import { createAxiosClient } from '@base44/sdk/dist/utils/axios-client';
 const AuthContext = createContext();
 
 // Routes that are always public — no auth check needed
-const PUBLIC_PATHS = new Set(["/", "/Home", "/home", "/pricing", "/Pricing", "/WidgetHost", "/login", "/Login", "/auth", "/Auth", "/beta", "/lead-capture", "/onboarding", "/invite", "/agent-program", "/agency-enquiry", "/free-trial", "/privacy", "/terms", "/about", "/contact", "/refund-policy", "/shipping-policy"]);
+const PUBLIC_PATHS = new Set(["/", "/Home", "/home", "/pricing", "/Pricing", "/WidgetHost", "/login", "/beta", "/lead-capture", "/onboarding"]);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -108,18 +108,11 @@ export const AuthProvider = ({ children }) => {
     sessionStorage.clear();
     setUser(null);
     setIsAuthenticated(false);
-    base44.auth.logout("/auth");
+    base44.auth.logout("/login");
   };
 
-  // BUG-001 FIX: Guard against redirect loop — don't redirect if already on login/auth
   const navigateToLogin = () => {
-    const _now = Date.now();
-    const _last = Number(sessionStorage.getItem('__nav_login_ts') || 0);
-    if (_now - _last < 2500) return; // debounce — don't double-redirect within 2.5s
-    sessionStorage.setItem('__nav_login_ts', String(_now));
-    const p = window.location.pathname.toLowerCase();
-    if (p === '/auth' || p === '/login') return; // already on auth page
-    window.location.href = '/auth';
+    base44.auth.redirectToLogin(window.location.href);
   };
 
   return (

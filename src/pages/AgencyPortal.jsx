@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { useOutletContext } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { mine } from "@/utils/scope";
-import { Building2, Plus, Search, Globe, Mail, Phone } from "lucide-react";
+import { Building2, Plus, Users, Megaphone, BarChart3, Settings, ExternalLink, Search, Globe, Mail, Phone } from "lucide-react";
 
 const STATUS_COLORS = {
   active:   "bg-emerald-500/10 text-emerald-400",
@@ -26,9 +25,8 @@ export default function AgencyPortal() {
   const [saving, setSaving] = useState(false);
 
   const { data: clients = [], isLoading } = useQuery({
-    queryKey: ["agency_clients", user?.email],
-    queryFn: () => base44.entities.Client.filter(mine(user), "-created_date", 100),
-    enabled: !!user?.email,
+    queryKey: ["agency_clients"],
+    queryFn: () => base44.entities.Client.list("-created_date", 100),
   });
 
   const filtered = clients.filter(c =>

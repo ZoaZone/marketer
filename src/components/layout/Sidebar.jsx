@@ -1,14 +1,13 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { PLAN_BY_KEY } from "@/config/plans";
 import {
   LayoutDashboard, Users, Megaphone, Share2, Sparkles, PenTool,
-  Search, GitBranch, UserPlus, MailCheck, Image, Globe,
+  FileText, Search, GitBranch, UserPlus, MailCheck, Image, Globe,
   BarChart3, Settings, CreditCard, ChevronDown, LogOut, Menu, X,
-  Lock, Bell, HelpCircle, ShieldCheck, Building2, Share,
-  Sun, Moon, Wand2, Monitor, Film, Music, Sliders, Plug, Languages, MessageSquare } from "lucide-react";
+  Lock, Bell, HelpCircle, ShieldCheck, Zap, Building2, Share,
+  Sun, Moon, Film
+} from "lucide-react";
 import { base44 } from "@/api/base44Client";
-import { BRAND } from "@/lib/brand";
 
 function DarkToggle() {
   const [dark, setDark] = useState(() => {
@@ -46,64 +45,53 @@ function DarkToggle() {
 }
 
 
+const M_LOGO = "https://media.base44.com/images/public/69b1f1d60b1fb9d791fddc64/d1aa347a6_generated_image.png";
 
-// The creative experience is primary: CREATE and LIBRARY come first.
-//
-// The social/marketing group used to be labelled "MARKETING (optional)" and
-// started COLLAPSED, with its header drawn at text-muted-foreground/90 — the
-// combination made the whole group effectively undiscoverable ("unable to
-// find out" was the report). It is now "SOCIAL MEDIA HUB", expanded like
-// every other section, and the section headers are drawn at a contrast that
-// is actually readable rather than merely present.
-//
-// All routes/paths are unchanged — only grouping/order/labels moved.
 const NAV_SECTIONS = [
   {
     label: "OVERVIEW",
     items: [
       { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+      { to: "/contacts",  icon: Users,           label: "Contacts" },
     ],
   },
   {
-    label: "CREATE",
+    label: "CAMPAIGNS",
     items: [
-      { to: "/movie-maker",  icon: Film,    label: "Movie Maker", badge: "ENT", minTier: 4 },
-      { to: "/song-creator", icon: Music,   label: "Song Creator", badge: "ENT", minTier: 4 },
-      { to: "/dubbing",      icon: Languages, label: "Dubbing Studio", badge: "ENT", minTier: 4 },
-      { to: "/media-editor", icon: Sliders, label: "Edit Media", badge: "NEW" },
-      { to: "/demo-video",   icon: Monitor, label: "Create Demo Video", badge: "NEW" },
-      { to: "/ad-creator",   icon: PenTool, label: "Ad Creator", minTier: 2 },
-      { to: "/quick-create", icon: Wand2,   label: "Quick Create", badge: "NEW" },
+      { to: "/campaigns",  icon: Megaphone, label: "Campaigns" },
+      { to: "/social-hub", icon: Share2,    label: "Social Hub" },
     ],
   },
   {
-    label: "LIBRARY",
+    label: "AI STUDIO",
     items: [
-      { to: "/media-library", icon: Image,     label: "Media Library" },
-      { to: "/web-projects",  icon: Globe,     label: "Web & App Projects" },
-      { to: "/analytics",     icon: BarChart3, label: "Analytics" },
+      { to: "/media-studio",    icon: Sparkles, label: "Media Studio" },
+      { to: "/video-editor",    icon: Film,     label: "Video Editor" },
+      { to: "/ad-creator",      icon: PenTool,  label: "Ad Creator",   minTier: 2 },
+      { to: "/script-writer",   icon: FileText, label: "Script Writer", minTier: 2 },
+      { to: "/website-scanner", icon: Search,   label: "Website Scanner", minTier: 2 },
+      { to: "/media-library",   icon: Image,    label: "Media Library" },
     ],
   },
   {
-    label: "SOCIAL MEDIA HUB",
+    label: "FUNNELS & LEADS",
     items: [
-      { to: "/campaigns",       icon: Megaphone, label: "Campaigns" },
-      { to: "/brands",          icon: Building2, label: "Brand Manager" },
-      { to: "/social-hub",      icon: Share2,    label: "Accounts & Scheduling" },
-      { to: "/campaign-studio", icon: Sparkles,  label: "Campaign Studio", badge: "NEW" },
-      { to: "/website-scanner", icon: Search,    label: "Website Scanner", minTier: 2 },
-      { to: "/funnel-builder",  icon: GitBranch, label: "Funnel Builder" },
-      { to: "/lead-capture",    icon: UserPlus,  label: "Lead Capture" },
-      { to: "/follow-up",       icon: MailCheck, label: "Follow-Up" },
-      { to: "/contacts",        icon: Users,     label: "Contacts" },
-      { to: "/whatsapp-inbox",  icon: MessageSquare, label: "WhatsApp Inbox" },
+      { to: "/funnel-builder", icon: GitBranch, label: "Funnel Builder" },
+      { to: "/lead-capture",   icon: UserPlus,  label: "Lead Capture" },
+      { to: "/follow-up",      icon: MailCheck, label: "Follow-Up" },
+    ],
+  },
+  {
+    label: "PROJECTS",
+    items: [
+      { to: "/web-projects", icon: Globe, label: "Web & App Projects" },
+      { to: "/analytics",    icon: BarChart3, label: "Analytics" },
     ],
   },
   {
     label: "ACCOUNT",
     items: [
       { to: "/billing",       icon: CreditCard,  label: "Billing" },
-      { to: "/integrations",  icon: Plug,        label: "Integrations" },
       { to: "/settings",      icon: Settings,    label: "Settings" },
       { to: "/notifications", icon: Bell,        label: "Notifications" },
       { to: "/help",          icon: HelpCircle,  label: "Help Center" },
@@ -111,108 +99,59 @@ const NAV_SECTIONS = [
   },
 ];
 
-export default function Sidebar({ userTier = 0, isAdmin = false, user = null, subscription = null }) {
+export default function Sidebar({ userTier = 0, isAdmin = false, user = null }) {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
-  // Every section starts expanded. The social/marketing group was the one
-  // exception and the one users could not find.
   const [collapsed, setCollapsed] = useState({});
 
   const toggle = (label) => setCollapsed(p => ({ ...p, [label]: !p[label] }));
-
-  // Plan name for the account badge. PLAN_BY_KEY is the same catalog the
-  // pricing and billing surfaces read, so the label can never drift from what
-  // the customer was actually sold.
-  const planLabel =
-    (subscription?.plan_tier && PLAN_BY_KEY[subscription.plan_tier]?.name) ||
-    (subscription?.plan_tier ? String(subscription.plan_tier) : "Free");
   const logout = () => {
     localStorage.removeItem("base44_access_token");
     localStorage.removeItem("base44_refresh_token");
     sessionStorage.clear();
-    base44.auth.logout("/auth");
+    base44.auth.logout("/login");
   };
 
   const navContent = (
     <div className="flex flex-col h-full">
-      {/* Logo. Uses the horizontal lockup (icon + wordmark, ~1.87:1), which is
-          the shape a 224px-wide sidebar header actually wants.
-          History worth keeping: the original /logo.png was a 1024×1024 square
-          whose mark filled only the middle ~17% of the height, so
-          `max-h-24 object-contain` fitted the empty square to 96px and rendered
-          the actual mark about 16px tall — the "too small to read" bug. Any
-          replacement asset must be cropped tight to its artwork for the same
-          reason: the box you give it is the size the mark should fill. */}
-      <div className="px-4 pt-6 pb-5 border-b border-sidebar-border">
-        <Link
-          to="/studio"
-          onClick={() => setMobileOpen(false)}
-          aria-label={`${BRAND.name} — go to Studio`}
-          className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500/60"
-        >
-          {/* The mark is light-on-transparent, so it needs a dark plate in light
-              mode; in dark mode the sidebar already provides one. */}
-          <div className="dark:bg-transparent bg-[#12121e] dark:p-0 px-3 py-2.5 rounded-xl transition-colors">
-            <img
-              src="/brand/lockup-h.png"
-              alt={BRAND.name}
-              width="600"
-              height="321"
-              className="w-full h-auto object-contain"
-              onError={(e) => e.target.style.display = "none"} />
+      {/* Logo */}
+      <div className="p-5 border-b border-sidebar-border">
+        <Link to="/dashboard" className="flex items-center gap-3" onClick={() => setMobileOpen(false)}>
+          <img src={M_LOGO} alt="M" className="h-9 w-9 rounded-xl object-cover shadow-lg shadow-fuchsia-500/20" onError={(e) => e.target.style.display="none"} />
+          <div>
+            <span className="text-base font-black bg-gradient-to-r from-fuchsia-400 to-purple-400 bg-clip-text text-transparent tracking-tight">media.aevoice.ai</span>
+            <div className="flex items-center gap-1 mt-0.5">
+              <Zap className="w-2.5 h-2.5 text-fuchsia-400" />
+              <span className="text-[9px] text-muted-foreground font-medium tracking-wide">AI MARKETING OS</span>
+            </div>
           </div>
-          <p className="mt-2.5 px-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/90">
-            {BRAND.tagline}
-          </p>
         </Link>
       </div>
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
         {NAV_SECTIONS.map(section => (
-          <div key={section.label} className="mb-3">
-            {/* 9px uppercase was below the legible floor. 10.5px at
-                muted-foreground/90 was still only ~3.4:1 on the sidebar —
-                enough to see, not enough to scan past. 11px at
-                foreground/75 clears 7:1 while staying quieter than the
-                nav items themselves. */}
+          <div key={section.label} className="mb-2">
             <button onClick={() => toggle(section.label)}
-              aria-expanded={!collapsed[section.label]}
-              className="flex items-center justify-between w-full px-3 py-2 text-[11px] font-bold tracking-[0.13em] text-foreground/75 uppercase hover:text-foreground transition-colors rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500/40">
+              className="flex items-center justify-between w-full px-3 py-1.5 text-[9px] font-bold tracking-widest text-muted-foreground/50 uppercase hover:text-muted-foreground transition-colors">
               {section.label}
-              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${collapsed[section.label] ? "-rotate-90" : ""}`} />
+              <ChevronDown className={`w-3 h-3 transition-transform ${collapsed[section.label] ? "-rotate-90" : ""}`} />
             </button>
             {!collapsed[section.label] && (
-              <div className="mt-1 space-y-0.5">
+              <div className="mt-0.5 space-y-0.5">
                 {section.items.map(item => {
                   const isActive = location.pathname === item.to;
-                  const isLocked = !isAdmin && item.minTier && userTier < item.minTier;
+                  const isLocked = item.minTier && userTier < item.minTier;
                   return (
                     <Link key={item.to} to={item.to} onClick={() => setMobileOpen(false)}
-                      aria-current={isActive ? "page" : undefined}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13.5px] font-medium transition-all group ${
+                      className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all group ${
                         isActive
                           ? "bg-fuchsia-500/10 text-fuchsia-400 border border-fuchsia-500/20"
                           : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-foreground"
                       }`}>
-                      <item.icon className={`w-[17px] h-[17px] flex-shrink-0 ${isActive ? "text-fuchsia-400" : "text-muted-foreground/90 group-hover:text-foreground"}`} />
+                      <item.icon className={`w-4 h-4 flex-shrink-0 ${isActive ? "text-fuchsia-400" : ""}`} />
                       <span className="flex-1 truncate">{item.label}</span>
-                      {/* The pill used to be a 15%-opacity fill with no
-                          border: measured 1.29:1 against the sidebar, i.e.
-                          the box visually dissolved into the background. A
-                          translucent fill cannot reach 3:1 on a near-black
-                          surface however far you push it, so the border does
-                          the work (3.1:1) and the fill only tints. 9px was
-                          also below the legible floor. */}
-                      {item.badge && !isLocked && (
-                        <span className={`px-1.5 py-[3px] rounded-md text-[10px] font-bold tracking-wider border ${
-                          item.badge === "ENT"
-                            ? "bg-amber-400/20 text-amber-300 border-amber-400/45"
-                            : "bg-fuchsia-400/20 text-fuchsia-300 border-fuchsia-300/50"
-                        }`}>{item.badge}</span>
-                      )}
-                      {/* 1.57:1 before — effectively invisible. */}
-                      {isLocked && <Lock className="w-3.5 h-3.5 text-muted-foreground/70" />}
+                      {isLocked && <Lock className="w-3 h-3 text-muted-foreground/30" />}
                     </Link>
                   );
                 })}
@@ -221,11 +160,8 @@ export default function Sidebar({ userTier = 0, isAdmin = false, user = null, su
           </div>
         ))}
 
-        {/* Agency/Affiliate — Agency tier, or any admin. Every other gate
-            in the app (page guards, server assertEntitled) exempts admins;
-            this one did not, so the owner's own account could not reach the
-            Affiliate or Agency portals from the nav at all. */}
-        {(isAdmin || userTier >= 3) && (
+        {/* Agency/Affiliate — Agency tier */}
+        {userTier >= 3 && (
           <div className="mt-2 pt-2 border-t border-sidebar-border space-y-0.5">
             <Link to="/affiliate" onClick={() => setMobileOpen(false)}
               className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${location.pathname === "/affiliate" ? "bg-fuchsia-500/10 text-fuchsia-400 border border-fuchsia-500/20" : "text-sidebar-foreground hover:bg-sidebar-accent"}`}>
@@ -259,16 +195,6 @@ export default function Sidebar({ userTier = 0, isAdmin = false, user = null, su
             <div className="flex-1 min-w-0">
               {user.full_name && <p className="text-xs font-semibold text-foreground truncate">{user.full_name}</p>}
               <p className="text-[10px] text-muted-foreground truncate">{user.email || "—"}</p>
-              {/* Which plan the session is actually on. The subscription was
-                  already loaded in AppLayout for tier gating; surfacing its
-                  name here means the sidebar's locked items have a visible
-                  reason. Falls back to Free when there is no subscription. */}
-              <span
-                title={planLabel}
-                className="mt-1 inline-block max-w-full truncate rounded bg-fuchsia-400/15 px-1.5 py-0.5 text-[10px] font-medium text-fuchsia-300 border border-fuchsia-400/40"
-              >
-                {isAdmin ? "Admin" : planLabel}
-              </span>
             </div>
           </div>
         )}

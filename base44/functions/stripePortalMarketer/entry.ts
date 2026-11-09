@@ -11,7 +11,7 @@ Deno.serve(async (req) => {
     const { return_url } = await req.json();
 
     if (!STRIPE_KEY) {
-      return Response.json({ error: 'Stripe not configured. Contact care@digitalstudios.app to manage your subscription.' }, { status: 400 });
+      return Response.json({ error: 'Stripe not configured. Contact care@aevoice.ai to manage your subscription.' }, { status: 400 });
     }
 
     // Find subscription for stripe_customer_id
@@ -24,11 +24,7 @@ Deno.serve(async (req) => {
 
     const params = new URLSearchParams({
       customer: customerId,
-      // Was 'https://agentmarketer.base44.app/billing' — a stale base44
-      // preview domain from before this app was renamed, not the app's real
-      // production URL. Caller (Billing.jsx) always passes its own
-      // return_url in practice, so this only bites when that's omitted.
-      return_url: return_url || 'https://digitalstudios.app/billing',
+      return_url: return_url || 'https://agentmarketer.base44.app/billing',
     });
 
     const res = await fetch('https://api.stripe.com/v1/billing_portal/sessions', {

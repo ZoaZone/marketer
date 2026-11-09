@@ -1,21 +1,11 @@
 import { useState, useEffect } from "react";
-import { useOutletContext, Link } from "react-router-dom";
+import { useOutletContext } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Settings, Key, Bell, Save, CheckCircle2, Loader2, Eye, EyeOff,
-  Zap, User, Share2, Plus, Trash2, AlertCircle, ExternalLink, RefreshCw,
-  Sparkles, Lock, Plug
+  Zap, User, Share2, Plus, Trash2, AlertCircle, ExternalLink
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
-import { mine } from "@/utils/scope";
-import { LLM_MODELS } from "@/utils/llmModels";
-
-const ACCOUNT_STATUS = {
-  active:       { dot: "bg-emerald-400", text: "text-emerald-400", label: "Active" },
-  connected:    { dot: "bg-emerald-400", text: "text-emerald-400", label: "Active" },
-  expired:      { dot: "bg-amber-400",   text: "text-amber-400",   label: "Token expired" },
-  disconnected: { dot: "bg-red-400",     text: "text-red-400",     label: "Disconnected" },
-};
 
 const KEY_FIELDS = [
   { k: "sendgrid_key",      l: "SendGrid API Key",    ph: "SG.xxxxxxxx",  help: "For email campaigns — get from sendgrid.com/account/apikeys" },
@@ -40,12 +30,10 @@ const SOCIAL_PLATFORMS = [
 
 // ── Social Accounts tab ──────────────────────────────────────────────────────
 function SocialAccountsTab() {
-  const { user } = useOutletContext() || {};
   const qc = useQueryClient();
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
-  const [testingId, setTestingId] = useState(null);
   const [showToken, setShowToken] = useState({});
   const [form, setForm] = useState({
     platform: "instagram",
@@ -54,44 +42,32 @@ function SocialAccountsTab() {
     access_token: "",
     refresh_token: "",
     page_id: "",
-    connection_method: "api",
   });
 
   const { data: accounts = [], isLoading } = useQuery({
-    queryKey: ["social_accounts", user?.email],
-    queryFn: () => base44.entities.SocialAccount.filter(mine(user), "-created_date", 50),
-    enabled: !!user?.email,
+    queryKey: ["social_accounts"],
+    queryFn: () => base44.entities.SocialAccount.list("-created_date", 50),
   });
 
   const selectedPlatform = SOCIAL_PLATFORMS.find(p => p.id === form.platform);
 
   const handleAdd = async () => {
-    if (!form.access_token.trim()) { alert("Access token is required for API connection"); return; }
-    if (!form.account_name.trim()) { alert("Account / display name is required"); return; }
+    if (!form.access_token.trim()) { alert("Access token is required"); return; }
+    if (!form.account_name.trim()) { alert("Account name is required"); return; }
     setSaving(true);
     try {
-      // Routed through saveSocialAccount rather than writing the entity
-      // directly: that function encrypts the token (AES-256-GCM) before it is
-      // stored, so a live posting credential never sits in plaintext on a
-      // client-readable record. The token is sent once, on this request, and
-      // is never read back to the browser afterwards.
-      const res = await base44.functions.invoke("saveSocialAccount", {
+      await base44.entities.SocialAccount.create({
         platform: form.platform,
         account_name: form.account_name,
         username: form.username || "",
-        access_token: form.access_token || "",
+        access_token: form.access_token,
         refresh_token: form.refresh_token || "",
         page_id: form.page_id || "",
-        connection_method: "api",
+        status: "active",
       });
-      const created = res?.data?.account ?? res?.account;
-      if (!created?.id) throw new Error(res?.data?.error || res?.error || "Could not save the account.");
-      try {
-        await base44.functions.invoke("testSocialConnection", { account_id: created.id });
-      } catch (_e) { /* verification is best-effort */ }
       qc.invalidateQueries(["social_accounts"]);
       setAdding(false);
-      setForm({ platform: "instagram", account_name: "", username: "", access_token: "", refresh_token: "", page_id: "", connection_method: "api" });
+      setForm({ platform: "instagram", account_name: "", username: "", access_token: "", refresh_token: "", page_id: "" });
     } catch (e) {
       alert("Failed to save account: " + e.message);
     }
@@ -106,15 +82,6 @@ function SocialAccountsTab() {
       qc.invalidateQueries(["social_accounts"]);
     } catch (e) { alert(e.message); }
     setDeletingId(null);
-  };
-
-  const testConnection = async (id) => {
-    setTestingId(id);
-    try {
-      await base44.functions.invoke("testSocialConnection", { account_id: id });
-      qc.invalidateQueries(["social_accounts"]);
-    } catch (e) { alert("Connection test failed: " + e.message); }
-    setTestingId(null);
   };
 
   return (
@@ -142,10 +109,8 @@ function SocialAccountsTab() {
           {accounts.map(acc => {
             const platform = SOCIAL_PLATFORMS.find(p => p.id === acc.platform);
             const isDeleting = deletingId === acc.id;
-            const isTesting = testingId === acc.id;
-            const st = ACCOUNT_STATUS[acc.status] || ACCOUNT_STATUS.disconnected;
             return (
-              <div key={acc.id} title={acc.description || st.label} className="flex items-center gap-3 p-3.5 rounded-xl bg-card border border-border">
+              <div key={acc.id} className="flex items-center gap-3 p-3.5 rounded-xl bg-card border border-border">
                 <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${platform?.color || "from-gray-500 to-gray-700"} flex items-center justify-center flex-shrink-0`}>
                   <span className="text-sm font-black text-white">{(acc.platform || "?")[0].toUpperCase()}</span>
                 </div>
@@ -155,19 +120,9 @@ function SocialAccountsTab() {
                     <span className="capitalize">{platform?.label || acc.platform}</span>
                     {acc.username && <span>· @{acc.username}</span>}
                     {acc.page_id && <span>· Page ID: {acc.page_id}</span>}
-                    <span className={`flex items-center gap-1 ${st.text}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} /> {st.label}
-                    </span>
+                    <span className="text-emerald-400">· Active</span>
                   </p>
                 </div>
-                <button
-                  onClick={() => testConnection(acc.id)}
-                  disabled={isTesting}
-                  className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
-                  title="Test connection"
-                >
-                  {isTesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                </button>
                 <button
                   onClick={() => handleDelete(acc.id)}
                   disabled={isDeleting}
@@ -315,7 +270,7 @@ function SocialAccountsTab() {
           {/* Action buttons */}
           <div className="flex gap-2 pt-1">
             <button
-              onClick={() => { setAdding(false); setForm({ platform: "instagram", account_name: "", username: "", access_token: "", refresh_token: "", page_id: "", connection_method: "api" }); }}
+              onClick={() => { setAdding(false); setForm({ platform: "instagram", account_name: "", username: "", access_token: "", refresh_token: "", page_id: "" }); }}
               className="flex-1 px-4 py-2.5 rounded-xl border border-border text-sm font-medium text-muted-foreground hover:text-foreground"
             >
               Cancel
@@ -337,7 +292,7 @@ function SocialAccountsTab() {
 
 // ── Main Settings component ───────────────────────────────────────────────────
 export default function SettingsPage() {
-  const { user, userTier = 0, isAdmin } = useOutletContext() || {};
+  const { user } = useOutletContext() || {};
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [show, setShow] = useState({});
@@ -345,8 +300,6 @@ export default function SettingsPage() {
   const [keys, setKeys] = useState({
     sendgrid_key: "", twilio_sid: "", twilio_token: "", twilio_phone: "",
     whatsapp_token: "", whatsapp_phone_id: "", stripe_key: "",
-    llm_provider: "", llm_api_key: "", llm_model: "", llm_base_url: "",
-    platform_model: "",
   });
   const [profile, setProfile] = useState({ full_name: "", business_name: "", website: "", logo_url: "", timezone: "Asia/Calcutta" });
   const [notifs, setNotifs] = useState({ email_campaigns: true, email_leads: true, email_social: false, weekly_report: true });
@@ -363,12 +316,7 @@ export default function SettingsPage() {
   const save = async () => {
     setSaving(true);
     try {
-      // Drop the legacy plaintext "bring your own LLM" fields on every save —
-      // that flow moved to Account > Integrations (encrypted, validated
-      // before storage). This purges old plaintext keys over time instead of
-      // leaving them sitting in settings indefinitely.
-      const { llm_provider: _lp, llm_api_key: _lk, llm_model: _lm, llm_base_url: _lb, ...restKeys } = keys;
-      await base44.auth.updateMe({ settings: { api_keys: restKeys, profile, notifications: notifs } });
+      await base44.auth.updateMe({ settings: { api_keys: keys, profile, notifications: notifs } });
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (e) { alert("Save failed: " + e.message); }
@@ -377,7 +325,6 @@ export default function SettingsPage() {
 
   const TABS = [
     { v: "apikeys",  l: "API Keys",        Icon: Key },
-    { v: "ai",       l: "AI Provider",     Icon: Sparkles },
     { v: "social",   l: "Social Accounts", Icon: Share2 },
     { v: "profile",  l: "Profile",         Icon: User },
     { v: "notifs",   l: "Notifications",   Icon: Bell },
@@ -429,46 +376,7 @@ export default function SettingsPage() {
             <Zap className="w-3.5 h-3.5 inline mr-1.5" />
             Keys are encrypted and stored in your account settings. Used only for your campaigns.
           </div>
-          {(userTier < 3 && !isAdmin) ? (
-            <div className="p-4 rounded-xl bg-card border border-border flex gap-3 items-start">
-              <Lock className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-semibold text-foreground">BYO credentials — Agency &amp; Enterprise only</p>
-                <p className="text-xs text-muted-foreground mt-1">Bring your own SendGrid, Twilio, WhatsApp BSP or Stripe keys for zero platform messaging fee. Upgrade to Agency or Enterprise to unlock this feature.</p>
-                <Link to="/billing" className="inline-flex items-center gap-1 mt-2 text-xs font-semibold text-fuchsia-400 hover:underline">Upgrade plan →</Link>
-              </div>
-            </div>
-          ) : (
-            <div className="p-4 rounded-xl bg-muted/30 border border-border text-xs text-muted-foreground">
-              Add your SendGrid / Twilio / WhatsApp BSP credentials below to send campaigns from your own sender accounts at
-              <strong className="text-foreground"> zero platform fee</strong>. Leave blank and digitalstudios.app will send on your behalf
-              (included in your plan's monthly quota, then per-message rates apply). See <Link to="/billing" className="text-fuchsia-400 hover:underline">Billing</Link> for rates.
-            </div>
-          )}
-
-          {/* Sender account provisioning */}
-          {(userTier >= 3 || isAdmin) && (
-            <div className="p-4 rounded-xl bg-fuchsia-500/5 border border-fuchsia-500/20">
-              <p className="text-xs font-semibold text-fuchsia-400 mb-2">Don't have a sender account yet? Sign up directly:</p>
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { label: "Get SendGrid (Email)", url: "https://signup.sendgrid.com/" },
-                  { label: "Get Twilio (SMS)", url: "https://www.twilio.com/try-twilio" },
-                  { label: "Get WhatsApp BSP (Meta)", url: "https://business.facebook.com/messaging/whatsapp" },
-                ].map(l => (
-                  <a key={l.url} href={l.url} target="_blank" rel="noreferrer"
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-fuchsia-500/10 border border-fuchsia-500/20 text-xs text-fuchsia-300 hover:bg-fuchsia-500/20 transition-colors">
-                    <ExternalLink className="w-3 h-3" /> {l.label}
-                  </a>
-                ))}
-              </div>
-              <p className="text-[11px] text-muted-foreground mt-2">
-                WhatsApp: marketing messages require pre-approved templates via Meta Business Manager.
-                Transactional messages (OTPs, order updates) can be sent from your registered number without pre-approval.
-              </p>
-            </div>
-          )}
-          {(userTier >= 3 || isAdmin) && KEY_FIELDS.map(({ k, l, ph, help }) => (
+          {KEY_FIELDS.map(({ k, l, ph, help }) => (
             <div key={k}>
               <label className="text-sm font-medium text-foreground block mb-1">{l}</label>
               <p className="text-xs text-muted-foreground mb-1.5">{help}</p>
@@ -489,54 +397,6 @@ export default function SettingsPage() {
               </div>
             </div>
           ))}
-        </div>
-      )}
-
-      {/* ── AI Provider ── */}
-      {tab === "ai" && (
-        <div className="space-y-4">
-          <div className="p-4 rounded-xl bg-fuchsia-500/5 border border-fuchsia-500/20 text-xs text-muted-foreground space-y-1.5">
-            <p className="flex items-center gap-1.5 text-fuchsia-400 font-semibold mb-1"><Sparkles className="w-3.5 h-3.5" /> How AI generation is routed</p>
-            <p><strong className="text-foreground">1. Base44 built-in AI</strong> — the default for every plan, no setup needed.</p>
-            <p><strong className="text-foreground">2. Platform backup model</strong> — used automatically if the built-in AI is briefly unavailable.</p>
-            <p><strong className="text-foreground">3. Your own LLM key</strong> (Account → Integrations) — when set, your requests use it first, before falling back to 1 and 2.</p>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-foreground block mb-1">Preferred platform model</label>
-            <p className="text-xs text-muted-foreground mb-1.5">
-              Applies to Base44's built-in AI (step 1 above) — has no effect if you've set your own LLM key below. If your
-              preferred model is briefly unavailable, generation automatically falls back to the platform default and
-              shows a notice.
-            </p>
-            <select
-              value={keys.platform_model || ""}
-              onChange={e => setKeys(p => ({ ...p, platform_model: e.target.value }))}
-              className="w-full px-3 py-2.5 rounded-xl bg-card border border-border text-sm focus:outline-none focus:border-fuchsia-500/50 transition-colors"
-            >
-              <option value="">Platform default (auto)</option>
-              {LLM_MODELS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
-            </select>
-          </div>
-
-          {userTier < 2 && !isAdmin ? (
-            <div className="p-5 rounded-xl bg-card border border-border text-center space-y-2">
-              <Lock className="w-5 h-5 text-muted-foreground mx-auto" />
-              <p className="text-sm font-semibold text-foreground">Bring your own LLM</p>
-              <p className="text-xs text-muted-foreground max-w-sm mx-auto">Connect your own OpenAI, Anthropic, or custom-endpoint API key so your AI generations run on your account. Available on Growth and Agency plans.</p>
-              <Link to="/billing" className="inline-flex items-center gap-1 mt-2 text-xs font-semibold text-fuchsia-400 hover:underline">Upgrade plan →</Link>
-            </div>
-          ) : (
-            <div className="p-5 rounded-xl bg-card border border-border text-center space-y-2">
-              <Plug className="w-5 h-5 text-cyan-400 mx-auto" />
-              <p className="text-sm font-semibold text-foreground">Bring your own LLM</p>
-              <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                Connecting your own OpenAI, Anthropic, or custom-endpoint key now lives in Account → Integrations, where it's
-                encrypted at rest and validated before it's saved.
-              </p>
-              <Link to="/integrations" className="inline-flex items-center gap-1 mt-2 text-xs font-semibold text-cyan-400 hover:underline">Go to Integrations →</Link>
-            </div>
-          )}
         </div>
       )}
 

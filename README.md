@@ -1,19 +1,10 @@
-# Digital Studio — digitalstudios.app
+**Welcome to your Base44 project** 
 
-AI creative + marketing platform: movie maker, song creator, media editor,
-dubbing, social scheduling, funnels, bulk messaging and analytics.
+**About**
 
-Built on Base44. This project contains everything you need to run the app
-locally.
+View and Edit  your app on [Base44.com](http://Base44.com) 
 
-## Authentication note
-
-Google sign-in redirects through the Base44 platform
-(`/api/apps/auth/login`), so the Google consent screen shows whichever OAuth
-client is configured in **Dashboard → Settings → Authentication → Google**.
-To show digitalstudios.app there instead of base44.com, select *"Use a custom
-OAuth from Google Console"* and supply a client id/secret from a Google Cloud
-project we own. Nothing in this repo can change that screen.
+This project contains everything you need to run your app locally.
 
 **Edit the code in your local development environment**
 
@@ -41,7 +32,7 @@ Run the app: `npm run dev`
 
 Open [Base44.com](http://Base44.com) and click on Publish.
 
-**Base44 platform docs & support**
+**Docs & Support**
 
 Documentation: [https://docs.base44.com/Integrations/Using-GitHub](https://docs.base44.com/Integrations/Using-GitHub)
 

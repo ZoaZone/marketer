@@ -2,15 +2,13 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import {
-  Building2, CheckCircle2, ArrowRight, ArrowLeft, Loader2, Users,
+  Building2, CheckCircle2, ArrowRight, Loader2, Users, Globe,
   Sparkles, BarChart3, Shield, Headphones, Zap, Star
 } from "lucide-react";
-import { useSeo, SEO } from "@/lib/seo";
-import { BRAND } from "@/lib/brand";
-import TurnstileWidget from "@/components/TurnstileWidget";
 
 const AGENCY_FEATURES = [
-  { icon: Users, title: "Unlimited Client Seats", desc: "Manage all your clients from a single dashboard." },
+  { icon: Users, title: "Unlimited Client Seats", desc: "Manage all your clients from a single white-labeled dashboard." },
+  { icon: Globe, title: "White-Label Platform", desc: "Brand the entire platform as your own. Custom domain + logo." },
   { icon: Sparkles, title: "10,000+ AI Generations", desc: "Bulk AI content creation across all client accounts." },
   { icon: BarChart3, title: "Unified Analytics", desc: "Cross-client performance reporting in one view." },
   { icon: Shield, title: "Dedicated Account Manager", desc: "Priority support with a named account manager for your agency." },
@@ -18,13 +16,10 @@ const AGENCY_FEATURES = [
 ];
 
 export default function AgencyEnquiry() {
-  useSeo(SEO.agencyEnquiry);
-
   const [form, setForm] = useState({ full_name: "", email: "", phone: "", agency_name: "", client_count: "", current_tools: "", requirements: "" });
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [turnstileToken, setTurnstileToken] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -32,20 +27,14 @@ export default function AgencyEnquiry() {
     setError("");
     setLoading(true);
     try {
-      // Via submitBetaRequest (asServiceRole), not a direct entity create:
-      // BetaRequest.create is now admin-only under RLS, because leaving it
-      // client-writable let anyone forge or overwrite invite records. This is a
-      // public form, so the write has to happen server-side.
-      const res = await base44.functions.invoke("submitBetaRequest", {
+      await base44.entities.BetaRequest.create({
         full_name: form.full_name,
         email: form.email,
         company: form.agency_name || "",
         use_case: `AGENCY ENQUIRY | Phone: ${form.phone} | Clients: ${form.client_count} | Tools: ${form.current_tools} | Requirements: ${form.requirements}`,
+        status: "pending",
         note: "Agency partnership enquiry",
-        turnstile_token: turnstileToken,
       });
-      const data = res?.data ?? res;
-      if (data?.error) throw new Error(data.error);
       setSubmitted(true);
     } catch (err) {
       setError(err.message || "Something went wrong. Please try again.");
@@ -55,11 +44,10 @@ export default function AgencyEnquiry() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
-      <div className="max-w-7xl mx-auto px-6 pt-4"><Link to="/" className="inline-flex items-center gap-1.5 text-sm text-white/60 hover:text-white"><ArrowLeft className="w-4 h-4" /> Back to home</Link></div>
       {/* Nav */}
       <nav className="border-b border-white/8 px-6 h-16 flex items-center justify-between max-w-7xl mx-auto">
         <Link to="/" className="text-lg font-black bg-gradient-to-r from-fuchsia-400 to-purple-400 bg-clip-text text-transparent">
-          {BRAND.name}
+          media.aevoice.ai
         </Link>
         <div className="flex items-center gap-4">
           <Link to="/agent-program" className="text-sm text-fuchsia-400 hover:text-fuchsia-300 transition-colors font-medium">Agent Program →</Link>
@@ -81,7 +69,7 @@ export default function AgencyEnquiry() {
             <span className="bg-gradient-to-r from-fuchsia-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">AI-powered tools.</span>
           </h1>
           <p className="text-lg text-white/50 mb-10 max-w-xl mx-auto leading-relaxed">
-            Get a custom agency plan tailored to your team size, client count, and requirements.
+            Get a custom agency plan tailored to your team size, client count, and requirements. White-label the entire platform as your own.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <a href="#enquire" className="inline-flex items-center gap-2 px-8 py-4 rounded-2xl bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white font-bold text-base hover:opacity-90 transition-opacity shadow-2xl shadow-fuchsia-500/30">
@@ -121,7 +109,7 @@ export default function AgencyEnquiry() {
               {[...Array(5)].map((_, i) => <Star key={i} className="w-5 h-5 fill-amber-400 text-amber-400" />)}
             </div>
             <p className="text-white/70 text-lg leading-relaxed mb-4 italic max-w-2xl mx-auto">
-              "Switching our entire agency to DigitalStudios.app was the best decision we made. Managing 20 clients from one platform, with AI doing the heavy lifting."
+              "Switching our entire agency to media.aevoice.ai was the best decision we made. Managing 20 clients from one platform, with AI doing the heavy lifting."
             </p>
             <p className="text-white font-semibold text-sm">James K. — Agency Owner, 20 Clients</p>
           </div>
@@ -200,10 +188,9 @@ export default function AgencyEnquiry() {
                 <div>
                   <label className="text-xs font-semibold text-white/50 block mb-1.5">What are your key requirements?</label>
                   <textarea value={form.requirements} onChange={e => setForm(f => ({ ...f, requirements: e.target.value }))}
-                    rows={3} placeholder="e.g. Custom integrations, bulk messaging, etc."
+                    rows={3} placeholder="e.g. White-label, custom integrations, bulk messaging, etc."
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-fuchsia-500/50 placeholder:text-white/20 resize-none" />
                 </div>
-                <TurnstileWidget onToken={setTurnstileToken} className="mb-1" />
                 <button type="submit" disabled={loading}
                   className="w-full py-4 bg-gradient-to-r from-fuchsia-600 to-purple-600 hover:from-fuchsia-500 hover:to-purple-500 disabled:opacity-60 text-white rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-fuchsia-500/20">
                   {loading ? <><Loader2 className="w-4 h-4 animate-spin" />Submitting…</> : <>Submit Enquiry <ArrowRight className="w-4 h-4" /></>}
@@ -214,7 +201,10 @@ export default function AgencyEnquiry() {
         </div>
       </section>
 
-
+      {/* Footer */}
+      <footer className="border-t border-white/8 py-8 px-6 text-center">
+        <p className="text-white/30 text-xs">© 2026 AEVOICE · <a href="mailto:agency@aevoice.ai" className="hover:text-white/50">agency@aevoice.ai</a> · <Link to="/" className="hover:text-white/50">media.aevoice.ai</Link></p>
+      </footer>
     </div>
   );
 }

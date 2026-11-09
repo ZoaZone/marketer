@@ -1,44 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
 
 /**
- * Platform tokens are stored AES-256-GCM encrypted in access_token_enc (written
- * only by saveSocialAccount), matching how saveApiKey handles BYOK provider
- * keys. resolveAccountToken decrypts that, and falls back to the deprecated
- * plaintext access_token column so accounts created before the migration keep
- * publishing until they are next saved. Delete the fallback once no plaintext
- * records remain.
- */
-async function decryptSecret(blob: string, keyB64: string): Promise<string> {
-  const stored = JSON.parse(blob);
-  const keyBytes = Uint8Array.from(atob(keyB64), (c) => c.charCodeAt(0));
-  const cryptoKey = await crypto.subtle.importKey('raw', keyBytes, 'AES-GCM', false, ['decrypt']);
-  const iv = Uint8Array.from(atob(stored.iv), (c) => c.charCodeAt(0));
-  const ciphertext = Uint8Array.from(atob(stored.ciphertext), (c) => c.charCodeAt(0));
-  const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, cryptoKey, ciphertext);
-  return new TextDecoder().decode(plainBuf);
-}
-
-async function resolveAccountToken(account: any): Promise<string> {
-  if (!account) return '';
-  if (account.access_token_enc) {
-    const key = Deno.env.get('BYOK_ENCRYPTION_KEY');
-    if (!key) {
-      console.error('BYOK_ENCRYPTION_KEY missing — cannot decrypt social token.');
-      return '';
-    }
-    try {
-      return await decryptSecret(account.access_token_enc, key);
-    } catch (e) {
-      // A rotated or corrupt key must fail this one account loudly in the
-      // result rows, not throw and abort the whole publish run.
-      console.error(`Failed to decrypt token for account ${account.id}: ${(e as Error).message}`);
-      return '';
-    }
-  }
-  return account.access_token || '';
-}
-
-/**
  * publishScheduledPosts — On-demand trigger (called from SocialHub UI)
  *
  * Flow:
@@ -71,7 +33,7 @@ Deno.serve(async (req) => {
     const { post_id } = body; // Optional: publish a specific post by ID
 
     // Load user's social accounts (keyed by id for fast lookup)
-    const userAccounts = await base44.entities.SocialAccount.filter({ created_by: user.email }, '-created_date', 50);
+    const userAccounts = await base44.entities.SocialAccount.list('-created_date', 50);
     const accountMap: Record<string, any> = {};
     for (const acc of userAccounts) {
       accountMap[acc.id] = acc;
@@ -81,12 +43,12 @@ Deno.serve(async (req) => {
     let postsToPublish: any[] = [];
     if (post_id) {
       // Single post — user explicitly clicked "Publish Now"
-      const allPosts = await base44.entities.ScheduledPost.filter({ id: post_id, created_by: user.email });
-      postsToPublish = allPosts;
+      const allPosts = await base44.entities.ScheduledPost.filter({ id: post_id });
+      postsToPublish = allPosts.filter((p: any) => p.created_by === user.email || !p.created_by);
     } else {
       // All scheduled posts that are due for this user
       const now = new Date();
-      const scheduledPosts = await base44.entities.ScheduledPost.filter({ status: 'scheduled', created_by: user.email });
+      const scheduledPosts = await base44.entities.ScheduledPost.filter({ status: 'scheduled' });
       postsToPublish = scheduledPosts.filter((p: any) => {
         if (!p.scheduled_at) return false;
         return new Date(p.scheduled_at) <= now;
@@ -100,7 +62,7 @@ Deno.serve(async (req) => {
     for (const post of postsToPublish) {
       // Resolve social account — must belong to this user
       const account = post.social_account_id ? accountMap[post.social_account_id] : null;
-      const token = await resolveAccountToken(account);
+      const token = account?.access_token;
 
       let postUrl = '';
       let status = 'posted';
@@ -250,13 +212,11 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Persist the failure reason onto the post itself (not just returned
-      // in `results` below) so it's visible after the fact — in Social Hub,
-      // after a page reload — not just in this call's transient response.
+      // Update post record
       await base44.entities.ScheduledPost.update(post.id, {
         status,
         post_url: postUrl || null,
-        failure_reason: status === 'failed' ? errorMsg : '',
+        ...(errorMsg ? { error_message: errorMsg } : {}),
       });
 
       if (status === 'posted') published++;

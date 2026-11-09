@@ -1,13 +1,7 @@
 import { useState } from "react";
-import { useOutletContext, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { mine } from "@/utils/scope";
-import { Image, FileText, Video, Trash2, Download, Copy, Search, Loader2, Sparkles, X, ExternalLink, Wand2, Sliders } from "lucide-react";
-import PageHeader from "@/components/ui/PageHeader";
-import resolveStudioMedia from '@/components/quick-create/resolveStudioMedia';
-
-import CompanionFiles from "@/components/media-library/CompanionFiles";
+import { Image, FileText, Video, Trash2, Download, Copy, Search, Loader2, Sparkles, X, ExternalLink } from "lucide-react";
 
 const TYPE_COLORS = {
   image: "bg-purple-500/10 text-purple-400",
@@ -45,7 +39,6 @@ function AssetPreview({ asset, onClose }) {
               <ExternalLink className="w-3 h-3" /> Open original
             </a>
           )}
-          <CompanionFiles asset={asset} />
         </div>
       </div>
     </div>
@@ -53,19 +46,14 @@ function AssetPreview({ asset, onClose }) {
 }
 
 export default function MediaLibrary() {
-  const { user } = useOutletContext() || {};
   const qc = useQueryClient();
-  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [copiedId, setCopiedId] = useState(null);
   const [view, setView] = useState("grid");
   const [preview, setPreview] = useState(null);
 
-  const { data: assets = [], isLoading } = useQuery({ queryKey: ["media_library", user?.email], queryFn: async () => {
-    const items = await base44.entities.ContentAsset.filter(mine(user), "-created_date", 200);
-    return Promise.all(items.map(resolveStudioMedia));
-  }, enabled: !!user?.email });
+  const { data: assets = [], isLoading } = useQuery({ queryKey: ["media_library"], queryFn: () => base44.entities.ContentAsset.list("-created_date", 200) });
 
   const filtered = assets.filter(a => {
     const q = search.toLowerCase();
@@ -84,18 +72,6 @@ export default function MediaLibrary() {
     await base44.entities.ContentAsset.delete(id);
     qc.invalidateQueries(["media_library"]);
   };
-
-  // Hands this asset's URL off to Movie Maker's Reference Library via
-  // navigation state (never touches the URL bar) — Movie Maker picks it up
-  // on mount and adds it as a reference. Only makes sense for assets with
-  // an actual image/video file.
-  const sendAsReference = (a) => {
-    navigate("/movie-maker", {
-      state: { incomingReference: { url: a.file_url, label: a.title || "From Media Library", kind: a.type === "video" ? "video" : "image" } },
-    });
-  };
-
-  const editAsset = (a) => navigate("/media-editor", { state: { assets: [a] } });
 
   // Thumbnail for grid cards
   const CardThumbnail = ({ a }) => {
@@ -123,18 +99,16 @@ export default function MediaLibrary() {
     <div className="max-w-6xl mx-auto space-y-5">
       {preview && <AssetPreview asset={preview} onClose={() => setPreview(null)} />}
 
-      <PageHeader
-        icon={Image}
-        iconGradient="from-fuchsia-500 to-purple-600"
-        title="Media Library"
-        subtitle={`${assets.length} assets saved`}
-        actions={
-          <>
-            <button onClick={() => setView("grid")} className={`px-3 py-1.5 rounded-lg text-xs font-medium ${view === "grid" ? "bg-fuchsia-500/10 text-fuchsia-400" : "bg-muted text-muted-foreground"}`}>Grid</button>
-            <button onClick={() => setView("list")} className={`px-3 py-1.5 rounded-lg text-xs font-medium ${view === "list" ? "bg-fuchsia-500/10 text-fuchsia-400" : "bg-muted text-muted-foreground"}`}>List</button>
-          </>
-        }
-      />
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div>
+          <h1 className="text-2xl font-black text-foreground flex items-center gap-2"><Image className="w-6 h-6 text-fuchsia-400" />Media Library</h1>
+          <p className="text-muted-foreground text-sm mt-0.5">{assets.length} assets saved</p>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={() => setView("grid")} className={`px-3 py-1.5 rounded-lg text-xs font-medium ${view === "grid" ? "bg-fuchsia-500/10 text-fuchsia-400" : "bg-muted text-muted-foreground"}`}>Grid</button>
+          <button onClick={() => setView("list")} className={`px-3 py-1.5 rounded-lg text-xs font-medium ${view === "list" ? "bg-fuchsia-500/10 text-fuchsia-400" : "bg-muted text-muted-foreground"}`}>List</button>
+        </div>
+      </div>
 
       <div className="flex gap-3 flex-wrap">
         <div className="relative flex-1 min-w-48">
@@ -172,18 +146,6 @@ export default function MediaLibrary() {
                     {a.file_url && <a href={a.file_url} download className="flex-1 py-1.5 rounded-lg text-[10px] font-medium bg-muted text-muted-foreground hover:text-foreground text-center">Save</a>}
                     <button onClick={() => del(a.id)} className="px-2 py-1.5 rounded-lg bg-muted text-muted-foreground hover:bg-red-500/10 hover:text-red-400"><Trash2 className="w-3 h-3" /></button>
                   </div>
-                  {a.file_url && (a.type === "image" || a.type === "video") && (
-                    <button onClick={() => sendAsReference(a)}
-                      className="w-full mt-1.5 py-1.5 rounded-lg text-[10px] font-medium bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 flex items-center justify-center gap-1">
-                      <Wand2 className="w-3 h-3" /> Use as reference
-                    </button>
-                  )}
-                  {a.file_url && (a.type === "image" || a.type === "video") && (
-                    <button onClick={() => editAsset(a)}
-                      className="w-full mt-1.5 py-1.5 rounded-lg text-[10px] font-medium bg-fuchsia-500/10 text-fuchsia-400 hover:bg-fuchsia-500/20 flex items-center justify-center gap-1">
-                      <Sliders className="w-3 h-3" /> Edit media
-                    </button>
-                  )}
                 </div>
               </div>
             ))}
@@ -207,12 +169,6 @@ export default function MediaLibrary() {
                     {a.content && <p className="text-[10px] text-muted-foreground/60 truncate mt-0.5">{a.content.slice(0, 80)}</p>}
                   </div>
                   <div className="flex gap-2">
-                    {a.file_url && (a.type === "image" || a.type === "video") && (
-                      <button onClick={() => sendAsReference(a)} title="Use as reference" className="p-1.5 rounded-lg text-cyan-400 hover:bg-cyan-500/10"><Wand2 className="w-3.5 h-3.5" /></button>
-                    )}
-                    {a.file_url && (a.type === "image" || a.type === "video") && (
-                      <button onClick={() => editAsset(a)} title="Edit media" className="p-1.5 rounded-lg text-fuchsia-400 hover:bg-fuchsia-500/10"><Sliders className="w-3.5 h-3.5" /></button>
-                    )}
                     <button onClick={() => copy(a)} className={`p-1.5 rounded-lg ${copiedId === a.id ? "text-emerald-400" : "text-muted-foreground hover:text-foreground"}`}><Copy className="w-3.5 h-3.5" /></button>
                     {a.file_url && <a href={a.file_url} download className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground"><Download className="w-3.5 h-3.5" /></a>}
                     <button onClick={() => del(a.id)} className="p-1.5 rounded-lg text-muted-foreground hover:text-red-400"><Trash2 className="w-3.5 h-3.5" /></button>

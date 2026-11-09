@@ -1,23 +1,20 @@
 import { useState } from "react";
-import { useOutletContext } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { mine } from "@/utils/scope";
-import { UserPlus, Plus, Search, Loader2, X } from "lucide-react";
+import { UserPlus, Plus, Search, Globe, Share2, Loader2, X, Download } from "lucide-react";
 
 const SOURCE_COLORS = { website:"bg-blue-500/10 text-blue-400", social:"bg-pink-500/10 text-pink-400", ad:"bg-amber-500/10 text-amber-400", referral:"bg-emerald-500/10 text-emerald-400", manual:"bg-muted text-muted-foreground", qr_code:"bg-purple-500/10 text-purple-400" };
 
 export default function LeadCapturePage() {
-  const { user } = useOutletContext() || {};
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [sourceFilter, setSourceFilter] = useState("all");
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ full_name:"", email:"", phone:"", whatsapp:"", source:"website", utm_source:"", utm_campaign:"", funnel_id:"" });
+  const [form, setForm] = useState({ full_name:"", email:"", phone:"", whatsapp:"", source:"website", utm_source:"", utm_campaign:"" });
   const [saving, setSaving] = useState(false);
 
-  const { data: leads = [], isLoading } = useQuery({ queryKey:["leads", user?.email], queryFn:()=>base44.entities.LeadCapture.filter(mine(user),"-captured_at",200), enabled:!!user?.email });
-  const { data: funnels = [] } = useQuery({ queryKey:["funnels_list", user?.email], queryFn:()=>base44.entities.Funnel.filter(mine(user),null,50), enabled:!!user?.email });
+  const { data: leads = [], isLoading } = useQuery({ queryKey:["leads"], queryFn:()=>base44.entities.LeadCapture.list("-captured_at",200) });
+  const { data: funnels = [] } = useQuery({ queryKey:["funnels_list"], queryFn:()=>base44.entities.Funnel.list(null,50) });
 
   const filtered = leads.filter(l=>{
     const q = search.toLowerCase();
@@ -30,21 +27,10 @@ export default function LeadCapturePage() {
     if (!form.full_name && !form.email) { alert("Name or email required"); return; }
     setSaving(true);
     try {
-      const { funnel_id, ...rest } = form;
-      const first = funnel_id ? (await base44.entities.FunnelStage.filter({ funnel_id }, "stage_order", 1))[0] : null;
-      const now = Date.now();
-      // Enrolling in a funnel schedules its first stage; the "Run Funnels" automation sends it when due.
-      const enroll = funnel_id ? { funnel_id, ...(first ? { funnel_status:"active", current_stage_order:first.stage_order, next_action_at:new Date(now + (first.delay_hours || 0) * 3600000).toISOString() } : {}) } : {};
-      await base44.entities.LeadCapture.create({ ...rest, ...enroll, captured_at:new Date(now).toISOString() });
-      if (funnel_id) {
-        const f = funnels.find(x => x.id === funnel_id);
-        await base44.entities.Funnel.update(funnel_id, { total_leads: (f?.total_leads || 0) + 1 });
-        if (first) await base44.entities.FunnelStage.update(first.id, { entry_count: (first.entry_count || 0) + 1 });
-        qc.invalidateQueries(["funnels"]); qc.invalidateQueries(["funnel_stages"]); qc.invalidateQueries(["funnels_list"]);
-      }
+      await base44.entities.LeadCapture.create({ ...form, captured_at:new Date().toISOString() });
       await base44.entities.MarketingContact.create({ full_name:form.full_name, email:form.email, phone:form.phone, whatsapp:form.whatsapp, source:form.source });
-      qc.invalidateQueries(["leads"]); qc.invalidateQueries(["contacts"]); qc.invalidateQueries(["leads_count"]);
-      setForm({ full_name:"", email:"", phone:"", whatsapp:"", source:"website", utm_source:"", utm_campaign:"", funnel_id:"" });
+      qc.invalidateQueries(["leads"]); qc.invalidateQueries(["contacts"]);
+      setForm({ full_name:"", email:"", phone:"", whatsapp:"", source:"website", utm_source:"", utm_campaign:"" });
       setShowAdd(false);
     } catch(e) { alert(e.message); }
     setSaving(false);
@@ -114,7 +100,7 @@ export default function LeadCapturePage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead><tr className="bg-muted/20 border-b border-border">
-                {["Name","Email","Phone","Source","Campaign","Funnel status","Captured"].map(h=><th key={h} className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">{h}</th>)}
+                {["Name","Email","Phone","Source","Campaign","Captured"].map(h=><th key={h} className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">{h}</th>)}
               </tr></thead>
               <tbody className="divide-y divide-border">
                 {filtered.slice(0,100).map(l=>(
@@ -124,7 +110,6 @@ export default function LeadCapturePage() {
                     <td className="px-4 py-3 text-xs text-muted-foreground">{l.phone||"—"}</td>
                     <td className="px-4 py-3"><span className={`text-xs px-2 py-0.5 rounded-full font-medium ${SOURCE_COLORS[l.source]||"bg-muted text-muted-foreground"}`}>{l.source}</span></td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">{l.utm_campaign||"—"}</td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">{l.funnel_id ? (l.last_action_note || (l.funnel_status === "active" ? "Waiting for first stage" : l.funnel_status || "—")) : "—"}</td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">{l.captured_at?new Date(l.captured_at).toLocaleDateString():""}</td>
                   </tr>
                 ))}
@@ -146,11 +131,6 @@ export default function LeadCapturePage() {
               <div className="space-y-1.5"><label className="text-xs font-medium text-muted-foreground">Source</label>
               <select value={form.source} onChange={e=>setForm(p=>({...p,source:e.target.value}))} className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none">
                 {["website","social","ad","referral","qr_code","manual"].map(s=><option key={s}>{s}</option>)}
-              </select></div>
-              <div className="space-y-1.5"><label className="text-xs font-medium text-muted-foreground">Add to funnel (optional)</label>
-              <select value={form.funnel_id} onChange={e=>setForm(p=>({...p,funnel_id:e.target.value}))} className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none">
-                <option value="">No funnel</option>
-                {funnels.map(f=><option key={f.id} value={f.id}>{f.name}</option>)}
               </select></div>
             </div>
             <div className="flex gap-3 mt-5">
