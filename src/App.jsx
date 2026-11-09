@@ -43,6 +43,7 @@ import FreeTrial from './pages/FreeTrial';
 import BrandManager from './pages/BrandManager';
 import CampaignStudio from './pages/CampaignStudio';
 import QuickCreate from './pages/QuickCreate';
+import QuickVideoMaker from './pages/QuickVideoMaker';
 import DemoVideoMaker from './pages/DemoVideoMaker';
 import MediaEditor from './pages/MediaEditor';
 import MovieMaker from './pages/MovieMaker';
@@ -143,6 +144,7 @@ const AuthenticatedApp = () => {
         <Route path="/brands" element={<BrandManager />} />
         <Route path="/campaign-studio" element={<CampaignStudio />} />
         <Route path="/quick-create" element={<QuickCreate />} />
+        <Route path="/quick-video" element={<QuickVideoMaker />} />
         <Route path="/demo-video" element={<DemoVideoMaker />} />
         <Route path="/media-editor" element={<MediaEditor />} />
         <Route path="/movie-maker" element={<MovieMaker />} />
