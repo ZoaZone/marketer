@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { mine } from "@/utils/scope";
 import { BRAND } from "@/lib/brand";
-import { Film, Music, Sliders, Monitor, Plus, Image as ImageIcon, ArrowRight, Briefcase, Clapperboard } from "lucide-react";
+import { Film, Music, Sliders, Monitor, Plus, Image as ImageIcon, ArrowRight, Briefcase, Clapperboard, Zap } from "lucide-react";
 
 // The two lanes (Work Package G): Lane 1 (Business/Marketing — Base44-native
 // generation + FFmpeg assembly, no paid Replicate/ElevenLabs calls) and
@@ -27,6 +27,7 @@ const LANES = [
 // link, both of which now point here instead of /dashboard). The marketing
 // dashboard itself is unchanged and still reachable from the sidebar.
 const TOOLS = [
+  { to: "/quick-video",  icon: Zap,     gradient: "from-rose-500 to-red-600",     label: "Quick Video", description: "One prompt → a fast, flexible-length clip — no script, no storyboard" },
   { to: "/movie-maker",  icon: Film,    gradient: "from-cyan-500 to-blue-600",   label: "Movie Maker", description: "Feature-length AI films — scenes, music, subtitles, dubbing" },
   { to: "/song-creator", icon: Music,   gradient: "from-violet-500 to-pink-600", label: "Song Creator", description: "AI lyrics, voiceover, and multilingual dubbing" },
   { to: "/media-editor", icon: Sliders, gradient: "from-fuchsia-500 to-purple-600", label: "Edit Media", description: "Trim, crop, text, logos, PiP, music, voice-over and AI fixes" },
