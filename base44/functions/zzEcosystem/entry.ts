@@ -8,7 +8,7 @@ import { createClientFromRequest } from "npm:@base44/sdk@0.8.53";
 // so the frontend can render an "other apps in your plan" switcher.
 // Requires HUB_API_KEY to be set in this app's secrets (shared with the hub
 // and every other ecosystem app).
-const HUB_BASE_URL = Deno.env.get("ZZ_HUB_BASE_URL") || "https://zoa-pay-core.base44.app";
+const HUB_BASE_URL = Deno.env.get("ZZ_HUB_BASE_URL") || "https://zoa-payhub.base44.app";
 const APP_CODE = "DIGITALSTUDIO";
 
 export default async function handler(req) {
