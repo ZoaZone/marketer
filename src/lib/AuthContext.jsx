@@ -29,6 +29,24 @@ export const AuthProvider = ({ children }) => {
     checkAppState();
   }, []);
 
+  // Ecosystem single sign-on: if we arrived via another Medha/AEVA app's
+  // "switch apps" link, redeem its one-time exchange code against the
+  // shared hub (marks it used, confirms the hop) and drop it from the URL.
+  // Fire-and-forget, silent on failure, independent of this app's own
+  // sign-in state.
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const xcode = params.get('xcode');
+      if (xcode) {
+        base44.functions.invoke('zzRedeem', { exchange_code: xcode }).catch(() => {});
+        params.delete('xcode');
+        const newUrl = window.location.pathname + (params.toString() ? `?${params}` : '') + window.location.hash;
+        window.history.replaceState({}, '', newUrl);
+      }
+    } catch (_) {}
+  }, []);
+
   const checkAppState = async () => {
     try {
       setIsLoadingPublicSettings(true);
