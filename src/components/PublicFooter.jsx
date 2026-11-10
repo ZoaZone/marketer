@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import EcosystemLinks from '@/components/EcosystemLinks';
 
 const links = [
   ['/about', 'About Us'], ['/contact', 'Contact Us'], ['/pricing', 'Pricing'],
@@ -27,6 +28,7 @@ export default function PublicFooter() {
           </>
         )}
       </div>
+      <EcosystemLinks selfKey="digitalstudio" onMedha={onMedha} />
       <p>© 2026 {brandName}. All rights reserved.</p>
       <p><a className="hover:text-white underline" href={`mailto:${email}`}>{email}</a></p>
       <nav aria-label="Public information" className="flex flex-wrap gap-x-5 gap-y-2">{links.map(([path, label]) => <Link key={path} to={path} className="hover:text-white underline underline-offset-2">{label}</Link>)}</nav>
