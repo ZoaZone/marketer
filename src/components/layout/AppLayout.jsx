@@ -44,7 +44,12 @@ export default function AppLayout() {
           {!["/studio", "/dashboard"].includes(pathname) && <BackButton className="mb-4" />}
           <Outlet context={{ user, userTier, isAdmin, subscription }} />
         </div>
-        <PublicFooter />
+        {/* Dashboard chrome: collapse the ecosystem cross-promo grid behind
+            a toggle (see EcosystemLinks' `compact` prop) — signed-in users
+            already know the app. The public marketing routes in App.jsx
+            render <PublicFooter /> without this prop, so the grid stays
+            fully visible there. */}
+        <PublicFooter compact />
       </main>
     </div>
   );
