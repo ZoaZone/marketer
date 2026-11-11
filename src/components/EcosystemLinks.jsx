@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 
 /**
@@ -6,6 +7,10 @@ import { base44 } from "@/api/base44Client";
  * ecosystem of apps. See EcosystemLinks.jsx in the other ecosystem apps for
  * the same pattern. Falls back to static marketing links if the visitor
  * isn't signed in or has no active ecosystem plan.
+ *
+ * `compact` collapses the grid behind a single toggle row (arrow + label),
+ * closed by default — use this on authenticated/dashboard pages; marketing
+ * pages should leave it off so the grid is visible right away.
  */
 
 const ECOSYSTEM_APPS = [
@@ -20,9 +25,10 @@ const ECOSYSTEM_APPS = [
   { key: "payroll", appCode: "PAYROLL", name: "Payroll & Billing", description: "Payroll processing and billing automation across the ecosystem.", nativeDomain: "pay.hellobiz.app", medhaDomain: "pay.medha.io" },
 ];
 
-export default function EcosystemLinks({ selfKey, onMedha }) {
+export default function EcosystemLinks({ selfKey, onMedha, compact = false }) {
   const apps = ECOSYSTEM_APPS.filter((app) => app.key !== selfKey);
   const [live, setLive] = useState(null);
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -43,33 +49,53 @@ export default function EcosystemLinks({ selfKey, onMedha }) {
 
   if (apps.length === 0) return null;
 
-  return (
-    <div className="mt-4 border-t border-gray-700 pt-4">
-      <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
-        {live ? `Included in your ${live.planName}` : "Explore the Medha.io Ecosystem"}
-      </p>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 text-left">
-        {apps.map((app) => {
-          const liveUrl = live?.launchUrls?.[app.appCode];
-          const domain = onMedha ? app.medhaDomain : app.nativeDomain;
-          const href = liveUrl || `https://${domain}`;
-          return (
-            <a
-              key={app.key}
-              href={href}
-              target={liveUrl ? "_self" : "_blank"}
-              rel="noopener noreferrer"
-              className="group rounded-lg border border-gray-700 px-3 py-2 transition-colors hover:border-gray-500 hover:bg-gray-800/50"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-gray-200 group-hover:text-white">{app.name}</span>
-                <span className="text-[10px] text-gray-500">{liveUrl ? "included ✓" : domain}</span>
-              </div>
-              <p className="mt-1 text-[11px] leading-snug text-gray-400">{app.description}</p>
-            </a>
-          );
-        })}
+  const label = live ? `Included in your ${live.planName}` : "Explore the Medha.io Ecosystem";
+
+  const grid = (
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 text-left">
+      {apps.map((app) => {
+        const liveUrl = live?.launchUrls?.[app.appCode];
+        const domain = onMedha ? app.medhaDomain : app.nativeDomain;
+        const href = liveUrl || `https://${domain}`;
+        return (
+          <a
+            key={app.key}
+            href={href}
+            target={liveUrl ? "_self" : "_blank"}
+            rel="noopener noreferrer"
+            className="group rounded-lg border border-gray-700 px-3 py-2 transition-colors hover:border-gray-500 hover:bg-gray-800/50"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-gray-200 group-hover:text-white">{app.name}</span>
+              <span className="text-[10px] text-gray-500">{liveUrl ? "included ✓" : domain}</span>
+            </div>
+            <p className="mt-1 text-[11px] leading-snug text-gray-400">{app.description}</p>
+          </a>
+        );
+      })}
+    </div>
+  );
+
+  if (compact) {
+    return (
+      <div className="pt-1">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="flex w-full items-center justify-between gap-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 transition-colors hover:text-gray-300"
+        >
+          <span>{label}</span>
+          <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
+        </button>
+        {open && <div className="mt-3">{grid}</div>}
       </div>
+    );
+  }
+
+  return (
+    <div>
+      <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">{label}</p>
+      {grid}
     </div>
   );
 }
