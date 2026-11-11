@@ -11,7 +11,7 @@ const links = [
 // chitra.medha.io is a white-labeled storefront of this same app/database,
 // operated by Zoa Zone Digi Tech Pvt Ltd. Override footer identity for that
 // host only; every other hostname (digitalstudios.app, etc.) renders unchanged.
-export default function PublicFooter() {
+export default function PublicFooter({ compact = false }) {
   const onMedha = typeof window !== "undefined" && window.location.hostname === "chitra.medha.io";
   const email = onMedha ? "care@medha.io" : "care@zoazoneservices.com";
   const brandName = onMedha ? "Chitra" : "DigitalStudios.app";
@@ -28,7 +28,7 @@ export default function PublicFooter() {
           </>
         )}
       </div>
-      <EcosystemLinks selfKey="digitalstudio" onMedha={onMedha} />
+      <EcosystemLinks selfKey="digitalstudio" onMedha={onMedha} compact={compact} />
       <p>© 2026 {brandName}. All rights reserved.</p>
       <p><a className="hover:text-white underline" href={`mailto:${email}`}>{email}</a></p>
       <nav aria-label="Public information" className="flex flex-wrap gap-x-5 gap-y-2">{links.map(([path, label]) => <Link key={path} to={path} className="hover:text-white underline underline-offset-2">{label}</Link>)}</nav>
