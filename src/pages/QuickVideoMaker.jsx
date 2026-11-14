@@ -3,6 +3,7 @@ import { useOutletContext, Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { generateText, generateSceneVideo } from "@/utils/lane2";
+import VideoFeedbackPanel from "@/components/video-feedback/VideoFeedbackPanel";
 import {
   Zap, Loader2, Download, Copy, CheckCircle2, Save, Sparkles,
   AlertTriangle, ArrowRight, Film, Clapperboard,
@@ -110,7 +111,9 @@ export default function QuickVideoMaker() {
 
   const duration = DURATIONS[form.durationIdx];
 
-  const generate = async () => {
+  const formState = form;
+  const generate = async (override) => {
+    const form = override?.form || formState;
     if (!form.prompt.trim()) { setError("Describe the video you want."); return; }
     setError(""); setResult(null); setLoading(true); setProgress(null);
     try {
@@ -137,8 +140,8 @@ export default function QuickVideoMaker() {
       if (!clipUrls.length) throw new Error("No video was produced. Please try again.");
 
       const totalSeconds = clipSpecs.reduce((a, b) => a + b, 0);
-      let captions = "";
-      try {
+      let captions = override?.captions || "";
+      if (!captions) try {
         captions = await generateText({
           type: "caption",
           platform: form.platform, tone: form.tone,
@@ -156,6 +159,12 @@ export default function QuickVideoMaker() {
     }
     setLoading(false);
     setProgress(null);
+  };
+
+  const applyFeedback = (imp) => {
+    const next = { ...formState, prompt: imp.prompt, audioNote: imp.references ? `${formState.audioNote ? formState.audioNote + ". " : ""}${imp.references}` : formState.audioNote };
+    setForm(next);
+    generate({ form: next, captions: imp.captions !== result?.captions ? imp.captions : "" });
   };
 
   const copyCaptions = async () => {
@@ -276,7 +285,7 @@ export default function QuickVideoMaker() {
           />
         </div>
 
-        <button onClick={generate} disabled={loading}
+        <button onClick={() => generate()} disabled={loading}
           className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-rose-500 to-red-600 text-white text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50">
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
           {loading
@@ -325,6 +334,7 @@ export default function QuickVideoMaker() {
               <pre className="mt-1 w-full rounded-lg border border-border bg-background p-3 text-xs whitespace-pre-wrap">{result.captions}</pre>
             </div>
           )}
+          <VideoFeedbackPanel prompt={form.prompt} captions={result.captions} applyLabel="Apply & regenerate video" disabled={loading} onApply={applyFeedback} />
           <div className="flex gap-2">
             <a href={result.url} download="quick-video.mp4" target="_blank" rel="noreferrer"
               className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-muted/20">

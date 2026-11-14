@@ -9,6 +9,7 @@ import { generateText, generateImage, generateVoiceover, uploadFile, splitScript
 // the client check below is UX, so an unentitled user gets an upgrade prompt
 // instead of a failed request.
 import { generateSceneVideo, generateMusic, submitRender, getRenderStatus, MAX_MUSIC_SECONDS } from "@/utils/lane2";
+import VideoFeedbackPanel from "@/components/video-feedback/VideoFeedbackPanel";
 import { buildStoryBible, shotFor, framePrompt, clipPrompt } from "@/components/quick-create/sceneContinuity";
 import { VIDEO_RATIOS } from "@/utils/videoAssembler";
 import { BASE44_VIDEO_CREDITS_PER_5S } from "@/config/plans";
@@ -1305,6 +1306,32 @@ export default function QuickCreate() {
                 {videoResult ? (
                   <div className="space-y-3">
                     <video src={videoResult} controls loop className="w-full rounded-xl border border-border bg-black" />
+                    <VideoFeedbackPanel
+                      prompt={prompt}
+                      scenes={scenes.map(sc => ({ text: sc.text, voiceover: sc.dialogue }))}
+                      applyLabel="Apply & go back to regenerate"
+                      onApply={(imp) => {
+                        let visualChanged = false;
+                        setPrompt(imp.prompt);
+                        if (imp.scenes.length === scenes.length) {
+                          setScenes(prev => prev.map((sc, i) => {
+                            const n = imp.scenes[i] || {};
+                            const textChanged = n.text && n.text.trim() !== (sc.text || "").trim();
+                            const dlgChanged = n.voiceover && n.voiceover.trim() !== (sc.dialogue || "").trim();
+                            if (textChanged) visualChanged = true;
+                            return {
+                              ...sc,
+                              text: textChanged ? n.text : sc.text,
+                              dialogue: dlgChanged ? n.voiceover : sc.dialogue,
+                              ...(textChanged ? { videoUrl: "" } : {}),
+                              ...(dlgChanged ? { voiceUrl: "", voiceSeconds: 0 } : {}),
+                            };
+                          }));
+                        }
+                        setVideoResult(""); setVideoSaved(false);
+                        setStep(visualChanged ? 3 : 4);
+                      }}
+                    />
                     <div className="flex gap-2">
                       <a href={videoResult} download target="_blank" rel="noopener noreferrer"
                         className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border text-sm font-semibold text-foreground hover:bg-muted/20">

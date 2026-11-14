@@ -6,6 +6,7 @@ import { useMovieProjectPersistence } from "@/hooks/use-movie-project-persistenc
 import { useAutoDemoFromUrl } from "@/hooks/use-auto-demo-from-url";
 import PageHeader from "@/components/ui/PageHeader";
 import SceneClipPlayer from "@/components/movie-maker/SceneClipPlayer";
+import VideoFeedbackPanel from "@/components/video-feedback/VideoFeedbackPanel";
 import {
   Film, Sparkles, Lock, Plus, Trash2, Loader2, ChevronRight,
   ChevronLeft, Mic, Music, Globe, Upload, Check, AlertCircle,
@@ -1695,6 +1696,30 @@ export default function MovieMaker() {
             {videoUrl && (
               <div className="space-y-3">
                 <video src={videoUrl} controls className="w-full rounded-2xl border border-border" />
+                <VideoFeedbackPanel
+                  prompt={storyPrompt}
+                  scenes={scenes.map(s => ({ text: s.text, voiceover: s.text, caption: s.caption }))}
+                  applyLabel="Apply & go back to regenerate"
+                  onApply={(imp) => {
+                    let textChanged = false;
+                    if (imp.prompt) setStoryPrompt(imp.prompt);
+                    if (imp.scenes.length === scenes.length) {
+                      setScenes(prev => prev.map((s, i) => {
+                        const n = imp.scenes[i] || {};
+                        const newText = n.text || n.voiceover;
+                        const changed = newText && newText.trim() !== (s.text || "").trim();
+                        if (changed) textChanged = true;
+                        return {
+                          ...s,
+                          caption: n.caption ?? s.caption,
+                          ...(changed ? { text: newText, videoUrl: "", clips: [], voiceBlob: null, voiceUrl: "", voiceSeconds: 0 } : {}),
+                        };
+                      }));
+                    }
+                    setVideoUrl(""); setSaved(false);
+                    setStep(textChanged ? 2 : 5);
+                  }}
+                />
                 <div className="flex gap-3">
                   <a href={videoUrl} download target="_blank" rel="noreferrer"
                     className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-card border border-border text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors">
