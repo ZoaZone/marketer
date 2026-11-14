@@ -7,6 +7,8 @@ import { useAutoDemoFromUrl } from "@/hooks/use-auto-demo-from-url";
 import PageHeader from "@/components/ui/PageHeader";
 import SceneClipPlayer from "@/components/movie-maker/SceneClipPlayer";
 import VideoFeedbackPanel from "@/components/video-feedback/VideoFeedbackPanel";
+import BrandKitPanel from "@/components/brand-kit/BrandKitPanel";
+import useBrandKit from "@/components/brand-kit/useBrandKit";
 import {
   Film, Sparkles, Lock, Plus, Trash2, Loader2, ChevronRight,
   ChevronLeft, Mic, Music, Globe, Upload, Check, AlertCircle,
@@ -258,6 +260,7 @@ export default function MovieMaker() {
   const [clipBatch, setClipBatch] = useState(null); // { done, total, active } | null
   const [uploadLoading, setUploadLoading] = useState({});
   const [error, setError] = useState("");
+  const kit = useBrandKit();
   const [saved, setSaved] = useState(false);
   const [progress, setProgress] = useState(0);
   // Which scene the render worker is currently on, for long films where a
@@ -465,7 +468,7 @@ export default function MovieMaker() {
     try {
       const result = await generateText({
         type: "video_script",
-                prompt: `Write ENTIRELY in ${language}. The complete film script - every scene and every line of narration and dialogue - MUST be written in ${language} and in no other language. Write a ${genre.toLowerCase()} film script. Create ${scenes.length} clearly-separated scenes, each 2-3 sentences of narration/dialogue. No markdown, no asterisks, no headers - plain prose only. Label each scene as "SCENE 1:", "SCENE 2:" etc. Title: "${title || "Untitled"}". Story: ${storyPrompt}`,
+                prompt: `Write ENTIRELY in ${language}. The complete film script - every scene and every line of narration and dialogue - MUST be written in ${language} and in no other language. Write a ${genre.toLowerCase()} film script. Create ${scenes.length} clearly-separated scenes, each 2-3 sentences of narration/dialogue. No markdown, no asterisks, no headers - plain prose only. Label each scene as "SCENE 1:", "SCENE 2:" etc. Title: "${title || "Untitled"}". Story: ${kit.withBrand(storyPrompt)}`,
         tone: "Cinematic",
       });
       setScript(result);
@@ -516,7 +519,7 @@ export default function MovieMaker() {
   // model) — video references are guidance-only, surfaced via the prompt
   // hint below instead.
   const getActiveReferenceUrls = () =>
-    references.filter(r => (r.kind === "character" || r.kind === "style" || r.kind === "image") && r.included !== false).map(r => r.url);
+    [...new Set([...references.filter(r => (r.kind === "character" || r.kind === "style" || r.kind === "image") && r.included !== false).map(r => r.url), ...kit.imageUrls])];
 
   // Prepended to every scene's image/video generation prompt so the model
   // is nudged toward the same established look even before it sees the
@@ -529,6 +532,7 @@ export default function MovieMaker() {
     let hint = "";
     if (primary) hint += "Consistent with the established lead character and visual style. ";
     if (videoRef) hint += `Match the motion and style established in the reference video "${videoRef.label}". `;
+    if (kit.brief) hint += `Follow the brand guidelines: ${kit.brief}. `;
     return hint;
   };
 
@@ -1141,6 +1145,8 @@ export default function MovieMaker() {
             </div>
           }
         />
+
+        <div className="rounded-2xl bg-card border border-border p-4"><BrandKitPanel kit={kit} /></div>
 
         {/* Step tabs */}
         <div className="flex items-center gap-1 overflow-x-auto pb-1">

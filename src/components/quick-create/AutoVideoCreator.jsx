@@ -8,7 +8,7 @@ import useAutoVideo from "@/components/quick-create/useAutoVideo";
 
 const btn = (on) => `px-3 py-1.5 rounded-lg border text-xs font-bold transition-all ${on ? "bg-fuchsia-500/15 border-fuchsia-500/50 text-fuchsia-400" : "border-border text-muted-foreground hover:bg-muted/20"}`;
 
-export default function AutoVideoCreator({ prompt, referenceImageUrls, canMotion, canMusic, onBusyChange, onAdvanced }) {
+export default function AutoVideoCreator({ prompt, brandBrief, referenceImageUrls, canMotion, canMusic, onBusyChange, onAdvanced }) {
   const isPro = canMusic;
   const [quality, setQuality] = useState("standard");
   const [ratio, setRatio] = useState(VIDEO_RATIOS[0]);
@@ -89,7 +89,7 @@ export default function AutoVideoCreator({ prompt, referenceImageUrls, canMotion
           {musicMode === "upload" && musicUrl && <audio src={musicUrl} controls className="w-full mt-2 h-8" />}
           <p className="text-[11px] text-muted-foreground mt-2">Music plays under the voice-over at a lower volume. Works for Quick and Cinematic motion videos.</p>
         </div>
-        <button onClick={() => v.run(prompt)} disabled={v.busy || !prompt.trim()}
+        <button onClick={() => v.run(brandBrief ? `${prompt}. Brand guidelines (apply automatically): ${brandBrief}` : prompt)} disabled={v.busy || !prompt.trim()}
           className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white text-sm font-bold hover:opacity-90 disabled:opacity-60 shadow-lg">
           {v.busy ? <><Loader2 className="w-4 h-4 animate-spin" /> {v.stage || "Working"}…</> : <><Wand2 className="w-4 h-4" /> Create my video</>}
         </button>

@@ -4,6 +4,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { generateText, generateSceneVideo } from "@/utils/lane2";
 import VideoFeedbackPanel from "@/components/video-feedback/VideoFeedbackPanel";
+import BrandKitPanel from "@/components/brand-kit/BrandKitPanel";
+import useBrandKit from "@/components/brand-kit/useBrandKit";
+import VideoAudioSection from "@/components/quick-video/VideoAudioSection";
 import {
   Zap, Loader2, Download, Copy, CheckCircle2, Save, Sparkles,
   AlertTriangle, ArrowRight, Film, Clapperboard,
@@ -108,6 +111,8 @@ export default function QuickVideoMaker() {
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [mixed, setMixed] = useState(null); // { url, voiceUrl, musicUrl } once voice/music is mixed in
+  const kit = useBrandKit();
 
   const duration = DURATIONS[form.durationIdx];
 
@@ -115,7 +120,7 @@ export default function QuickVideoMaker() {
   const generate = async (override) => {
     const form = override?.form || formState;
     if (!form.prompt.trim()) { setError("Describe the video you want."); return; }
-    setError(""); setResult(null); setLoading(true); setProgress(null);
+    setError(""); setResult(null); setMixed(null); setLoading(true); setProgress(null);
     try {
       const clipSpecs = duration.clips;
       const safePrompt = sanitizeVideoPrompt(form.prompt.trim());
@@ -127,11 +132,12 @@ export default function QuickVideoMaker() {
         const sceneHint = clipSpecs.length > 1
           ? ` This is clip ${i + 1} of ${clipSpecs.length} — seamlessly continue the same shot and subject, do not restart the scene.`
           : "";
-        const videoPrompt = `${safePrompt}. Platform: ${form.platform}. Tone: ${form.tone}. ${styleHint}${sceneHint}${audioHint}`;
+        const videoPrompt = `${safePrompt}. Platform: ${form.platform}. Tone: ${form.tone}. ${styleHint} ${kit.look}${kit.voice ? ` Mood: ${kit.voice}.` : ""}${sceneHint}${audioHint}`;
         setProgress({ index: i + 1, total: clipSpecs.length, status: "starting" });
         const url = await generateSceneVideo({
           prompt: videoPrompt,
           durationSeconds: clipSpecs[i],
+          imageUrl: i === 0 ? kit.imageRefs[0] : undefined,
           aspectRatio: form.aspect,
           onProgress: ({ status }) => setProgress({ index: i + 1, total: clipSpecs.length, status }),
         });
@@ -180,7 +186,9 @@ export default function QuickVideoMaker() {
       type: "video",
       title: form.prompt.slice(0, 60),
       content: result.captions || "",
-      file_url: result.url,
+      file_url: mixed?.url || result.url,
+      voiceover_url: mixed?.voiceUrl || undefined,
+      music_url: mixed?.musicUrl || undefined,
       platform: form.platform,
       ai_generated: true,
       prompt_used: form.prompt,
@@ -285,6 +293,8 @@ export default function QuickVideoMaker() {
           />
         </div>
 
+        <BrandKitPanel kit={kit} disabled={loading} />
+
         <button onClick={() => generate()} disabled={loading}
           className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-rose-500 to-red-600 text-white text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50">
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
@@ -307,13 +317,16 @@ export default function QuickVideoMaker() {
       {/* Result */}
       {result?.url && (
         <div className="p-5 rounded-2xl bg-card border border-border space-y-4">
-          <video src={result.url} controls className="w-full rounded-xl bg-black max-h-[480px]" />
-          {result.clipUrls.length > 1 && (
+          <video key={mixed?.url || result.url} src={mixed?.url || result.url} controls className="w-full rounded-xl bg-black max-h-[480px]" />
+          {mixed && <p className="text-xs text-emerald-400 flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> Preview includes your voice-over and music. This is what will be saved.</p>}
+          {!mixed && result.clipUrls.length > 1 && (
             <p className="text-xs text-muted-foreground flex items-center gap-1.5">
               <Film className="w-3.5 h-3.5" /> {result.clipUrls.length} clips generated and chained — showing clip 1. Each clip is also downloadable individually.
             </p>
           )}
-          {result.clipUrls.length > 1 && (
+          <VideoAudioSection clipUrls={result.clipUrls} clipSeconds={duration.clips} aspect={form.aspect} topic={form.prompt}
+            voiceStyle={kit.voice || form.tone} disabled={loading} onMixed={setMixed} />
+          {!mixed && result.clipUrls.length > 1 && (
             <div className="flex flex-wrap gap-2">
               {result.clipUrls.map((url, i) => (
                 <a key={url} href={url} download={`clip-${i + 1}.mp4`} target="_blank" rel="noreferrer"
@@ -336,7 +349,7 @@ export default function QuickVideoMaker() {
           )}
           <VideoFeedbackPanel prompt={form.prompt} captions={result.captions} applyLabel="Apply & regenerate video" disabled={loading} onApply={applyFeedback} />
           <div className="flex gap-2">
-            <a href={result.url} download="quick-video.mp4" target="_blank" rel="noreferrer"
+            <a href={mixed?.url || result.url} download="quick-video.mp4" target="_blank" rel="noreferrer"
               className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-muted/20">
               <Download className="w-4 h-4" /> Download
             </a>

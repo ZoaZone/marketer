@@ -10,6 +10,8 @@ import { generateText, generateImage, generateVoiceover, uploadFile, splitScript
 // instead of a failed request.
 import { generateSceneVideo, generateMusic, submitRender, getRenderStatus, MAX_MUSIC_SECONDS } from "@/utils/lane2";
 import VideoFeedbackPanel from "@/components/video-feedback/VideoFeedbackPanel";
+import BrandKitPanel from "@/components/brand-kit/BrandKitPanel";
+import useBrandKit from "@/components/brand-kit/useBrandKit";
 import { buildStoryBible, shotFor, framePrompt, clipPrompt } from "@/components/quick-create/sceneContinuity";
 import { VIDEO_RATIOS } from "@/utils/videoAssembler";
 import { BASE44_VIDEO_CREDITS_PER_5S } from "@/config/plans";
@@ -338,14 +340,15 @@ export default function QuickCreate() {
   };
 
   const removeAttachment = (idx) => setAttachments(prev => prev.filter((_, i) => i !== idx));
-  const referenceImageUrls = attachments.map(a => a.url);
+  const kit = useBrandKit();
+  const referenceImageUrls = [...new Set([...attachments.map(a => a.url), ...kit.imageUrls])];
 
   // ── Image (quick) generation ──
   const generateImageQuick = async () => {
     if (!prompt.trim()) { setError("Describe what you'd like to create."); return; }
     setError(""); setUpgradeRequired(false); setImageResult(null); setImageSaved(false); setGenerating(true);
     try {
-      const url = await generateImage({ prompt, dimensions: RATIO_DIMENSIONS[ratio] || "1024x1024", referenceImageUrls });
+      const url = await generateImage({ prompt: kit.withBrand(prompt), dimensions: RATIO_DIMENSIONS[ratio] || "1024x1024", referenceImageUrls });
       if (!url) throw new Error("Image generation failed — try a different description.");
       setImageResult(url);
     } catch (e) {
@@ -373,7 +376,7 @@ export default function QuickCreate() {
     try {
       const result = await generateText({
         type: "video_script",
-        prompt: `Write a short, vivid visual video script (plain prose, no scene labels or markdown, no preamble) for a video about: ${prompt}`,
+        prompt: `Write a short, vivid visual video script (plain prose, no scene labels or markdown, no preamble) for a video about: ${kit.withBrand(prompt)}`,
         tone: "Professional",
       });
       setScript((result || prompt).trim());
@@ -394,7 +397,7 @@ export default function QuickCreate() {
       for (let i = 0; i < sceneScripts.length; i++) {
         setStoryboardProgress(i / sceneScripts.length);
         const shot = shotFor(i);
-        const imgUrl = await generateImage({ prompt: framePrompt({ bible, shot, index: i, total: sceneScripts.length, text: sceneScripts[i].imagePrompt || sceneScripts[i].text || prompt }), referenceImageUrls });
+        const imgUrl = await generateImage({ prompt: framePrompt({ bible, shot, index: i, total: sceneScripts.length, text: `${sceneScripts[i].imagePrompt || sceneScripts[i].text || prompt} ${kit.look}` }), referenceImageUrls });
         built.push({
           imageUrl: imgUrl,
           bible,
@@ -505,7 +508,7 @@ export default function QuickCreate() {
       const result = await generateText({
         type: "script",
         prompt:
-          `Write the spoken DIALOGUE for a ${scenes.length}-scene short video about: ${prompt || script}.\n\n` +
+          `Write the spoken DIALOGUE for a ${scenes.length}-scene short video about: ${prompt || script}.${kit.voice ? ` Brand voice: ${kit.voice}.` : ""}\n\n` +
           `Speak AS the people on screen, in their own words. Do not describe them, do not narrate the picture, ` +
           `and do not write in the third person. Exactly one line per scene, short enough to say aloud in about ` +
           `${MOTION_CLIP_SECONDS} seconds. Where a character has a name, prefix their line with it, like "MAYA: ...". ` +
@@ -886,6 +889,7 @@ export default function QuickCreate() {
               onPick={items => setAttachments(prev => [...prev, ...items.map(a => ({ url: a.file_url, name: a.title || "Library image" }))])} />
           </div>
         </div>}
+        <BrandKitPanel kit={kit} disabled={base44Busy} />
       </div>
 
       {studioEngine === "base44" ? (
@@ -912,7 +916,7 @@ export default function QuickCreate() {
           <StudioImagePreview imageResult={imageResult} generating={generating} imageSaved={imageSaved} onSave={saveImageToLibrary} />
         </div>
       ) : !advanced ? (
-        <AutoVideoCreator prompt={prompt} referenceImageUrls={referenceImageUrls} canMotion={canMotion} canMusic={canMusic} onBusyChange={setBase44Busy} onAdvanced={() => setAdvanced(true)} />
+        <AutoVideoCreator prompt={prompt} brandBrief={kit.brief} referenceImageUrls={referenceImageUrls} canMotion={canMotion} canMusic={canMusic} onBusyChange={setBase44Busy} onAdvanced={() => setAdvanced(true)} />
       ) : (
         <div className="space-y-4">
           <button type="button" onClick={() => setAdvanced(false)} className="text-xs text-fuchsia-400 hover:underline">← Back to simple mode</button>
