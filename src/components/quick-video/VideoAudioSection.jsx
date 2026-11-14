@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { Mic, Music, Loader2, Sparkles, Upload, Wand2 } from "lucide-react";
-import { generateText, generateVoiceover, generateMusic, uploadFile, submitRender, getRenderStatus } from "@/utils/lane2";
+import { generateText, generateVoiceover, uploadFile } from "@/utils/lane1";
+import { generateMusic, submitRender, getRenderStatus } from "@/utils/lane2";
+import VoiceOptions, { useVoiceOptions, LANGUAGES } from "@/components/voice/VoiceOptions";
+import LibraryPickButton from "@/components/media-editor/LibraryPickButton";
 
 /**
  * Voice-over + music for Quick Video. "Create preview" mixes both under the
@@ -14,6 +17,8 @@ export default function VideoAudioSection({ clipUrls, clipSeconds, aspect, topic
   const [busy, setBusy] = useState("");
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState("");
+  const [vo, setVo] = useVoiceOptions();
+  const langName = (LANGUAGES.find(([c]) => c === vo.lang) || [])[1] || "English";
   const total = clipSeconds.reduce((a, b) => a + b, 0);
 
   const run = async (name, fn) => {
@@ -25,13 +30,13 @@ export default function VideoAudioSection({ clipUrls, clipSeconds, aspect, topic
   const writeScript = () => run("write", async () => {
     const t = await generateText({
       type: "script", tone: "Professional",
-      prompt: `Write a short spoken voice-over of about ${Math.max(10, Math.round(total * 2.2))} words for a ${total}-second video about: ${topic}. ${voiceStyle ? `Voice/tone: ${voiceStyle}.` : ""} Plain spoken text only, no labels or directions.`,
+      prompt: `Write a short spoken voice-over of about ${Math.max(10, Math.round(total * 2.2))} words for a ${total}-second video about: ${topic}. ${voiceStyle ? `Voice/tone: ${voiceStyle}.` : ""} Write it in ${langName}. Plain spoken text only, no labels or directions.`,
     });
     setScript(String(t || "").trim());
   });
 
   const makeVoice = () => run("voice", async () => {
-    const blob = await generateVoiceover(script);
+    const blob = await generateVoiceover(script, vo);
     if (!blob) throw new Error("Write the voice-over text first.");
     setVoiceUrl(await uploadFile(new File([blob], "voiceover.mp3", { type: blob.type || "audio/mpeg" })));
   });
@@ -64,6 +69,7 @@ export default function VideoAudioSection({ clipUrls, clipSeconds, aspect, topic
   return (
     <div className="rounded-xl border border-border p-4 space-y-3">
       <h3 className="text-sm font-semibold text-foreground flex items-center gap-2"><Mic className="w-4 h-4 text-fuchsia-400" />Voice-over &amp; music</h3>
+      <VoiceOptions opts={vo} onChange={setVo} disabled={working} />
       <textarea value={script} onChange={e => setScript(e.target.value)} rows={3} placeholder="Voice-over text (write your own, or let AI write it)"
         className="w-full rounded-lg border border-border bg-background p-3 text-sm resize-none" />
       <div className="flex flex-wrap gap-2">
@@ -79,6 +85,8 @@ export default function VideoAudioSection({ clipUrls, clipSeconds, aspect, topic
         <label className={`${btn} cursor-pointer`}><Upload className="w-3.5 h-3.5" />Upload music
           <input type="file" accept="audio/*" className="hidden" disabled={working} onChange={e => { uploadMusic(e.target.files?.[0]); e.target.value = ""; }} />
         </label>
+        <LibraryPickButton kinds={["audio"]} multi={false} label="Music from library" disabled={working} className={btn}
+          onPick={items => items[0]?.file_url && setMusicUrl(items[0].file_url)} />
       </div>
       {voiceUrl && <div><p className="text-[11px] text-muted-foreground mb-1">Voice-over</p><audio src={voiceUrl} controls className="w-full h-9" /></div>}
       {musicUrl && <div><p className="text-[11px] text-muted-foreground mb-1">Music</p><audio src={musicUrl} controls className="w-full h-9" /></div>}

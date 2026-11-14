@@ -451,6 +451,7 @@ Deno.serve(async (req) => {
       text?: string;
       lang?: string;
       voiceId?: string;
+      voice?: string;
       stability?: number;
       style?: number;
     };
@@ -485,7 +486,7 @@ Deno.serve(async (req) => {
       try {
         const native: Uint8Array[] = [];
         for (const chunk of chunks) {
-          const speech = await base44.asServiceRole.integrations.Core.GenerateSpeech({ text: chunk, ...(body.lang ? { language_code: body.lang.slice(0, 2) } : {}) });
+          const speech = await base44.asServiceRole.integrations.Core.GenerateSpeech({ text: chunk, ...(['river', 'honey', 'sunny', 'storm', 'spark'].includes(body.voice || '') ? { voice: body.voice } : {}), ...(body.lang ? { language_code: body.lang.slice(0, 2) } : {}) });
           const audioUrl = speech?.url;
           if (!audioUrl) throw new Error('No audio returned.');
           const res = await fetch(audioUrl);

@@ -11,6 +11,7 @@ import { generateText, generateImage, generateVoiceover, uploadFile, splitScript
 import { generateSceneVideo, generateMusic, submitRender, getRenderStatus, MAX_MUSIC_SECONDS } from "@/utils/lane2";
 import VideoFeedbackPanel from "@/components/video-feedback/VideoFeedbackPanel";
 import BrandKitPanel from "@/components/brand-kit/BrandKitPanel";
+import VoiceOptions, { useVoiceOptions, LANGUAGES } from "@/components/voice/VoiceOptions";
 import useBrandKit from "@/components/brand-kit/useBrandKit";
 import { buildStoryBible, shotFor, framePrompt, clipPrompt } from "@/components/quick-create/sceneContinuity";
 import { VIDEO_RATIOS } from "@/utils/videoAssembler";
@@ -341,6 +342,8 @@ export default function QuickCreate() {
 
   const removeAttachment = (idx) => setAttachments(prev => prev.filter((_, i) => i !== idx));
   const kit = useBrandKit();
+  const [vo, setVo] = useVoiceOptions();
+  const voLangName = (LANGUAGES.find(([c]) => c === vo.lang) || [])[1] || "English";
   const referenceImageUrls = [...new Set([...attachments.map(a => a.url), ...kit.imageUrls])];
 
   // ── Image (quick) generation ──
@@ -513,7 +516,7 @@ export default function QuickCreate() {
           `and do not write in the third person. Exactly one line per scene, short enough to say aloud in about ` +
           `${MOTION_CLIP_SECONDS} seconds. Where a character has a name, prefix their line with it, like "MAYA: ...". ` +
           `Prefix every line with its scene number and a pipe: "1| MAYA: ...". ` +
-          `No scene labels, no stage directions, no parentheticals, no quotation marks around the line.\n\n` +
+          `No scene labels, no stage directions, no parentheticals, no quotation marks around the line. Write the lines in ${voLangName}.\n\n` +
           `Scenes (what is on screen):\n${numbered}${reference}`,
         tone: "Conversational",
       });
@@ -548,7 +551,7 @@ export default function QuickCreate() {
     setError("");
     let ok = false;
     try {
-      const blob = await generateVoiceover(toSpokenLine(line));
+      const blob = await generateVoiceover(toSpokenLine(line), vo);
       if (!blob) throw new Error("No audio was produced for this line.");
       const url = await uploadFile(new File([blob], `scene-${index + 1}-line.mp3`, { type: blob.type || "audio/mpeg" }));
       if (!url) throw new Error("Uploading the line's audio failed.");
@@ -597,12 +600,12 @@ export default function QuickCreate() {
       try {
         const rewritten = await generateText({
           type: "script",
-          prompt: `Rewrite the following as natural, conversational spoken narration only — remove any scene labels, visual directions, parentheticals, or stage directions, and phrase it the way a narrator would actually say it aloud. Return plain spoken text only, nothing else.\n\n${raw}`,
+          prompt: `Rewrite the following as natural, conversational spoken narration only — remove any scene labels, visual directions, parentheticals, or stage directions, and phrase it the way a narrator would actually say it aloud. Write it in ${voLangName}. Return plain spoken text only, nothing else.\n\n${raw}`,
           tone: "Professional",
         });
         if (rewritten?.trim()) spoken = rewritten.trim();
       } catch { /* verbatim fallback */ }
-      const blob = await generateVoiceover(spoken);
+      const blob = await generateVoiceover(spoken, vo);
       if (blob) {
         const url = await uploadFile(new File([blob], "quick-create-vo.mp3", { type: blob.type || "audio/mpeg" }));
         setVoiceoverUrl(url || "");
@@ -1141,6 +1144,7 @@ export default function QuickCreate() {
                 {/* ── Speech ── */}
                 <div className="space-y-3">
                   <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wide">Speech</label>
+                  <VoiceOptions opts={vo} onChange={setVo} />
                   <div className="grid sm:grid-cols-3 gap-2">
                     {NARRATION_MODES.map(m => (
                       <button key={m.id} type="button" onClick={() => setNarrationMode(m.id)}
@@ -1272,6 +1276,9 @@ export default function QuickCreate() {
                         <input type="file" accept="audio/*" className="hidden" disabled={uploadingMusic}
                           onChange={e => { handleMusicUpload(e.target.files?.[0]); e.target.value = ""; }} />
                       </label>
+                      <LibraryPickButton kinds={["audio"]} multi={false} label="Choose music from Media Library"
+                        className="w-full flex items-center justify-center gap-2 p-3 rounded-xl border border-border text-sm text-muted-foreground hover:bg-muted/20"
+                        onPick={items => { if (items[0]?.file_url) { setMusicUrl(items[0].file_url); setMusicName(items[0].title || "Library music"); } }} />
                       {musicUrl && <audio src={musicUrl} controls className="w-full" />}
                       <p className="text-[11px] text-muted-foreground">
                         Music plays underneath any speech, ducked so the words stay clear — it is no longer one or the other.

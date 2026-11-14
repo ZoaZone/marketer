@@ -121,14 +121,14 @@ export async function proxyImageAsObjectUrl(url) {
  *   backend responding without audio) — callers should catch this and show
  *   it, rather than treating a real failure the same as empty input.
  */
-export async function generateVoiceover(text) {
+export async function generateVoiceover(text, { lang, voice } = {}) {
   if (!text?.trim()) return null;
   let data;
   try {
     // 20000 matches the backend's own MAX_CHARS (ElevenLabs TTS) — the old
     // 2000-char cap here was a leftover from the previous Google Translate
     // TTS backend, which silently cut off long narrations.
-    const res = await base44.functions.invoke("generateVoiceover", { text: text.slice(0, 20000) });
+    const res = await base44.functions.invoke("generateVoiceover", { text: text.slice(0, 20000), ...(lang ? { lang } : {}), ...(voice ? { voice } : {}) });
     data = res?.data ?? res;
   } catch (e) {
     // The backend refuses narration for reasons the user can act on — an
