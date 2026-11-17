@@ -38,10 +38,14 @@ import {
   getRenderStatus,
   submitCapture,
   getCaptureStatus,
+  startLiveCapture,
+  finishLiveCapture,
+  cancelLiveCapture,
 } from "./aiClient.js";
 
 export {
   submitLane1Video, getLane1VideoStatus, assembleLane1Video,
   submitRender, getRenderStatus,
   submitCapture, getCaptureStatus,
+  startLiveCapture, finishLiveCapture, cancelLiveCapture,
 };
