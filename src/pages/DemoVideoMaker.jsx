@@ -930,22 +930,121 @@ if (realVideo) {
                   <button onClick={cancelCapture} className="text-[11px] text-muted-foreground hover:text-foreground underline">Cancel</button>
                 </div>
               )}
+            </div>
+          )}
 
-              {captureResult && (
+          {/* Mode D: Live Login — the caller sees and drives a real, server-
+              hosted browser to log into their own site themselves. No
+              username/password is ever typed into, sent to, or stored by
+              this app — only where clicks/keystrokes land on the real page
+              is relayed, exactly like screen-sharing control. */}
+          {mode === "live" && (
+            <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+              <h3 className="font-semibold text-foreground">3. Log In, Then Capture</h3>
+              <p className="text-sm text-muted-foreground">
+                A live browser opens below, pointed at <strong>{url}</strong>. Click and type in it exactly like your own
+                browser tab to sign in — your username and password go straight to the real site and are never seen,
+                sent to, or stored by this app. When you're in, click <strong>I'm Logged In — Start Capture</strong> and a
+                recorded walkthrough begins from there.
+              </p>
+
+              {!liveSession && !capturing && (
+                <button onClick={startLiveSession} disabled={liveStarting || !url.trim()}
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white text-sm font-bold hover:opacity-90 disabled:opacity-60 shadow-lg">
+                  {liveStarting ? <><Loader2 className="w-4 h-4 animate-spin" /> Opening live browser…</> : <><UserCheck className="w-4 h-4" /> Open Live Browser &amp; Log In</>}
+                </button>
+              )}
+
+              {liveSession && (
                 <div className="space-y-3">
-                  <video src={captureResult.url} controls className="w-full rounded-xl border border-border bg-black" />
-                  <div className="flex gap-2">
-                    <a href={captureResult.url} download target="_blank" rel="noopener noreferrer"
-                      className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border text-sm font-semibold text-foreground hover:bg-muted/20">
-                      <Download className="w-4 h-4" /> Download
-                    </a>
-                    <button onClick={saveCapture} disabled={captureSaved}
-                      className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-fuchsia-500/15 border border-fuchsia-500/50 text-fuchsia-400 text-sm font-semibold hover:bg-fuchsia-500/25 disabled:opacity-60">
-                      {captureSaved ? <><CheckCircle2 className="w-4 h-4" /> Saved</> : <><Save className="w-4 h-4" /> Save to Library</>}
-                    </button>
+                  <div className="relative rounded-xl border border-fuchsia-500/40 overflow-hidden bg-black" style={{ aspectRatio: `${LIVE_VIEWPORT.width} / ${LIVE_VIEWPORT.height}` }}>
+                    {liveFrameSrc ? (
+                      // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
+                      <img ref={liveImgRef} src={liveFrameSrc} alt="Live browser — click and type to log in"
+                        tabIndex={0}
+                        onClick={handleLiveClick}
+                        onWheel={handleLiveWheel}
+                        onKeyDown={handleLiveKeyDown}
+                        className="w-full h-full object-contain cursor-text outline-none focus:ring-2 focus:ring-fuchsia-500" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" /> Loading live view…
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">Click the browser above, then type as usual. Scroll with your mouse wheel. Nothing you type here is read, logged, or stored by this app — it's relayed straight to the real page.</p>
+
+                  {!liveConfirmLoggedIn ? (
+                    <div className="flex gap-2">
+                      <button onClick={() => setLiveConfirmLoggedIn(true)}
+                        className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/50 text-emerald-400 text-sm font-semibold hover:bg-emerald-500/25">
+                        <CheckCircle2 className="w-4 h-4" /> I'm Logged In — Start Capture
+                      </button>
+                      <button onClick={cancelLiveSession}
+                        className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:bg-muted/20">
+                        <XCircle className="w-4 h-4" /> Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-xl bg-background border border-border space-y-2">
+                      <p className="text-xs text-muted-foreground">Confirm and start the recorded walkthrough now — the live browser above will close and a fresh, recorded session continues from your logged-in state.</p>
+                      <div className="flex gap-2">
+                        <button onClick={finishLiveSession} disabled={liveFinishing}
+                          className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white text-sm font-bold hover:opacity-90 disabled:opacity-60">
+                          {liveFinishing ? <><Loader2 className="w-4 h-4 animate-spin" /> Starting capture…</> : <><Video className="w-4 h-4" /> Confirm &amp; Capture</>}
+                        </button>
+                        <button onClick={() => setLiveConfirmLoggedIn(false)} disabled={liveFinishing}
+                          className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:bg-muted/20 disabled:opacity-50">
+                          Back
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {capturing && !liveSession && (
+                <div className="space-y-1.5">
+                  <p className="text-sm text-foreground flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> {captureStepLabel || "Capturing…"}</p>
+                  <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div className="h-full bg-fuchsia-500 transition-all" style={{ width: `${Math.round(capturePercent * 100)}%` }} />
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Shared result + review step for Server Capture and Live Login —
+              both produce the same captureResult, so there's one finalize
+              flow regardless of which mode made it. */}
+          {(mode === "capture" || mode === "live") && captureResult && (
+            <div className="bg-card border border-border rounded-2xl p-6 space-y-3">
+              <h3 className="font-semibold text-foreground">4. Review &amp; Finalize</h3>
+              <video src={captureResult.url} controls className="w-full rounded-xl border border-border bg-black" />
+              {!captureSaved && (
+                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 space-y-2">
+                  <p className="text-xs font-semibold text-amber-300 flex items-center gap-1.5">
+                    <MessageSquareWarning className="w-3.5 h-3.5" /> Anything wrong with this take?
+                  </p>
+                  <textarea value={revisionNotes} onChange={e => setRevisionNotes(e.target.value)} rows={2} disabled={capturing || liveStarting}
+                    placeholder="e.g. ‘it logged out partway through’, ‘missed the dashboard page’ — kept with the saved video either way"
+                    className="w-full rounded-lg border border-amber-500/30 bg-background text-xs p-2.5 focus:outline-none focus:ring-2 focus:ring-amber-500/40 resize-none disabled:opacity-50" />
+                  <button onClick={retryCaptureWithFeedback} disabled={capturing || liveStarting}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/15 border border-amber-500/40 text-amber-300 text-xs font-semibold hover:bg-amber-500/25 disabled:opacity-50">
+                    <RefreshCw className="w-3.5 h-3.5" /> Try Again
+                  </button>
+                </div>
+              )}
+              <div className="flex gap-2">
+                <a href={captureResult.url} download target="_blank" rel="noopener noreferrer"
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border text-sm font-semibold text-foreground hover:bg-muted/20">
+                  <Download className="w-4 h-4" /> Download
+                </a>
+                <button onClick={saveCapture} disabled={captureSaved}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-fuchsia-500/15 border border-fuchsia-500/50 text-fuchsia-400 text-sm font-semibold hover:bg-fuchsia-500/25 disabled:opacity-60">
+                  {captureSaved ? <><CheckCircle2 className="w-4 h-4" /> Saved</> : <><Save className="w-4 h-4" /> Save to Library</>}
+                </button>
+              </div>
             </div>
           )}
         </>
