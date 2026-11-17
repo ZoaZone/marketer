@@ -171,8 +171,189 @@ async function processQueue() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Phase 3: live login capture. liveSessions holds the in-progress
+// interactive browser sessions a caller is actively driving (via /live/*).
+// Keyed by sessionId (nanoid, used only to address the session — never
+// logged, never the thing that actually authorizes access to it); each
+// entry also carries its own random `token`, which is the one real
+// capability secret a caller must present to read frames from or send
+// input to that session (so the public, cors()-open /live/:id/frame and
+// /live/:id/input routes don't need the main CAPTURE_SHARED_SECRET — the
+// frontend calls those directly from the browser, and the shared secret
+// must never reach a browser). /live/start and /live/:id/finish still
+// require CAPTURE_SHARED_SECRET, same as every other route — those are
+// only ever called server-to-server, from the Base44 proxy functions.
+const liveSessions = new Map();
+
+function closeAndForgetLiveSession(id) {
+  const session = liveSessions.get(id);
+  if (!session) return;
+  clearTimeout(session.expiryTimer);
+  liveSessions.delete(id);
+  releaseConcurrencySlot(session.userId || "anonymous");
+  closeLiveSession(session).catch(() => { });
+}
+
 app.get("/health", (_req, res) => {
   res.json({ ok: true });
+});
+
+app.post("/live/start", requireSecret, async (req, res) => {
+  const body = req.body || {};
+  const userId = typeof body.userId === "string" && body.userId.trim() ? body.userId.trim() : "anonymous";
+  const url = typeof body.url === "string" && body.url.trim() ? body.url.trim() : "";
+
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return res.status(400).json({ error: "url must be http(s)." });
+    }
+  } catch {
+    return res.status(400).json({ error: "url must be a valid absolute URL." });
+  }
+
+  if (!checkRateLimit(userId)) {
+    return res.status(429).json({ error: "Too many requests. Please wait a moment and try again." });
+  }
+  // A live session occupies the same per-user concurrency slot a normal
+  // capture would — it's the same one-job-at-a-time budget, just spent on
+  // an interactive session instead of a queued job until /finish hands it
+  // over to the real queue.
+  if (!claimConcurrencySlot(userId)) {
+    return res.status(429).json({ error: "You already have a capture or live session in progress. Please wait for it to finish." });
+  }
+
+  let session;
+  try {
+    session = await launchLiveSession(url);
+  } catch (e) {
+    releaseConcurrencySlot(userId);
+    return res.status(502).json({ error: "Could not start a live session: " + String(e?.message || e) });
+  }
+
+  const id = nanoid();
+  const token = nanoid(32);
+  session.id = id;
+  session.token = token;
+  session.userId = userId;
+  session.createdAt = Date.now();
+  session.expiryTimer = setTimeout(() => {
+    console.log(`[live] session ${id} timed out — closing.`);
+    closeAndForgetLiveSession(id);
+  }, LIVE_SESSION_MAX_MS).unref();
+  liveSessions.set(id, session);
+
+  console.log(`[live] started session ${id} for ${redactUrl(session.targetUrl)}`);
+  res.status(201).json({ sessionId: id, token, expiresInSeconds: Math.round(LIVE_SESSION_MAX_MS / 1000) });
+});
+
+function requireLiveToken(req, res) {
+  const session = liveSessions.get(req.params.id);
+  if (!session) { res.status(404).json({ error: "Live session not found or already closed." }); return null; }
+  const token = req.query.token || req.body?.token || req.header("x-live-token");
+  if (!token || token !== session.token) { res.status(401).json({ error: "Unauthorized" }); return null; }
+  return session;
+}
+
+app.get("/live/:id/frame", async (req, res) => {
+  const session = requireLiveToken(req, res);
+  if (!session) return;
+  try {
+    const jpeg = await captureLiveFrame(session.page);
+    res.set("Content-Type", "image/jpeg");
+    res.set("Cache-Control", "no-store");
+    res.send(jpeg);
+  } catch (e) {
+    res.status(502).json({ error: "Could not capture a frame: " + String(e?.message || e) });
+  }
+});
+
+app.post("/live/:id/input", express.json({ limit: "256kb" }), async (req, res) => {
+  const session = requireLiveToken(req, res);
+  if (!session) return;
+  try {
+    const result = await sendLiveInput(session.page, req.body || {});
+    res.json({ ok: true, url: result.url });
+  } catch (e) {
+    res.status(502).json({ error: "Input failed: " + String(e?.message || e) });
+  }
+});
+
+app.post("/live/:id/cancel", async (req, res) => {
+  const id = req.params.id;
+  const session = liveSessions.get(id);
+  if (!session) return res.json({ ok: true }); // already gone — cancelling twice is fine
+  const secretOk = req.header("x-capture-secret") === CAPTURE_SHARED_SECRET;
+  const token = req.query.token || req.body?.token || req.header("x-live-token");
+  if (!secretOk && token !== session.token) return res.status(401).json({ error: "Unauthorized" });
+  closeAndForgetLiveSession(id);
+  res.json({ ok: true });
+});
+
+// POST /live/:id/finish — server-to-server only (Base44's finishLiveCapture
+// proxy). Ends the interactive phase, exports the now-authenticated
+// session's storageState (cookies + localStorage — never a password, since
+// none was ever collected in this flow), closes the live browser, and
+// queues a "liveHandoff" job on the SAME job store/queue/polling contract
+// every other capture uses — the frontend's existing getCaptureStatus
+// polling loop works against the returned captureId completely unchanged.
+app.post("/live/:id/finish", requireSecret, async (req, res) => {
+  const id = req.params.id;
+  const session = liveSessions.get(id);
+  if (!session) return res.status(404).json({ error: "Live session not found or already closed." });
+  const body = req.body || {};
+  const token = body.token;
+  if (!token || token !== session.token) return res.status(401).json({ error: "Unauthorized" });
+
+  clearTimeout(session.expiryTimer);
+  liveSessions.delete(id);
+
+  let storageState = null;
+  try {
+    storageState = await session.context.storageState();
+  } catch (e) {
+    releaseConcurrencySlot(session.userId || "anonymous");
+    closeLiveSession(session).catch(() => { });
+    return res.status(502).json({ error: "Could not finish the live session: " + String(e?.message || e) });
+  }
+  await closeLiveSession(session).catch(() => { });
+
+  let plan;
+  if (body.plan !== undefined) {
+    if (!Array.isArray(body.plan) || !body.plan.length) {
+      releaseConcurrencySlot(session.userId || "anonymous");
+      return res.status(400).json({ error: "plan, if provided, must be a non-empty array of steps." });
+    }
+    plan = body.plan;
+  }
+
+  const jobId = nanoid();
+  jobs.set(jobId, {
+    id: jobId,
+    status: "queued",
+    progress: 0,
+    stepIndex: null,
+    stepTotal: null,
+    videoUrl: null,
+    durationSeconds: null,
+    pageInfo: null,
+    steps: null,
+    hasCredentials: false,
+    hasAuthToken: false,
+    userId: session.userId || "anonymous",
+    error: null,
+    createdAt: Date.now(),
+  });
+  // Reuses the concurrency slot the live session already held — this is
+  // one continuous job from the caller's point of view (interactive login,
+  // then the recorded walkthrough), not two separate ones, so it isn't
+  // released and re-claimed here.
+  queue.push({ id: jobId, kind: "liveHandoff", spec: { url: session.targetUrl, storageState, plan } });
+
+  console.log(`[live] session ${id} handed off to capture job ${jobId} for ${redactUrl(session.targetUrl)}`);
+  res.status(202).json({ captureId: jobId });
+  processQueue();
 });
 
 app.post("/capture", requireSecret, (req, res) => {
