@@ -41,6 +41,7 @@ exactly as Phase 1 always has.
 | `CAPTURE_CREDENTIAL_ENCRYPTION_KEY` | Required only for Phase 2 (authenticated capture). A 32-byte AES-256 key, base64-encoded (e.g. `openssl rand -base64 32`). Without it, any `/capture` request that includes `credentials` is rejected with `503` — the worker never falls back to holding credentials unencrypted. See "Authenticated capture (Phase 2)" below. |
 | `CAPTURE_RATE_LIMIT_PER_MINUTE` | Optional, defaults to `5`. Max `/capture` requests accepted per user id per rolling 60s window (applies to every capture, authenticated or not); further requests get `429`. |
 | `CAPTURE_MAX_CONCURRENT_PER_USER` | Optional, defaults to `1`. Max queued+processing captures a single user id may have at once; a request over the cap gets `429`. |
+| `CAPTURE_LIVE_SESSION_MAX_SECONDS` | Optional, defaults to `360` (6 minutes). How long a Phase 3 live-login session (see below) may stay open before it's force-closed and its concurrency slot freed, in case the caller abandons it mid-login. |
 
 ### Voiceover / music generation env vars
 
@@ -135,6 +136,69 @@ The Base44 proxy functions in front of this worker are `submitCapture` and
 calls; `submitCapture` also stamps the caller's server-verified Base44 user
 id onto the request as `userId`, so the rate limit/concurrency cap above are
 keyed by a real identity rather than anything a client could spoof.
+
+## Phase 3: live login capture (no credentials collected at all)
+
+An alternative to Phase 2 for sites that use OTP/magic-link/SSO auth (where
+`performLogin` can't work at all) or where the caller would rather not type
+a password into this app's UI even when it could. The caller drives a real,
+server-hosted browser themselves — seeing it as polled JPEG frames and
+controlling it via relayed clicks/keystrokes/scroll — to log into their own
+site exactly as they would in their own browser tab. No username, password,
+or other credential is ever typed into, sent to, or stored by this app at
+any point in this flow; the worker only relays *where* the caller's own
+input lands on the real page.
+
+- `POST /live/start` — requires `x-capture-secret` (server-to-server only,
+  called by the Base44 `startLiveCapture` proxy). Body `{ url, userId? }`.
+  Launches a plain (unrecorded) headless browser context, navigates to
+  `url`, and returns `201 { sessionId, token, expiresInSeconds }`. Subject
+  to the same `checkRateLimit`/`claimConcurrencySlot` as `/capture` — a
+  live session spends the same per-user concurrency budget a queued capture
+  would, for as long as it's open.
+- `GET /live/:id/frame?token=...` — no shared secret; instead requires the
+  session's own `token` (minted fresh per session, never CAPTURE_SHARED_SECRET
+  itself) as a query param, `x-live-token` header, or body field. Returns a
+  single JPEG screenshot of the live page's current state. Meant to be
+  polled directly from the browser (a few times a second) and shown as a
+  plain `<img>` — no WebSocket or extra client library needed.
+- `POST /live/:id/input` — same token auth as `/frame`. Body
+  `{ type: "click"|"dblclick"|"move"|"scroll"|"type"|"key"|"goto"|"back"|"forward", ... }`
+  — translated 1:1 into the equivalent Playwright action on the live page
+  (`capture.js`'s `sendLiveInput`). Deliberately **not** origin-restricted
+  the way Phase 2 is: the caller is driving their own normal browsing,
+  which may legitimately cross into an SSO/IdP origin (e.g. "Sign in with
+  Google"), and nothing here ever reads a field's value back, so there's no
+  credential-interception surface to sandbox against.
+- `POST /live/:id/cancel` — either `x-capture-secret` or the session's
+  `token` closes the session early (abandoned tab, explicit Cancel click),
+  freeing its browser and concurrency slot immediately instead of waiting
+  out `CAPTURE_LIVE_SESSION_MAX_SECONDS`.
+- `POST /live/:id/finish` — requires `x-capture-secret` (the Base44
+  `finishLiveCapture` proxy) **and** the session's `token`. Body
+  `{ token, plan? }`. Exports the now-authenticated session's
+  `storageState` (cookies + localStorage — never a password, since none was
+  ever collected), closes the live browser, and queues a `"liveHandoff"`
+  job on the *same* job store/queue/`GET /captures/:id` contract every
+  other capture uses (`capture.js`'s `runLiveHandoffCapture`: a fresh,
+  **recorded** browser context seeded with that `storageState`, running the
+  normal walkthrough/record/upload pipeline). Returns `202 { captureId }`
+  — the frontend's existing `getCaptureStatus` polling loop works against
+  it completely unchanged. If the carried-over session doesn't actually
+  look logged in on the fresh context (an essential cookie didn't survive,
+  or the session had since expired), the job reports `status:
+  "login_required"` rather than `"login_failed"` — there was no password to
+  get wrong, so "failed login" would be the wrong word for it.
+
+The Base44 proxy functions for this flow are `startLiveCapture`,
+`finishLiveCapture`, and `cancelLiveCapture`
+(`base44/functions/{start,finish,cancel}LiveCapture/entry.ts`).
+`startLiveCapture` is the only one that hands the frontend anything to call
+directly (without going back through a Base44 function first): it returns
+`frameUrl`/`inputUrl`/`cancelUrl` with the session's own `token` already
+built in, so the high-frequency frame-polling and input calls hit this
+worker's public URL directly — `CAPTURE_SHARED_SECRET` itself never leaves
+the Base44 function layer.
 
 ## Authenticated capture (Phase 2)
 
