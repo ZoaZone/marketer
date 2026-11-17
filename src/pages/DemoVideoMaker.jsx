@@ -664,24 +664,30 @@ if (realVideo) {
           </div>
 
           {/* Mode tabs */}
-          <div className="flex gap-2 max-w-lg">
+          <div className="flex gap-2 max-w-3xl flex-wrap">
             <button onClick={() => setMode("walkthrough")}
-              className={`flex-1 p-4 rounded-xl border text-left transition-all ${mode === "walkthrough" ? "bg-fuchsia-500/15 border-fuchsia-500/50 text-fuchsia-300" : "border-border text-muted-foreground hover:bg-muted/20"}`}>
+              className={`flex-1 min-w-[160px] p-4 rounded-xl border text-left transition-all ${mode === "walkthrough" ? "bg-fuchsia-500/15 border-fuchsia-500/50 text-fuchsia-300" : "border-border text-muted-foreground hover:bg-muted/20"}`}>
               <Wand2 className="w-5 h-5 mb-1" />
               <div className="text-sm font-semibold">AI Walkthrough</div>
               <div className="text-xs opacity-70 mt-0.5">Fully automatic — AI generates scene visuals + voiceover, no manual steps.</div>
             </button>
             <button onClick={() => setMode("recording")}
-              className={`flex-1 p-4 rounded-xl border text-left transition-all ${mode === "recording" ? "bg-fuchsia-500/15 border-fuchsia-500/50 text-fuchsia-300" : "border-border text-muted-foreground hover:bg-muted/20"}`}>
+              className={`flex-1 min-w-[160px] p-4 rounded-xl border text-left transition-all ${mode === "recording" ? "bg-fuchsia-500/15 border-fuchsia-500/50 text-fuchsia-300" : "border-border text-muted-foreground hover:bg-muted/20"}`}>
               <Monitor className="w-5 h-5 mb-1" />
               <div className="text-sm font-semibold">Screen Recording</div>
               <div className="text-xs opacity-70 mt-0.5">Record your own screen showing the real site, narrated live by the AI voiceover.</div>
             </button>
             <button onClick={() => setMode("capture")}
-              className={`flex-1 p-4 rounded-xl border text-left transition-all ${mode === "capture" ? "bg-fuchsia-500/15 border-fuchsia-500/50 text-fuchsia-300" : "border-border text-muted-foreground hover:bg-muted/20"}`}>
+              className={`flex-1 min-w-[160px] p-4 rounded-xl border text-left transition-all ${mode === "capture" ? "bg-fuchsia-500/15 border-fuchsia-500/50 text-fuchsia-300" : "border-border text-muted-foreground hover:bg-muted/20"}`}>
               <Video className="w-5 h-5 mb-1" />
               <div className="text-sm font-semibold">Server Capture</div>
               <div className="text-xs opacity-70 mt-0.5">A headless browser records the real site for you — no screen-share needed, works from any device.</div>
+            </button>
+            <button onClick={() => setMode("live")}
+              className={`flex-1 min-w-[160px] p-4 rounded-xl border text-left transition-all ${mode === "live" ? "bg-fuchsia-500/15 border-fuchsia-500/50 text-fuchsia-300" : "border-border text-muted-foreground hover:bg-muted/20"}`}>
+              <UserCheck className="w-5 h-5 mb-1" />
+              <div className="text-sm font-semibold">Live Login</div>
+              <div className="text-xs opacity-70 mt-0.5">Log into your own site yourself, in a live browser — your password never touches this app.</div>
             </button>
           </div>
 
