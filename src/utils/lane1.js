@@ -35,6 +35,9 @@ import {
   assembleLane1Video,
   submitCapture,
   getCaptureStatus,
+  startLiveCapture,
+  finishLiveCapture,
+  cancelLiveCapture,
 } from "./assembly.js";
 
 export {
@@ -51,4 +54,7 @@ export {
   assembleLane1Video,
   submitCapture,
   getCaptureStatus,
+  startLiveCapture,
+  finishLiveCapture,
+  cancelLiveCapture,
 };
