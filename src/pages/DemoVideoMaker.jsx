@@ -765,6 +765,20 @@ if (realVideo) {
               {walkthroughResult && (
                 <div className="space-y-3">
                   <video src={walkthroughResult.url} controls loop className="w-full rounded-xl border border-border bg-black" />
+                  {!walkthroughSaved && (
+                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 space-y-2">
+                      <p className="text-xs font-semibold text-amber-300 flex items-center gap-1.5">
+                        <MessageSquareWarning className="w-3.5 h-3.5" /> Review before finalizing — anything to fix?
+                      </p>
+                      <textarea value={revisionNotes} onChange={e => setRevisionNotes(e.target.value)} rows={2} disabled={revising}
+                        placeholder="e.g. ‘the pricing scene doesn't match our actual plans’, ‘voiceover is too fast’, ‘mention the free trial’"
+                        className="w-full rounded-lg border border-amber-500/30 bg-background text-xs p-2.5 focus:outline-none focus:ring-2 focus:ring-amber-500/40 resize-none disabled:opacity-50" />
+                      <button onClick={regenerateWalkthroughWithFeedback} disabled={revising || !revisionNotes.trim()}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/15 border border-amber-500/40 text-amber-300 text-xs font-semibold hover:bg-amber-500/25 disabled:opacity-50">
+                        {revising ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Revise Script &amp; Regenerate
+                      </button>
+                    </div>
+                  )}
                   <div className="flex gap-2">
                     <a href={walkthroughResult.url} download target="_blank" rel="noopener noreferrer"
                       className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border text-sm font-semibold text-foreground hover:bg-muted/20">
