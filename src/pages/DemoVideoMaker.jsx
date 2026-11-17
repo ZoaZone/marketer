@@ -7,7 +7,7 @@ import { base44 } from "@/api/base44Client";
 // getCaptureStatus reach the capture worker (server-capture/) the same
 // way every other call here reaches the render worker — through a Base44
 // function (no worker URL or shared secret ever touches this client code).
-import { generateText, generateImage, generateVoiceover, uploadFile, splitScriptIntoScenes, assembleLane1Video, submitCapture, getCaptureStatus } from "@/utils/lane1";
+import { generateText, generateImage, generateVoiceover, uploadFile, splitScriptIntoScenes, assembleLane1Video, submitCapture, getCaptureStatus, startLiveCapture, finishLiveCapture, cancelLiveCapture } from "@/utils/lane1";
 import { VIDEO_RATIOS } from "@/utils/videoAssembler";
 // AI background music (ElevenLabs Music, paid Lane 2) — enabled for the walkthrough
 // so "Music" mode generates a track instead of shipping silent.
@@ -16,12 +16,19 @@ import { isRealVideoEntitled } from "@/utils/entitlements";
 import {
   Globe, Loader2, Sparkles, Monitor, Wand2, Play, Square, Download, Save,
   CheckCircle2, AlertTriangle, Mic, ExternalLink, RefreshCw, Music, VolumeX,
-  Lock, Video,
+  Lock, Video, UserCheck, MessageSquareWarning, XCircle,
 } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 
 const CAPTURE_POLL_MS = 3000;
 const CAPTURE_TIMEOUT_MS = 5 * 60 * 1000;
+const LIVE_FRAME_POLL_MS = 350;
+// 1920x1080 is the real viewport the worker's browser renders at (see
+// server-capture/capture.js's VIEWPORT) — every relayed click/scroll
+// coordinate is scaled from the on-screen <img> size back to this before
+// it's sent, so it lands in the right place regardless of how large the
+// preview is drawn on the page.
+const LIVE_VIEWPORT = { width: 1920, height: 1080 };
 
 // Mode A's walkthrough assembles server-side via the shared FFmpeg-assembly
 // worker route (1080p H.264 with real audio) instead of the old
