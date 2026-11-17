@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 // Lane 1 (Business/Marketing) page — imports only from @/utils/lane1,
@@ -131,7 +131,18 @@ export default function DemoVideoMaker() {
     setRecordedUrl(""); recordedBlobRef.current = null; setRecordingSaved(false);
     setCaptureResult(null); setCaptureSaved(false);
     setRevisionNotes("");
+    stopLiveFramePollingRef.current?.();
+    if (liveSessionRef.current?.sessionId) cancelLiveCapture({ sessionId: liveSessionRef.current.sessionId });
+    setLiveSession(null); setLiveFrameSrc(""); setLiveConfirmLoggedIn(false);
   };
+
+  // Refs mirroring liveSession/stopLiveFramePolling so resetResults (called
+  // from analyze(), defined above these) and the unmount cleanup effect
+  // below can reach the current session/stop function without a
+  // function-declaration-order problem — updated right after each is
+  // (re)defined, further down this component.
+  const liveSessionRef = useRef(null);
+  const stopLiveFramePollingRef = useRef(null);
 
   const analyze = async () => {
     if (!url.trim()) return;
