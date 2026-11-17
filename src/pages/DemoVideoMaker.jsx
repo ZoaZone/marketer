@@ -558,11 +558,42 @@ if (realVideo) {
     if (!captureResult) return;
     try {
       await base44.entities.ContentAsset.create({
-        type: "video", title: `Demo capture — ${url}`, file_url: captureResult.url, ai_generated: true, prompt_used: script.slice(0, 500) || undefined,
+        type: "video", title: `Demo capture — ${url}`, file_url: captureResult.url, ai_generated: true,
+        prompt_used: [script.slice(0, 400), revisionNotes.trim() ? `Reviewer notes: ${revisionNotes.trim()}` : ""].filter(Boolean).join(" — ") || undefined,
       });
       qc.invalidateQueries(["media_library"]);
       setCaptureSaved(true);
     } catch (e) { setError(e?.message || "Save failed."); }
+  };
+
+  // ── Review & feedback loop (before finalizing) ──
+  // For the AI Walkthrough, feedback is something the model can actually
+  // act on: it revises the script to address it and regenerates. For
+  // Server Capture / Live Login, the "video" is real footage of a real
+  // site, so there's nothing for an AI to rewrite — feedback there re-runs
+  // the capture itself (the caller gets a fresh pass instead of only ever
+  // being able to accept or silently discard a bad take), and the note is
+  // kept on the saved asset either way so it isn't lost even if they do
+  // accept the first result.
+  const regenerateWalkthroughWithFeedback = async () => {
+    if (!revisionNotes.trim()) { setError("Describe what to fix first."); return; }
+    setRevising(true); setError("");
+    try {
+      const prompt = `Revise this voiceover script to address the feedback below. Keep it the same rough length (60-90 seconds read aloud), plain prose, no scene labels, no markdown, no preamble.\n\nCurrent script:\n${script}\n\nFeedback to address:\n${revisionNotes.trim()}`;
+      const revised = await generateText({ type: "video_script", prompt, tone: scan?.tone || "Professional" });
+      setScript((revised || "").trim());
+      setRevisionNotes("");
+      await generateWalkthrough();
+    } catch (e) {
+      setError(e?.message || "Could not apply that feedback.");
+    }
+    setRevising(false);
+  };
+
+  const retryCaptureWithFeedback = async () => {
+    setCaptureResult(null); setCaptureSaved(false);
+    if (mode === "live") await startLiveSession();
+    else await startServerCapture();
   };
 
   return (
