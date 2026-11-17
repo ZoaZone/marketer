@@ -751,6 +751,177 @@ export async function runCapture(spec, onProgress = () => { }, credentials = nul
 // its real duration. Shared by finalizeRecording (runCapture's raw,
 // upload-immediately path) and runAppDemoWalkthrough (which needs the mp4
 // path *before* uploading, to mux narration/music onto it first).
+// ---------------------------------------------------------------------------
+// Live login capture (Phase 3): the caller interactively logs into their own
+// site themselves, in a real sense — they see and control a live,
+// server-hosted browser page via periodic screenshots and forwarded
+// click/keyboard/scroll events, driven entirely from the frontend. No
+// password or other credential is ever typed into, sent to, or stored by
+// this server: we only relay where the user's own clicks and keystrokes
+// land on the real page, exactly as if they'd opened the site in their own
+// browser. Once they confirm they're logged in, we capture the session's
+// cookies/localStorage (Playwright's storageState) and hand that off into a
+// brand-new, recorded browser context to run the normal walkthrough — the
+// live, unrecorded phase and the final, recorded walkthrough are
+// deliberately two separate browser contexts so nothing from the login step
+// itself (mouse jitter, typos, retries) ends up in the finished video
+// unless the caller's plan says to revisit that page.
+// ---------------------------------------------------------------------------
+
+// Launches a plain (unrecorded) browser context and navigates it to `url`,
+// for a caller (index.js's /live/start) to then screenshot/drive
+// interactively. Returns { browser, context, page, targetUrl, targetOrigin }
+// — the caller owns this triple's lifecycle (close it via closeLiveSession
+// once done, one way or another; nothing here schedules its own cleanup).
+export async function launchLiveSession(url) {
+  const targetUrl = normalizeUrl(url);
+  if (!targetUrl) throw new Error("A valid http(s) url is required.");
+  const targetOrigin = new URL(targetUrl).origin;
+
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({ viewport: VIEWPORT, acceptDownloads: false });
+  const page = await context.newPage();
+  page.on("download", (d) => { d.cancel().catch(() => { }); });
+  await page.goto(targetUrl, { waitUntil: "domcontentloaded", timeout: GOTO_TIMEOUT_MS }).catch((e) => {
+    // Still return the session even if the first navigation is slow/fails —
+    // the live viewer will just show whatever the page settles on, and the
+    // user can navigate from there themselves like any browser tab.
+    console.log("[live] initial goto error: " + redactErrorMessage(String(e?.message || e)));
+  });
+  return { browser, context, page, targetUrl, targetOrigin };
+}
+
+// One JPEG screenshot of the live page's current state — polled by the
+// frontend (every few hundred ms) and shown as a plain <img>, the simplest
+// viewer that needs no extra client-side library or WebSocket plumbing.
+export async function captureLiveFrame(page) {
+  return page.screenshot({ type: "jpeg", quality: 55 });
+}
+
+// Translates one relayed input event into the equivalent real action on the
+// live page. Deliberately NOT origin-restricted (unlike Phase 2's
+// credentialed capture) — the user is driving their own browsing session
+// exactly as they would in a normal tab (which may legitimately cross into
+// an SSO/IdP origin, e.g. "Sign in with Google"), and nothing here ever
+// reads back a field's value, so there's no credential-interception surface
+// to sandbox against.
+export async function sendLiveInput(page, input) {
+  const type = input?.type;
+  if (type === "click") {
+    await page.mouse.click(Number(input.x) || 0, Number(input.y) || 0, { button: input.button === "right" ? "right" : "left" });
+  } else if (type === "dblclick") {
+    await page.mouse.dblclick(Number(input.x) || 0, Number(input.y) || 0);
+  } else if (type === "move") {
+    await page.mouse.move(Number(input.x) || 0, Number(input.y) || 0);
+  } else if (type === "scroll") {
+    await page.mouse.wheel(Number(input.deltaX) || 0, Number(input.deltaY) || 0);
+  } else if (type === "type") {
+    await page.keyboard.type(String(input.text || ""), { delay: 15 });
+  } else if (type === "key") {
+    await page.keyboard.press(String(input.key || ""));
+  } else if (type === "goto") {
+    const dest = normalizeUrl(input.url);
+    if (dest) await page.goto(dest, { waitUntil: "domcontentloaded", timeout: GOTO_TIMEOUT_MS }).catch(() => { });
+  } else if (type === "back") {
+    await page.goBack({ waitUntil: "domcontentloaded", timeout: GOTO_TIMEOUT_MS }).catch(() => { });
+  } else if (type === "forward") {
+    await page.goForward({ waitUntil: "domcontentloaded", timeout: GOTO_TIMEOUT_MS }).catch(() => { });
+  }
+  let url = "";
+  try { url = page.url(); } catch { /* ignore */ }
+  return { url };
+}
+
+export async function closeLiveSession(session) {
+  try { await session?.context?.close(); } catch { /* ignore */ }
+  try { await session?.browser?.close(); } catch { /* ignore */ }
+}
+
+/**
+ * runLiveHandoffCapture({ url, storageState, plan }, onProgress) — the
+ * recorded second half of a live-login capture. Opens a *fresh* browser
+ * context seeded with the storageState exported from the live session the
+ * user just logged into by hand (cookies + localStorage only — never a
+ * password, since none was ever collected), with video recording turned
+ * on, then runs the exact same walkthrough/record/upload pipeline
+ * runCapture uses for its own authenticated branch. If the handed-off
+ * session doesn't actually look logged in on this fresh context (storage
+ * state didn't carry an essential cookie, or the session had already
+ * expired), this returns status "login_required" rather than
+ * "login_failed" — there was no password to get wrong, so "failed login"
+ * would be a misleading status here.
+ */
+export async function runLiveHandoffCapture(spec, onProgress = () => { }) {
+  const targetUrl = normalizeUrl(spec?.url);
+  if (!targetUrl) throw new Error("A valid http(s) url is required.");
+  const targetOrigin = new URL(targetUrl).origin;
+  const log = (msg) => console.log(`[live-capture] ${msg}`);
+
+  const workDir = await fs.mkdtemp(path.join(os.tmpdir(), "capture-"));
+  let browser = null;
+  try {
+    onProgress({ fraction: 0 });
+    browser = await chromium.launch({ headless: true });
+    const context = await browser.newContext({
+      viewport: VIEWPORT,
+      recordVideo: { dir: workDir, size: VIEWPORT },
+      acceptDownloads: false,
+      storageState: spec.storageState || undefined,
+    });
+    const page = await context.newPage();
+    page.on("download", (d) => { d.cancel().catch(() => { }); });
+
+    const deadline = Date.now() + CAPTURE_MAX_SECONDS * 1000;
+
+    await installSafetyGuards(context);
+
+    log(`navigating to ${redactUrl(targetUrl)}`);
+    await page.goto(targetUrl, { waitUntil: "domcontentloaded", timeout: GOTO_TIMEOUT_MS });
+    await declineCookieBanner(page);
+
+    if (await isLoginRequired(page)) {
+      log("still shows a login wall after handoff — the session may have expired.");
+      await context.close();
+      return { status: "login_required" };
+    }
+
+    const pageInfo = await extractPageInfo(page);
+
+    const steps = Array.isArray(spec.plan) && spec.plan.length
+      ? normalizePlan(spec.plan)
+      : await buildAutoPlan(page, targetUrl, targetOrigin);
+
+    onProgress({ fraction: 0.1, stepIndex: 0, stepTotal: steps.length });
+
+    let loginRequired = false;
+    for (let i = 0; i < steps.length; i++) {
+      if (Date.now() >= deadline) {
+        log(`duration cap (${CAPTURE_MAX_SECONDS}s) reached — stopping early at step ${i}/${steps.length}.`);
+        break;
+      }
+      onProgress({ fraction: 0.1 + (i / steps.length) * 0.6, stepIndex: i, stepTotal: steps.length });
+      await executeStep(page, steps[i], targetUrl, targetOrigin, log);
+      if (await isLoginRequired(page)) { loginRequired = true; break; }
+    }
+
+    const video = page.video();
+    await context.close();
+    await browser.close();
+    browser = null;
+
+    if (loginRequired) {
+      log("login required mid-walkthrough — aborting capture, discarding recording.");
+      return { status: "login_required" };
+    }
+
+    const { videoUrl, durationSeconds } = await finalizeRecording(video, workDir, onProgress);
+    return { status: "done", videoUrl, durationSeconds, pageInfo };
+  } finally {
+    if (browser) await browser.close().catch(() => { });
+    await fs.rm(workDir, { recursive: true, force: true }).catch(() => { });
+  }
+}
+
 async function convertToMp4(video, workDir) {
   const videoPath = video ? await video.path() : null;
   if (!videoPath) throw new Error("Recording produced no video file.");
