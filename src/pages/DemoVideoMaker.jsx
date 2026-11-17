@@ -104,11 +104,33 @@ export default function DemoVideoMaker() {
   const [captureSaved, setCaptureSaved] = useState(false);
   const captureCancelledRef = useRef(false);
 
+  // Mode D — live login: the caller sees and drives a real, server-hosted
+  // browser (via polled frames + relayed clicks/keystrokes) to log into
+  // their own site themselves. No username or password is ever collected
+  // by, or sent through, this app — see startLiveCapture's doc comment.
+  // Once they confirm they're logged in, the worker hands that session off
+  // into the same recorded-walkthrough pipeline Server Capture uses, so
+  // its result reuses captureResult/captureSaved above.
+  const [liveSession, setLiveSession] = useState(null); // { sessionId, token, frameUrl, inputUrl, cancelUrl }
+  const [liveStarting, setLiveStarting] = useState(false);
+  const [liveFrameSrc, setLiveFrameSrc] = useState("");
+  const [liveFinishing, setLiveFinishing] = useState(false);
+  const [liveConfirmLoggedIn, setLiveConfirmLoggedIn] = useState(false);
+  const liveFramePollRef = useRef(null);
+  const liveImgRef = useRef(null);
+
+  // Review-before-finalizing: shown once any mode produces a result, before
+  // it's saved to the library — lets the caller flag something to fix
+  // instead of only ever being able to accept or silently discard it.
+  const [revisionNotes, setRevisionNotes] = useState("");
+  const [revising, setRevising] = useState(false);
+
   const resetResults = () => {
     setWalkthroughResult(null); setWalkthroughSaved(false);
     setVoiceoverUrl(""); voiceoverBlobRef.current = null;
     setRecordedUrl(""); recordedBlobRef.current = null; setRecordingSaved(false);
     setCaptureResult(null); setCaptureSaved(false);
+    setRevisionNotes("");
   };
 
   const analyze = async () => {
