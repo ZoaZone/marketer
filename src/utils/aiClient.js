@@ -471,6 +471,49 @@ export async function getCaptureStatus(captureId) {
 }
 
 /**
+ * startLiveCapture({ url }) — opens an interactive live-login session on
+ * the capture worker: a real headless browser the caller will see (as
+ * polled frames) and control (clicks/keystrokes) to log into their own
+ * site themselves. No username/password is ever sent through this call or
+ * any other part of this flow. Returns { sessionId, token, frameUrl,
+ * inputUrl, cancelUrl, expiresInSeconds } — frameUrl/inputUrl/cancelUrl
+ * are called directly (not through a Base44 function) for low-latency
+ * polling/input; they're already scoped to this one session via `token`.
+ */
+export async function startLiveCapture({ url }) {
+  const res = await base44.functions.invoke("startLiveCapture", { url });
+  const data = res?.data ?? res;
+  if (!data?.sessionId) throw new Error(data?.error || "Could not start a live login session.");
+  return data;
+}
+
+/**
+ * finishLiveCapture({ sessionId, token, plan? }) — tells the worker the
+ * caller has finished logging in. The worker carries the now-authenticated
+ * session's cookies over into a fresh, recorded context and queues the
+ * real walkthrough. Returns the capture id; poll it with getCaptureStatus
+ * exactly like any other capture.
+ */
+export async function finishLiveCapture({ sessionId, token, plan }) {
+  return submitWorkerJob("finishLiveCapture", { sessionId, token, plan }, {
+    idField: "captureId",
+    offlineCode: "capture_worker_unreachable",
+    offlineMessage: "The capture service is offline. Please try again shortly.",
+    genericMessage: "Could not finish the live session.",
+  });
+}
+
+/**
+ * cancelLiveCapture({ sessionId }) — closes an abandoned live-login
+ * session early, freeing the worker's browser and concurrency slot. Fully
+ * best-effort: never throws, since there's nothing a caller could usefully
+ * do about this failing (the session times out on its own regardless).
+ */
+export async function cancelLiveCapture({ sessionId }) {
+  try { await base44.functions.invoke("cancelLiveCapture", { sessionId }); } catch (_e) { /* best-effort */ }
+}
+
+/**
  * Submit an AI audio-dubbing job (ElevenLabs Dubbing API — see
  * server-render/dub.js's dubAudio for the spec) to the render worker.
  * Returns the job id; poll it with getDubStatus(). Throws a friendly
