@@ -65,6 +65,7 @@ export default function DemoVideoMaker() {
   const [musicUrl, setMusicUrl] = useState("");
   const [musicName, setMusicName] = useState("");
   const [uploadingMusic, setUploadingMusic] = useState(false);
+  const [generatingMusic, setGeneratingMusic] = useState(false);
   const [warnings, setWarnings] = useState([]);
 
   // Mode B — screen recording + AI voiceover
@@ -179,6 +180,29 @@ export default function DemoVideoMaker() {
       setError(e?.message || "Script generation failed.");
     }
     setScanning(false);
+  };
+
+  // Explicit "Generate with AI" for the Music tab — the auto-generation
+  // fallback inside generateWalkthrough() (triggered when audioMode ===
+  // "music" and no track was ever uploaded) already called this same
+  // Lane 2 generateMusic(), but silently, at submit time, with no way to
+  // preview or redo the track first. This gives it its own button and
+  // visible result, same as Upload.
+  const handleGenerateMusic = async () => {
+    setError(""); setGeneratingMusic(true);
+    try {
+      const totalSeconds = script ? Math.min(Math.max(splitScriptIntoScenes(script, 4).length * 8, 20), 120) : 30;
+      const music = await generateMusic({
+        prompt: `Upbeat, modern, inspiring background music for a product demo about ${description || "an AI creative platform"}. Instrumental, no vocals.`,
+        durationSeconds: totalSeconds,
+        instrumental: true,
+      });
+      if (music?.url) { setMusicUrl(music.url); setMusicName("AI-generated track"); }
+      else setError("AI music generation returned no track. Try again or upload your own.");
+    } catch (e) {
+      setError(e?.message || "AI music generation failed.");
+    }
+    setGeneratingMusic(false);
   };
 
   const handleMusicUpload = async (file) => {
@@ -757,16 +781,31 @@ if (realVideo) {
 
               {audioMode === "music" && (
                 <div>
-                  <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">Music track (required — upload one, or ships silent)</label>
-                  <label className="w-full flex items-center gap-3 p-3 rounded-xl border border-border text-left cursor-pointer hover:bg-muted/20 transition-all">
-                    <Music className="w-4 h-4 shrink-0 text-muted-foreground" />
-                    <span className="flex-1 text-sm text-muted-foreground truncate">
-                      {uploadingMusic ? "Uploading…" : musicName || "Upload a music track"}
-                    </span>
-                    {uploadingMusic ? <Loader2 className="w-4 h-4 animate-spin shrink-0" /> : musicUrl ? <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" /> : null}
-                    <input type="file" accept="audio/*" className="hidden" disabled={uploadingMusic}
-                      onChange={e => { handleMusicUpload(e.target.files?.[0]); e.target.value = ""; }} />
-                  </label>
+                  <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">Music track — generate with AI or upload your own</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button type="button" onClick={handleGenerateMusic} disabled={generatingMusic || uploadingMusic}
+                      className="flex items-center justify-center gap-2 p-3 rounded-xl border border-fuchsia-500/40 bg-fuchsia-500/10 text-fuchsia-400 text-sm font-semibold hover:bg-fuchsia-500/20 disabled:opacity-60 transition-all">
+                      {generatingMusic ? <Loader2 className="w-4 h-4 animate-spin shrink-0" /> : <Sparkles className="w-4 h-4 shrink-0" />}
+                      {generatingMusic ? "Composing…" : "Generate with AI"}
+                    </button>
+                    <label className="flex items-center gap-2 p-3 rounded-xl border border-border text-left cursor-pointer hover:bg-muted/20 transition-all">
+                      <Music className="w-4 h-4 shrink-0 text-muted-foreground" />
+                      <span className="flex-1 text-sm text-muted-foreground truncate">
+                        {uploadingMusic ? "Uploading…" : "Upload a track"}
+                      </span>
+                      <input type="file" accept="audio/*" className="hidden" disabled={uploadingMusic || generatingMusic}
+                        onChange={e => { handleMusicUpload(e.target.files?.[0]); e.target.value = ""; }} />
+                    </label>
+                  </div>
+                  {musicUrl && (
+                    <div className="mt-2 flex items-center gap-2 p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs">
+                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                      <span className="flex-1 truncate">{musicName || "Track ready"}</span>
+                      <audio controls src={musicUrl} className="h-7 max-w-[160px]" />
+                      <button type="button" onClick={() => { setMusicUrl(""); setMusicName(""); }} className="underline hover:text-emerald-300">Clear</button>
+                    </div>
+                  )}
+                  {!musicUrl && <p className="mt-1.5 text-[11px] text-muted-foreground">If you generate the video without a track here, one will be composed automatically.</p>}
                 </div>
               )}
 
