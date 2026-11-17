@@ -269,7 +269,9 @@ app.get("/live/:id/frame", async (req, res) => {
   }
 });
 
-app.post("/live/:id/input", express.json({ limit: "256kb" }), async (req, res) => {
+// Body already parsed by the global express.json() middleware registered
+// above — no extra body parser needed here.
+app.post("/live/:id/input", async (req, res) => {
   const session = requireLiveToken(req, res);
   if (!session) return;
   try {
