@@ -393,6 +393,35 @@ if (realVideo) {
     setCapturing(false);
   };
 
+  // Shared polling tail for any capture job id, regardless of which mode
+  // started it (Server Capture's own submitCapture, or Live Login's
+  // finishLiveCapture handoff) — both produce the exact same job shape, so
+  // both drive the same captureResult/captureStepLabel/capturePercent UI.
+  const pollCaptureJob = async (captureId, { loginRequiredMessage } = {}) => {
+    const startedAt = Date.now();
+    for (;;) {
+      if (captureCancelledRef.current) return;
+      if (Date.now() - startedAt > CAPTURE_TIMEOUT_MS) throw new Error("Capture timed out. Please try again.");
+      await new Promise((resolve) => setTimeout(resolve, CAPTURE_POLL_MS));
+      const job = await getCaptureStatus(captureId);
+      if (typeof job?.stepIndex === "number" && typeof job?.stepTotal === "number" && job.stepTotal > 0) {
+        setCaptureStepLabel(`Capturing walkthrough… step ${Math.min(job.stepIndex + 1, job.stepTotal)} of ${job.stepTotal}`);
+      }
+      if (typeof job?.percent === "number") setCapturePercent(job.percent / 100);
+      if (job?.status === "done") { setCaptureResult({ url: job.videoUrl }); return; }
+      if (job?.status === "login_required") {
+        throw new Error(job.error || loginRequiredMessage || "This page requires a login — turn on Authenticated capture and provide credentials.");
+      }
+      if (job?.status === "login_failed") {
+        // Deliberately generic, same as the worker's own message — never
+        // surface anything from the credentials that were sent.
+        throw new Error("Login failed. Please double-check the credentials and try again.");
+      }
+      if (job?.status === "error") throw new Error(job.error || "Capture failed.");
+      // else "queued" / "processing" — keep polling
+    }
+  };
+
   const startServerCapture = async () => {
     if (!url.trim()) { setError("Enter a URL first."); return; }
     if (captureAuthenticated && (!capturePassword || !captureConsent)) {
@@ -422,32 +451,107 @@ if (realVideo) {
       // in memory/React DevTools for the rest of the session.
       setCapturePassword(""); setCaptureUsername("");
 
-      const startedAt = Date.now();
-      for (;;) {
-        if (captureCancelledRef.current) return;
-        if (Date.now() - startedAt > CAPTURE_TIMEOUT_MS) throw new Error("Capture timed out. Please try again.");
-        await new Promise((resolve) => setTimeout(resolve, CAPTURE_POLL_MS));
-        const job = await getCaptureStatus(captureId);
-        if (typeof job?.stepIndex === "number" && typeof job?.stepTotal === "number" && job.stepTotal > 0) {
-          setCaptureStepLabel(`Capturing walkthrough… step ${Math.min(job.stepIndex + 1, job.stepTotal)} of ${job.stepTotal}`);
-        }
-        if (typeof job?.percent === "number") setCapturePercent(job.percent / 100);
-        if (job?.status === "done") { setCaptureResult({ url: job.videoUrl }); break; }
-        if (job?.status === "login_required") {
-          throw new Error(job.error || "This page requires a login — turn on Authenticated capture and provide credentials.");
-        }
-        if (job?.status === "login_failed") {
-          // Deliberately generic, same as the worker's own message — never
-          // surface anything from the credentials that were sent.
-          throw new Error("Login failed. Please double-check the credentials and try again.");
-        }
-        if (job?.status === "error") throw new Error(job.error || "Capture failed.");
-        // else "queued" / "processing" — keep polling
-      }
+      await pollCaptureJob(captureId);
     } catch (e) {
       if (!captureCancelledRef.current) setError(e?.message || "Capture failed.");
     }
     if (!captureCancelledRef.current) setCapturing(false);
+  };
+
+  // ── Mode D: Live Login ──
+  const stopLiveFramePolling = () => {
+    if (liveFramePollRef.current) { clearInterval(liveFramePollRef.current); liveFramePollRef.current = null; }
+  };
+
+  const startLiveSession = async () => {
+    if (!url.trim()) { setError("Enter a URL first."); return; }
+    setError(""); setCaptureResult(null); setCaptureSaved(false); setLiveConfirmLoggedIn(false);
+    setLiveStarting(true);
+    try {
+      const cleanUrl = url.startsWith("http") ? url : `https://${url}`;
+      const session = await startLiveCapture({ url: cleanUrl });
+      setLiveSession(session);
+      // Poll JPEG frames and show them as a plain <img> — the simplest
+      // viewer that needs no extra client library or WebSocket plumbing.
+      liveFramePollRef.current = setInterval(async () => {
+        try {
+          const res = await fetch(`${session.frameUrl}&t=${Date.now()}`, { cache: "no-store" });
+          if (!res.ok) return;
+          const blob = await res.blob();
+          setLiveFrameSrc((prev) => { if (prev) URL.revokeObjectURL(prev); return URL.createObjectURL(blob); });
+        } catch { /* a dropped frame isn't worth surfacing as an error */ }
+      }, LIVE_FRAME_POLL_MS);
+    } catch (e) {
+      setError(e?.message || "Could not start a live login session.");
+    }
+    setLiveStarting(false);
+  };
+
+  // Scales a click/mouse position from the rendered <img> back to the
+  // worker's real 1920x1080 viewport before sending it.
+  const liveImagePointToViewport = (clientX, clientY) => {
+    const el = liveImgRef.current;
+    if (!el) return { x: 0, y: 0 };
+    const rect = el.getBoundingClientRect();
+    const x = Math.round(((clientX - rect.left) / rect.width) * LIVE_VIEWPORT.width);
+    const y = Math.round(((clientY - rect.top) / rect.height) * LIVE_VIEWPORT.height);
+    return { x: Math.max(0, Math.min(LIVE_VIEWPORT.width, x)), y: Math.max(0, Math.min(LIVE_VIEWPORT.height, y)) };
+  };
+
+  const sendLiveInputEvent = async (input) => {
+    if (!liveSession?.inputUrl) return;
+    try {
+      await fetch(liveSession.inputUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...input, token: liveSession.token }),
+      });
+    } catch { /* a dropped input event isn't worth surfacing as an error — the
+                 user can just click/type again */ }
+  };
+
+  const handleLiveClick = (e) => {
+    const { x, y } = liveImagePointToViewport(e.clientX, e.clientY);
+    sendLiveInputEvent({ type: "click", x, y });
+  };
+
+  const handleLiveWheel = (e) => {
+    e.preventDefault();
+    sendLiveInputEvent({ type: "scroll", deltaX: e.deltaX, deltaY: e.deltaY });
+  };
+
+  const handleLiveKeyDown = (e) => {
+    e.preventDefault();
+    // One event per keydown, forwarded as a Playwright key name — this
+    // covers both printable characters ("a", "@", "5") and named keys
+    // ("Enter", "Backspace", "Tab") in a single, simple path, with no
+    // separate "type a whole string" action needed.
+    const key = e.key === " " ? "Space" : e.key;
+    sendLiveInputEvent({ type: "key", key });
+  };
+
+  const cancelLiveSession = async () => {
+    stopLiveFramePolling();
+    if (liveSession?.sessionId) cancelLiveCapture({ sessionId: liveSession.sessionId });
+    setLiveSession(null); setLiveFrameSrc(""); setLiveConfirmLoggedIn(false);
+  };
+
+  const finishLiveSession = async () => {
+    if (!liveSession) return;
+    stopLiveFramePolling();
+    captureCancelledRef.current = false;
+    setLiveFinishing(true); setError("");
+    try {
+      const captureId = await finishLiveCapture({ sessionId: liveSession.sessionId, token: liveSession.token });
+      setLiveSession(null); setLiveFrameSrc("");
+      setCapturing(true); setCaptureStepLabel("Recording your walkthrough…"); setCapturePercent(0);
+      await pollCaptureJob(captureId, {
+        loginRequiredMessage: "The logged-in session couldn't be carried over — it may have expired. Please try Live Login again.",
+      });
+    } catch (e) {
+      setError(e?.message || "Could not finish the live session.");
+    }
+    setLiveFinishing(false); setCapturing(false);
   };
 
   const saveCapture = async () => {
