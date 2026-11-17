@@ -15,7 +15,7 @@
 import express from "express";
 import cors from "cors";
 import { nanoid } from "nanoid";
-import { runCapture, runAppDemoWalkthrough, redactUrl } from "./capture.js";
+import { runCapture, runAppDemoWalkthrough, redactUrl, launchLiveSession, captureLiveFrame, sendLiveInput, closeLiveSession, runLiveHandoffCapture } from "./capture.js";
 import { encryptCredentials, decryptCredentials, zeroCredentials, credentialEncryptionAvailable } from "./credentials.js";
 
 const PORT = process.env.PORT || 8080;
@@ -26,6 +26,13 @@ const MAX_CONCURRENT_PER_USER = Number(process.env.CAPTURE_MAX_CONCURRENT_PER_US
 // (Movie Maker's "Auto Demo from URL") always send an explicit url, so
 // this only matters for a bare health-check-style call.
 const TARGET_BASE_URL = process.env.TARGET_BASE_URL || "https://digitalstudios.app";
+// Phase 3 (live login capture): how long a caller may keep an interactive
+// live session open before it's force-closed and its concurrency slot
+// freed, in case the tab is abandoned mid-login. Generous enough for a real
+// login flow (password manager, 2FA code, SSO redirect) without holding a
+// headless Chromium instance open indefinitely on this worker's single-job
+// queue.
+const LIVE_SESSION_MAX_MS = (Number(process.env.CAPTURE_LIVE_SESSION_MAX_SECONDS) || 360) * 1000;
 
 // An unauthenticated capture worker would let anyone point a headless
 // browser at arbitrary URLs through this service — refuse to start rather
@@ -121,11 +128,15 @@ async function processQueue() {
 
     const result = next.kind === "appDemo"
       ? await runAppDemoWalkthrough(onProgress, TARGET_BASE_URL, credentials, authToken)
-      : await runCapture(next.spec, onProgress, credentials, authToken);
+      : next.kind === "liveHandoff"
+        ? await runLiveHandoffCapture(next.spec, onProgress)
+        : await runCapture(next.spec, onProgress, credentials, authToken);
 
     if (result.status === "login_required") {
       job.status = "login_required";
-      job.error = "This page requires a login and can't be captured yet — Phase 1 only supports public pages.";
+      job.error = next.kind === "liveHandoff"
+        ? "The logged-in session couldn't be carried over — it may have expired. Please try the live login again."
+        : "This page requires a login and can't be captured yet — Phase 1 only supports public pages.";
     } else if (result.status === "login_failed") {
       // Deliberately generic — never echoes which field failed or any
       // credential value, per the "return a generic login failed" rule.
