@@ -473,6 +473,16 @@ if (realVideo) {
   const stopLiveFramePolling = () => {
     if (liveFramePollRef.current) { clearInterval(liveFramePollRef.current); liveFramePollRef.current = null; }
   };
+  stopLiveFramePollingRef.current = stopLiveFramePolling;
+
+  useEffect(() => {
+    // Free the worker's browser/concurrency slot if the user navigates away
+    // mid-login rather than clicking Cancel.
+    return () => {
+      stopLiveFramePollingRef.current?.();
+      if (liveSessionRef.current?.sessionId) cancelLiveCapture({ sessionId: liveSessionRef.current.sessionId });
+    };
+  }, []);
 
   const startLiveSession = async () => {
     if (!url.trim()) { setError("Enter a URL first."); return; }
@@ -482,6 +492,7 @@ if (realVideo) {
       const cleanUrl = url.startsWith("http") ? url : `https://${url}`;
       const session = await startLiveCapture({ url: cleanUrl });
       setLiveSession(session);
+      liveSessionRef.current = session;
       // Poll JPEG frames and show them as a plain <img> — the simplest
       // viewer that needs no extra client library or WebSocket plumbing.
       liveFramePollRef.current = setInterval(async () => {
@@ -544,6 +555,7 @@ if (realVideo) {
   const cancelLiveSession = async () => {
     stopLiveFramePolling();
     if (liveSession?.sessionId) cancelLiveCapture({ sessionId: liveSession.sessionId });
+    liveSessionRef.current = null;
     setLiveSession(null); setLiveFrameSrc(""); setLiveConfirmLoggedIn(false);
   };
 
@@ -554,6 +566,7 @@ if (realVideo) {
     setLiveFinishing(true); setError("");
     try {
       const captureId = await finishLiveCapture({ sessionId: liveSession.sessionId, token: liveSession.token });
+      liveSessionRef.current = null;
       setLiveSession(null); setLiveFrameSrc("");
       setCapturing(true); setCaptureStepLabel("Recording your walkthrough…"); setCapturePercent(0);
       await pollCaptureJob(captureId, {
