@@ -37,6 +37,7 @@ const LIVE_VIEWPORT = { width: 1920, height: 1080 };
 // music here is upload-only — Lane 1 doesn't have access to AI music
 // generation (that's a paid provider call, Lane 2 only).
 const AUDIO_MODES = [
+  { id: "both", label: "Voice + Music", icon: Mic },
   { id: "voiceover", label: "Voiceover", icon: Mic },
   { id: "music", label: "Music", icon: Music },
   { id: "silent", label: "Silent", icon: VolumeX },
@@ -56,7 +57,7 @@ export default function DemoVideoMaker() {
   // Mode A — AI-narrated walkthrough
   const [ratio, setRatio] = useState("16:9");
   const [resolution, setResolution] = useState("1080p"); // "1080p" | "720p"
-  const [audioMode, setAudioMode] = useState("voiceover"); // "voiceover" | "music" | "silent"
+  const [audioMode, setAudioMode] = useState("both"); // "both" | "voiceover" | "music" | "silent"
   const [generatingVideo, setGeneratingVideo] = useState(false);
   const [progress, setProgress] = useState(0);
   const [statusMsg, setStatusMsg] = useState("");
@@ -249,12 +250,15 @@ export default function DemoVideoMaker() {
 
       let voiceoverUrl;
       let finalMusicUrl = musicUrl || undefined;
-      if (audioMode === "voiceover") {
+      const wantVoice = audioMode === "voiceover" || audioMode === "both";
+      const wantMusic = audioMode === "music" || audioMode === "both";
+      if (wantVoice) {
         setStatusMsg("Generating voiceover...");
         const blob = await generateVoiceover(scenes.map(s => s.text).join(". "));
         if (blob) voiceoverUrl = await uploadFile(new File([blob], "demo-vo.mp3", { type: blob.type || "audio/mpeg" }));
         else setWarnings(prev => [...prev, "No voiceover was produced — shipping silent instead."]);
-      } else if (audioMode === "music" && !finalMusicUrl) {
+      }
+      if (wantMusic && !finalMusicUrl) {
         // No track uploaded: generate AI background music (Lane 2).
         setStatusMsg("Composing AI background music...");
         const totalSeconds = scenes.reduce((s, sc) => s + (sc.seconds || 8), 0);
@@ -290,7 +294,10 @@ try {
 } catch (_e) { realVideo = false; }
 
 let hostedUrl;
-const effectiveAudioMode = (audioMode === "voiceover" && !voiceoverUrl) || (audioMode === "music" && !finalMusicUrl) ? "silent" : audioMode;
+if (!wantVoice) voiceoverUrl = undefined;
+if (!wantMusic) finalMusicUrl = undefined;
+// Omitting audioMode makes the renderer mix every supplied track (voice + music).
+const effectiveAudioMode = voiceoverUrl || finalMusicUrl ? undefined : "silent";
 if (realVideo) {
   const videoScenes = [];
   for (let i = 0; i < scenes.length; i++) {
@@ -304,7 +311,7 @@ if (realVideo) {
     videoScenes.push({ imageUrl: scenes[i].imageUrl, videoUrl: clipUrl, seconds: scenes[i].seconds, subtitle: scenes[i].text });
   }
   setStatusMsg("Rendering your video...");
-  const jobId = await submitRender({ scenes: videoScenes, audioMode: effectiveAudioMode, voiceoverUrl, musicUrl: finalMusicUrl, burnSubtitles: true });
+  const jobId = await submitRender({ scenes: videoScenes, audioMode: effectiveAudioMode, voiceoverUrl, musicUrl: finalMusicUrl, burnSubtitles: false });
   const startedAt = Date.now();
   while (true) {
     if (Date.now() - startedAt > CAPTURE_TIMEOUT_MS) throw new Error("Video render timed out. Please try again.");
@@ -459,8 +466,8 @@ if (realVideo) {
 
   const startServerCapture = async () => {
     if (!url.trim()) { setError("Enter a URL first."); return; }
-    if (captureAuthenticated && (!capturePassword || !captureConsent)) {
-      setError("Enter a password and confirm you're authorized to log in first.");
+    if (captureAuthenticated && (!captureUsername.trim() || !capturePassword || !captureConsent)) {
+      setError("Enter the username and password, and confirm you're authorized to log in first.");
       return;
     }
 
@@ -476,7 +483,7 @@ if (realVideo) {
         passwordField: capturePasswordField.trim() || undefined,
         submitSelector: captureSubmitSelector.trim() || undefined,
         successSelector: captureSuccessSelector.trim() || undefined,
-        username: captureUsername,
+        username: captureUsername.trim(),
         password: capturePassword,
       } : undefined;
 
@@ -484,9 +491,9 @@ if (realVideo) {
       // The password (and username) only ever need to exist in state for
       // this one submit — clear them immediately rather than leaving them
       // in memory/React DevTools for the rest of the session.
-      setCapturePassword(""); setCaptureUsername("");
-
       await pollCaptureJob(captureId);
+      // Cleared only after a successful capture, so a failed login can be retried without retyping.
+      setCapturePassword(""); setCaptureUsername("");
     } catch (e) {
       if (!captureCancelledRef.current) setError(e?.message || "Capture failed.");
     }
@@ -779,7 +786,7 @@ if (realVideo) {
                 </div>
               </div>
 
-              {audioMode === "music" && (
+              {(audioMode === "music" || audioMode === "both") && (
                 <div>
                   <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">Music track — generate with AI or upload your own</label>
                   <div className="grid grid-cols-2 gap-2">
@@ -981,7 +988,7 @@ if (realVideo) {
                 </div>
               )}
 
-              <button onClick={startServerCapture} disabled={capturing || !url.trim() || (captureAuthenticated && (!capturePassword || !captureConsent))}
+              <button onClick={startServerCapture} disabled={capturing || !url.trim() || (captureAuthenticated && (!captureUsername.trim() || !capturePassword || !captureConsent))}
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white text-sm font-bold hover:opacity-90 disabled:opacity-60 shadow-lg">
                 {capturing ? <><Loader2 className="w-4 h-4 animate-spin" /> {captureStepLabel || "Capturing…"}</> : <><Video className="w-4 h-4" /> Start Capture</>}
               </button>
@@ -1022,7 +1029,6 @@ if (realVideo) {
                 <div className="space-y-3">
                   <div className="relative rounded-xl border border-fuchsia-500/40 overflow-hidden bg-black" style={{ aspectRatio: `${LIVE_VIEWPORT.width} / ${LIVE_VIEWPORT.height}` }}>
                     {liveFrameSrc ? (
-                      // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
                       <img ref={liveImgRef} src={liveFrameSrc} alt="Live browser — click and type to log in"
                         tabIndex={0}
                         onClick={handleLiveClick}
