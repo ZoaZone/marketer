@@ -30,10 +30,10 @@ import {
 } from "./audio.js";
 
 const VIEWPORT = { width: 1920, height: 1080 };
-const CAPTURE_MAX_SECONDS = Number(process.env.CAPTURE_MAX_SECONDS) || 60;
+const CAPTURE_MAX_SECONDS = Number(process.env.CAPTURE_MAX_SECONDS) || 180;
 
 const DEFAULT_SCROLL_STEPS = 5;
-const DEFAULT_NAV_LINK_COUNT = 3;
+const DEFAULT_NAV_LINK_COUNT = Number(process.env.CAPTURE_NAV_LINK_COUNT) || 6;
 const SCROLL_SETTLE_MS = 900;
 const NAV_CLICK_SETTLE_MS = 1500;
 const GOTO_TIMEOUT_MS = 20000;
@@ -351,8 +351,32 @@ async function performLogin(page, credentials, targetOrigin) {
 
   const passwordSelector = credentials.passwordField || 'input[type="password"]';
   const passwordLocator = page.locator(passwordSelector).first();
-  await passwordLocator.waitFor({ state: "visible", timeout: 30000 }).catch(() => { });
-  if (!(await passwordLocator.isVisible({ timeout: 20000 }).catch(() => false))) {
+
+  // Two-step logins (email screen -> "Continue" -> password screen) are
+  // common — this app's own /auth page is one. Wait briefly for a password
+  // field; if the page is still on the email step, fill the username field
+  // and press that step's continue control, then wait for the password
+  // screen. Without this the capture gave up on a perfectly valid login and
+  // reported a generic credentials failure.
+  await passwordLocator.waitFor({ state: "visible", timeout: 6000 }).catch(() => { });
+  if (!(await passwordLocator.isVisible({ timeout: 1000 }).catch(() => false))) {
+    const stepUsernameSelector = credentials.usernameField
+      || 'form input[autocomplete="username"], form input[type="email"], input[autocomplete="username"], input[type="email"], input[name*="email" i], input[id*="email" i], input[name*="user" i], input[name*="login" i], form input[type="text"]';
+    const stepUsernameLocator = page.locator(stepUsernameSelector).first();
+    if (await stepUsernameLocator.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await reactSafeFill(stepUsernameLocator, credentials.username || "");
+      const continueControl = page.locator(
+        'form button[type="submit"], button:has-text("Continue"), button:has-text("Next"), button:has-text("Proceed"), button:has-text("Sign in"), button:has-text("Sign In"), button:has-text("Log in"), button:has-text("Log In")'
+      ).first();
+      if (await continueControl.isVisible({ timeout: 2000 }).catch(() => false)) {
+        await continueControl.click().catch(() => { });
+        console.log("[capture] login: stepped past the email screen, waiting for the password field.");
+      }
+      await passwordLocator.waitFor({ state: "visible", timeout: 20000 }).catch(() => { });
+    }
+  }
+
+  if (!(await passwordLocator.isVisible({ timeout: 5000 }).catch(() => false))) {
     const diag = await page.evaluate(() => {
       const norm = (s) => (s || "").replace(/\s+/g, " ").trim().slice(0, 200);
       return {
@@ -360,12 +384,12 @@ async function performLogin(page, credentials, targetOrigin) {
         buttons: Array.from(document.querySelectorAll("button, [role=button]")).map((el) => norm(el.textContent)).filter(Boolean).slice(0, 8),
       };
     }).catch(() => ({}));
-    console.log("[capture] login: password field not found on " + redactUrl(page.url()) + " using selector " + JSON.stringify(passwordSelector) + ". inputs=" + JSON.stringify(diag.inputs || []) + " buttons=" + JSON.stringify(diag.buttons || []));
+    console.log("[capture] login: no password field appeared (single-step form not detected) on " + redactUrl(page.url()) + " using selector " + JSON.stringify(passwordSelector) + ". inputs=" + JSON.stringify(diag.inputs || []) + " buttons=" + JSON.stringify(diag.buttons || []));
     return false;
   }
   
   const usernameSelector = credentials.usernameField
-    || 'input[type="email"], input[type="text"][name*="user" i], input[type="text"][name*="email" i], input[name*="email" i], input[name*="user" i]';
+    || 'input[autocomplete="username"], input[type="email"], input[type="text"][name*="user" i], input[type="text"][name*="email" i], input[name*="email" i], input[name*="user" i], input[id*="email" i], input[name*="login" i]';
 
   for (let attempt = 1; attempt <= LOGIN_MAX_ATTEMPTS; attempt++) {
     const usernameLocator = page.locator(usernameSelector).first();
@@ -531,7 +555,7 @@ function normalizePlan(plan) {
 // drift if the page's markup shifts between loads.
 async function discoverTopNavLinks(page, targetOrigin, count) {
   const hrefs = await page.$$eval(
-    'header a, nav a, [role="navigation"] a',
+    'header a, nav a, [role="navigation"] a, aside a, [class*="sidebar" i] a, [class*="side-nav" i] a, [class*="sideNav" i] a',
     (els) => els.map((el) => el.getAttribute("href") || "")
   ).catch(() => []);
 
@@ -564,7 +588,10 @@ async function buildAutoPlan(page, targetUrl, targetOrigin) {
   const navLinks = await discoverTopNavLinks(page, targetOrigin, DEFAULT_NAV_LINK_COUNT);
   for (const url of navLinks) {
     steps.push({ action: "goto", url, ms: NAV_CLICK_SETTLE_MS });
-    steps.push({ action: "goto", url: targetUrl }); // return to home between nav links
+    // Dwell and scroll each visited page so it is genuinely shown (and gets
+    // its own narration window) instead of bouncing straight back to home.
+    steps.push({ action: "wait", ms: 1200 });
+    for (let i = 0; i < 2; i++) steps.push({ action: "scroll", ms: SCROLL_SETTLE_MS });
   }
   return steps;
 }
@@ -837,6 +864,23 @@ export async function closeLiveSession(session) {
   try { await session?.browser?.close(); } catch { /* ignore */ }
 }
 
+// Builds one spoken line for a live-capture step. Steps from a caller plan
+// may already carry narration text; the auto plan's steps don't, so the
+// page's own heading/title describes what the viewer is looking at. Returns
+// "" when the page offers nothing usable (that step then has no voiceover).
+async function describeStepForNarration(page, step) {
+  if (step && typeof step.narration === "string" && step.narration.trim()) return step.narration.trim();
+  const info = await page.evaluate(() => {
+    const norm = (s) => (s || "").replace(/\s+/g, " ").trim();
+    const h = document.querySelector("h1, h2, [role='heading']");
+    return { title: norm(document.title), heading: norm(h && h.textContent) };
+  }).catch(() => ({ title: "", heading: "" }));
+  const heading = (info.heading || "").slice(0, 120);
+  const title = (info.title || "").split(/[|\u2013\u2014-]/)[0].trim().slice(0, 120);
+  const label = heading || title;
+  return label ? `Here's ${label}.` : "";
+}
+
 /**
  * runLiveHandoffCapture({ url, storageState, plan }, onProgress) — the
  * recorded second half of a live-login capture. Opens a *fresh* browser
@@ -894,13 +938,18 @@ export async function runLiveHandoffCapture(spec, onProgress = () => { }) {
     onProgress({ fraction: 0.1, stepIndex: 0, stepTotal: steps.length });
 
     let loginRequired = false;
+    const stepDurationsMs = [];
+    const stepNarrations = [];
     for (let i = 0; i < steps.length; i++) {
       if (Date.now() >= deadline) {
         log(`duration cap (${CAPTURE_MAX_SECONDS}s) reached — stopping early at step ${i}/${steps.length}.`);
         break;
       }
       onProgress({ fraction: 0.1 + (i / steps.length) * 0.6, stepIndex: i, stepTotal: steps.length });
+      const stepStartedAt = Date.now();
       await executeStep(page, steps[i], targetUrl, targetOrigin, log);
+      stepDurationsMs.push(Date.now() - stepStartedAt);
+      stepNarrations.push(await describeStepForNarration(page, steps[i]).catch(() => ""));
       if (await isLoginRequired(page)) { loginRequired = true; break; }
     }
 
@@ -914,8 +963,53 @@ export async function runLiveHandoffCapture(spec, onProgress = () => { }) {
       return { status: "login_required" };
     }
 
-    const { videoUrl, durationSeconds } = await finalizeRecording(video, workDir, onProgress);
-    return { status: "done", videoUrl, durationSeconds, pageInfo };
+    onProgress({ fraction: 0.55 });
+    const { mp4Path, durationSeconds } = await convertToMp4(video, workDir);
+
+    // The live handoff used to upload the raw, silent screen recording.
+    // Narrate it exactly the way the scripted app-demo walkthrough is
+    // narrated: a per-step voiceover aligned to each step's real on-screen
+    // duration, plus a best-effort music bed. A missing TTS key degrades to
+    // the silent recording rather than failing the capture.
+    let finalPath = mp4Path;
+    const hasNarration = stepNarrations.some((n) => n && n.trim());
+    if (hasNarration && process.env.ELEVENLABS_API_KEY) {
+      try {
+        onProgress({ fraction: 0.65 });
+        log("generating per-step narration voiceover for the live capture.");
+        const voiceClips = await generateStepVoiceovers(stepNarrations, workDir);
+        const voiceoverTrackPath = await buildAlignedVoiceoverTrack(
+          stepDurationsMs.map((ms) => ms / 1000),
+          voiceClips,
+          workDir
+        );
+        try {
+          onProgress({ fraction: 0.85 });
+          log("generating background music.");
+          const musicTrackPath = await buildBackgroundMusicTrack(durationSeconds, workDir);
+          finalPath = await muxWalkthroughAudio(mp4Path, voiceoverTrackPath, musicTrackPath, durationSeconds, workDir);
+        } catch (e) {
+          log(`background music failed, muxing voiceover only: ${e.message}`);
+          finalPath = await muxVoiceoverOnly(mp4Path, voiceoverTrackPath, durationSeconds, workDir);
+        }
+      } catch (e) {
+        log(`narration failed, shipping the silent recording: ${e.message}`);
+        finalPath = mp4Path;
+      }
+    } else {
+      log("no narration produced (ELEVENLABS_API_KEY not set or no page text) — shipping the silent recording.");
+    }
+
+    onProgress({ fraction: 0.97 });
+    const videoUrl = await uploadResult(finalPath);
+    onProgress({ fraction: 1, stepIndex: steps.length, stepTotal: steps.length });
+    return {
+      status: "done",
+      videoUrl,
+      durationSeconds,
+      pageInfo,
+      steps: steps.map((s, i) => ({ path: s.url || s.path || null, label: s.label || null, narration: stepNarrations[i] || "" })),
+    };
   } finally {
     if (browser) await browser.close().catch(() => { });
     await fs.rm(workDir, { recursive: true, force: true }).catch(() => { });
