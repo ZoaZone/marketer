@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { Upload, Mic, Square, X } from 'lucide-react';
-import { btn, Slider } from '@/components/media-editor/ui';
+import { Upload, Mic, Square, X, Sparkles, Loader2 } from 'lucide-react';
+import { btn, Slider, Chip } from '@/components/media-editor/ui';
 import { totalLength, fmtTime } from '@/components/media-editor/editorModel';
+import { generateText, generateVoiceover, uploadFile } from '@/utils/lane2';
 
-// Voice-over recorder with a timeline bar: the narration is a block you can
-// place anywhere along the video with the start slider.
 export default function VoiceTimeline({ p }) {
   const recorder = useRef(null), fileIn = useRef(null), startedAt = useRef(0);
   const [recording, setRecording] = useState(false), [elapsed, setElapsed] = useState(0);
+  const [aiMode, setAiMode] = useState('write'); // 'write' | 'script'
+  const [aiTopic, setAiTopic] = useState(''), [aiScript, setAiScript] = useState('');
+  const [generating, setGenerating] = useState(false), [genStatus, setGenStatus] = useState('');
   const total = Math.max(1, totalLength(p.clips)), voice = p.voice;
 
   useEffect(() => {
@@ -30,6 +32,32 @@ export default function VoiceTimeline({ p }) {
     startedAt.current = Date.now(); setElapsed(0); rec.start(); recorder.current = rec; setRecording(true);
   });
 
+  // Generates spoken narration with AI, either from a short topic (AI writes
+  // a script sized to the timeline's length) or from the user's own script
+  // text, then synthesizes it the same way Quick Create does (ElevenLabs TTS
+  // via generateVoiceover) and drops it on the voice track.
+  const generateAiVoice = () => p.run(async () => {
+    setGenerating(true); setGenStatus('');
+    try {
+      let script = aiScript.trim();
+      if (aiMode === 'write') {
+        if (!aiTopic.trim()) throw new Error('Describe what the voice-over should say.');
+        setGenStatus('Writing script…');
+        script = await generateText({
+          type: 'script', tone: 'Conversational',
+          prompt: `Write natural spoken narration (no scene labels, no stage directions, no quotation marks) for a video about: "${aiTopic.trim()}". It should take about ${Math.round(total)} seconds to read aloud at a natural pace. Return only the narration text.`,
+        });
+      }
+      if (!script?.trim()) throw new Error('There is no script to speak yet.');
+      setGenStatus('Generating voice-over…');
+      const blob = await generateVoiceover(script.trim());
+      if (!blob) throw new Error('No audio was produced.');
+      const url = await uploadFile(new File([blob], 'ai-voiceover.mp3', { type: blob.type || 'audio/mpeg' }));
+      if (!url) throw new Error('Uploading the voice-over failed.');
+      await setTrack(url, aiMode === 'write' ? `AI voice-over — ${aiTopic.slice(0, 40)}` : 'AI voice-over (your script)', voice?.start || 0);
+    } finally { setGenerating(false); setGenStatus(''); }
+  });
+
   const start = voice?.start || 0, width = voice?.duration ? Math.min(100 - (start / total) * 100, (voice.duration / total) * 100) : 4;
   return <div className="space-y-2">
     <p className="text-xs font-semibold text-foreground">Voice-over</p>
@@ -48,12 +76,25 @@ export default function VoiceTimeline({ p }) {
       if (!file.type.startsWith('audio/') || file.size > 50 * 1024 * 1024) { p.setError('Choose an audio file (MP3, WAV, M4A) under 50 MB.'); return; }
       setTrack(URL.createObjectURL(file), file.name, voice?.start || 0);
     }} />
+    <div className="space-y-1.5 rounded-lg border border-dashed border-fuchsia-500/30 p-2.5">
+      <p className="text-[11px] font-semibold text-foreground flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5 text-fuchsia-400" />Generate with AI</p>
+      <div className="flex gap-2"><Chip active={aiMode === 'write'} onClick={() => setAiMode('write')}>Write for me</Chip><Chip active={aiMode === 'script'} onClick={() => setAiMode('script')}>Use my script</Chip></div>
+      {aiMode === 'write'
+        ? <input value={aiTopic} onChange={e => setAiTopic(e.target.value)} placeholder="What should the voice-over talk about?"
+            className="w-full rounded-lg border border-input bg-background p-2 text-xs" />
+        : <textarea value={aiScript} onChange={e => setAiScript(e.target.value)} rows={3} placeholder="Paste or type the exact script to speak…"
+            className="w-full rounded-lg border border-input bg-background p-2 text-xs" />}
+      <button type="button" className={btn} disabled={generating} onClick={generateAiVoice}>
+        {generating ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />{genStatus || 'Working…'}</> : <><Sparkles className="w-3.5 h-3.5" />Generate voice-over</>}
+      </button>
+      <p className="text-[10px] text-muted-foreground">Uses your plan's AI credits (free trial included) — about 1 credit per 1,500 characters spoken.</p>
+    </div>
     {voice && <div className="space-y-1 rounded-xl border border-border bg-card p-3">
       <div className="flex items-center gap-2"><audio src={voice.src} controls className="h-8 flex-1 min-w-0" /><button type="button" aria-label="Remove Voice-over" onClick={() => p.setVoice(null)}><X className="w-4 h-4" /></button></div>
       <p className="text-[11px] text-muted-foreground truncate">{voice.name}</p>
       <Slider label="Starts at" value={start} min={0} max={total} step={0.1} suffix="s" onChange={v => p.setVoice({ ...voice, start: v })} />
       <Slider label="Voice-over volume" value={voice.volume} min={0} max={1.5} step={0.05} onChange={v => p.setVoice({ ...voice, volume: v })} />
     </div>}
-    <p className="text-[11px] text-muted-foreground">Record your narration, then slide it to where it should begin in the video. Re-record any time.</p>
+    <p className="text-[11px] text-muted-foreground">Record your narration, upload a file, or generate one with AI — then slide it to where it should begin in the video. Re-record any time.</p>
   </div>;
 }
