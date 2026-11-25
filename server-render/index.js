@@ -25,6 +25,7 @@ import cors from "cors";
 import { nanoid } from "nanoid";
 import { randomUUID } from "node:crypto";
 import { renderProject, hasSceneVisual, estimateProjectDurationSeconds, MAX_SCENES, MAX_TOTAL_DURATION_SECONDS } from "./render.js";
+import { renderMediaEditorProject, hasMediaEditorVisual, estimateMediaEditorDurationSeconds, MAX_ME_CLIPS } from "./mediaEditorRender.js";
 import { generateMusicJob } from "./music.js";
 import { generateSceneVideo } from "./video.js";
 import { dubAudio, dubVideo } from "./dub.js";
@@ -94,7 +95,7 @@ import { createScheduler } from "./scheduler.js";
 // own rate limit (Replicate 429s under a burst — see isRetryableReplicateError),
 // not this process's capacity, and a batch that trips rate limiting is slower
 // than one that does not.
-export const CPU_BOUND_KINDS = new Set(["render", "lane1Video"]);
+export const CPU_BOUND_KINDS = new Set(["render", "lane1Video", "mediaEditorRender"]);
 const CPU_CONCURRENCY = 1;
 const PROVIDER_CONCURRENCY = Math.max(1, Number(process.env.PROVIDER_CONCURRENCY) || 3);
 
@@ -224,6 +225,8 @@ async function runJob(next) {
       result = await dubVideo(next.payload, onProgress, buildWebhookHooks(next.id));
     } else if (next.kind === "lane1Video") {
       result = await assembleLane1Video(next.project, onProgress);
+    } else if (next.kind === "mediaEditorRender") {
+      result = await renderMediaEditorProject(next.project, onProgress);
     } else {
       result = await renderProject(next.project, onProgress);
     }
@@ -321,6 +324,41 @@ app.post("/render", requireSecret, (req, res) => {
 // instead — see lane1.js. Still no Replicate involved; this is purely the
 // FFmpeg finishing step Lane 1 never had (it used to render client-side to
 // WebM via Canvas+MediaRecorder).
+// Media Editor's server-side export — a general multi-clip timeline with
+// overlay layers, an independently-timed voice track, a music track, and a
+// bass/treble/fade/duck mixer (see mediaEditorRender.js). The frontend's
+// Canvas+MediaRecorder export still exists as a fallback when this isn't
+// available, so this route failing doesn't block exporting entirely.
+app.post("/media-editor-render", requireSecret, (req, res) => {
+  const project = req.body || {};
+  if (!hasMediaEditorVisual(project)) {
+    return res.status(400).json({ error: "Each clip must have a url." });
+  }
+  const clipCount = Array.isArray(project.clips) ? project.clips.length : 0;
+  if (clipCount > MAX_ME_CLIPS) {
+    return res.status(400).json({ error: `Project has ${clipCount} clips, which exceeds the ${MAX_ME_CLIPS}-clip limit.` });
+  }
+  const estimatedSeconds = estimateMediaEditorDurationSeconds(project);
+  if (estimatedSeconds > MAX_TOTAL_DURATION_SECONDS) {
+    return res.status(400).json({ error: `Project's estimated duration (${Math.round(estimatedSeconds)}s) exceeds the ${MAX_TOTAL_DURATION_SECONDS}s limit.` });
+  }
+
+  const id = nanoid();
+  jobs.set(id, {
+    id,
+    kind: "mediaEditorRender",
+    status: "queued",
+    progress: 0,
+    url: null,
+    captionsUrl: null,
+    error: null,
+    createdAt: Date.now(),
+  });
+  scheduler.enqueue({ id, kind: "mediaEditorRender", project });
+
+  res.status(202).json({ jobId: id });
+});
+
 app.post("/lane1-video", requireSecret, (req, res) => {
   const project = req.body || {};
   const hasScene = Array.isArray(project.scenes) && project.scenes.some((s) => s && typeof s.imageUrl === "string" && s.imageUrl.trim());
