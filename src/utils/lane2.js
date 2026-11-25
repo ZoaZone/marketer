@@ -27,6 +27,7 @@ import {
 import {
   submitRender,
   getRenderStatus,
+  submitMediaEditorRender,
   submitCapture,
   getCaptureStatus,
 } from "./assembly.js";
@@ -58,6 +59,7 @@ export {
   splitScriptIntoScenes,
   submitRender,
   getRenderStatus,
+  submitMediaEditorRender,
   submitCapture,
   getCaptureStatus,
   submitVideo,
