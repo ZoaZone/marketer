@@ -729,6 +729,25 @@ export async function getRenderStatus(jobId) {
 }
 
 /**
+ * Submit a Media Editor project (see server-render/mediaEditorRender.js for
+ * the schema) to the render worker for server-side FFmpeg export — the
+ * Media Editor's counterpart to submitRender(), covering per-clip crop/
+ * zoom/pan/filter, overlay layers, an independently-timed voice track, a
+ * music track, and the bass/treble/fade/duck mixer. Returns the worker's
+ * job id; poll it with the same getRenderStatus() used for submitRender
+ * (the worker's GET /jobs/:id is generic across job kinds). Throws a
+ * friendly message if the worker itself is unreachable, or a generic one
+ * for any other failure to start the job.
+ */
+export async function submitMediaEditorRender(project) {
+  return submitWorkerJob("submitMediaEditorRender", project, {
+    offlineCode: "render_worker_unreachable",
+    offlineMessage: "The render service is offline. Please try again shortly.",
+    genericMessage: "Could not start the export.",
+  });
+}
+
+/**
  * Submit a Lane 1 short-video assembly job (Quick Create, Campaign Studio,
  * Demo Video Maker — see server-render/lane1.js for the schema) to the
  * render worker. Returns the job id; poll it with getLane1VideoStatus().
