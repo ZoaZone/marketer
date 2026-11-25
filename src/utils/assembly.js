@@ -36,6 +36,7 @@ import {
   assembleLane1Video,
   submitRender,
   getRenderStatus,
+  submitMediaEditorRender,
   submitCapture,
   getCaptureStatus,
   startLiveCapture,
@@ -46,6 +47,7 @@ import {
 export {
   submitLane1Video, getLane1VideoStatus, assembleLane1Video,
   submitRender, getRenderStatus,
+  submitMediaEditorRender,
   submitCapture, getCaptureStatus,
   startLiveCapture, finishLiveCapture, cancelLiveCapture,
 };
