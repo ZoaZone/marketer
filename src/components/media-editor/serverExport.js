@@ -8,7 +8,6 @@
 // persistent https URL — the same fix used for the photo-to-video feature
 // in ClipsPanel.jsx.
 import { uploadFile, submitMediaEditorRender, getRenderStatus } from '@/utils/lane2';
-import { totalLength } from '@/components/media-editor/editorModel';
 
 async function toHttpsUrl(src, filename) {
   if (/^https?:\/\//i.test(src)) return src; // already persistent — nothing to do
@@ -90,5 +89,3 @@ export async function exportViaServer(p, onProgress = () => {}) {
     onProgress(Math.min(99, 15 + Math.round(workerPercent * 0.85)));
   }
 }
-
-export { totalLength };
