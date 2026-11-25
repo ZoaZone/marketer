@@ -22,14 +22,19 @@ const TABS = [
 ];
 
 export default function MediaEditor() {
-  const { user } = useOutletContext() || {};
+  const { user, userTier = 0, isAdmin = false } = useOutletContext() || {};
+  // AI music generation is a paid Replicate/ElevenLabs call (same as Quick
+  // Create's and Movie Maker's) — Agency+/Lane 2, mirrors MOTION_MIN_TIER in
+  // QuickCreate.jsx. AI voice-over and photo-to-video stay open to every
+  // plan (free trial included), same as elsewhere, so they have no gate here.
+  const canMusic = isAdmin || userTier >= 3;
   const location = useLocation();
   const p = useEditorProject();
   const [tab, setTab] = useState("clips");
   const [picker, setPicker] = useState(null); // 'clips' | 'pip'
+  const [insertAt, setInsertAt] = useState(null); // clip index to insert at (picker === 'clips' only)
   const handedOff = useRef(false);
 
-  // Items sent here from the Media Library ("Edit" button) open straight away.
   useEffect(() => {
     const incoming = location.state?.assets;
     if (handedOff.current || !incoming?.length) return;
@@ -39,9 +44,9 @@ export default function MediaEditor() {
 
   const selClip = p.clips.find(c => c.id === p.selClipId) || p.clips[0];
   const panels = {
-    clips: <ClipsPanel p={p} openLibrary={() => setPicker("clips")} />,
+    clips: <ClipsPanel p={p} openLibrary={atIndex => { setInsertAt(typeof atIndex === "number" ? atIndex : null); setPicker("clips"); }} />,
     layers: <LayersPanel p={p} openLibrary={() => setPicker("pip")} />,
-    audio: <AudioPanel p={p} />,
+    audio: <AudioPanel p={p} canMusic={canMusic} />,
     size: <SizePanel p={p} />,
     ai: <AiPanel p={p} />,
     export: <ExportPanel p={p} />,
@@ -50,7 +55,7 @@ export default function MediaEditor() {
   return (
     <div className="max-w-6xl mx-auto space-y-5">
       <PageHeader icon={Film} iconGradient="from-fuchsia-500 to-purple-600" title="Edit Media"
-        subtitle="Combine photos and videos, crop, add text, logos, PiP, music and voice-over. AI helps fix broken text." />
+        subtitle="Combine photos and videos, trim and split clips, crop, add text, logos, PiP, AI or custom music and voice-over, and turn photos into real AI video." />
       <div className="grid lg:grid-cols-[1fr_400px] gap-6">
         <EditorPreview size={p.size} clip={selClip} layers={p.layers} selLayerId={p.selLayerId}
           onSelectLayer={id => { p.setSelLayerId(id); setTab("layers"); }}
@@ -75,8 +80,8 @@ export default function MediaEditor() {
         </div>
       </div>
       {picker && (
-        <LibraryPicker user={user} multi={picker === "clips"} onClose={() => setPicker(null)}
-          onPick={assets => { picker === "clips" ? p.addAssets(assets) : p.addMediaLayer("pip", assets[0]); setPicker(null); }} />
+        <LibraryPicker user={user} multi={picker === "clips"} onClose={() => { setPicker(null); setInsertAt(null); }}
+          onPick={assets => { picker === "clips" ? p.addAssets(assets, insertAt) : p.addMediaLayer("pip", assets[0]); setPicker(null); setInsertAt(null); }} />
       )}
     </div>
   );
