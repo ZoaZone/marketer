@@ -3,11 +3,12 @@ import { Upload, Mic, Square, X, Sparkles, Loader2 } from 'lucide-react';
 import { btn, Slider, Chip } from '@/components/media-editor/ui';
 import { totalLength, fmtTime } from '@/components/media-editor/editorModel';
 import { generateText, generateVoiceover, uploadFile } from '@/utils/lane2';
+import { writeScriptFromVideo } from '@/components/media-editor/aiTools';
 
 export default function VoiceTimeline({ p }) {
   const recorder = useRef(null), fileIn = useRef(null), startedAt = useRef(0);
   const [recording, setRecording] = useState(false), [elapsed, setElapsed] = useState(0);
-  const [aiMode, setAiMode] = useState('write'); // 'write' | 'script'
+  const [aiMode, setAiMode] = useState('write'); // 'write' | 'script' | 'describe'
   const [aiTopic, setAiTopic] = useState(''), [aiScript, setAiScript] = useState('');
   const [generating, setGenerating] = useState(false), [genStatus, setGenStatus] = useState('');
   const total = Math.max(1, totalLength(p.clips)), voice = p.voice;
@@ -47,6 +48,10 @@ export default function VoiceTimeline({ p }) {
           type: 'script', tone: 'Conversational',
           prompt: `Write natural spoken narration (no scene labels, no stage directions, no quotation marks) for a video about: "${aiTopic.trim()}". It should take about ${Math.round(total)} seconds to read aloud at a natural pace. Return only the narration text.`,
         });
+      } else if (aiMode === 'describe') {
+        if (!p.clips.length) throw new Error('Add some photos or video first so there is something to describe.');
+        setGenStatus('Watching your video…');
+        script = await writeScriptFromVideo(p.clips, p.size, total);
       }
       if (!script?.trim()) throw new Error('There is no script to speak yet.');
       setGenStatus('Generating voice-over…');
@@ -54,7 +59,7 @@ export default function VoiceTimeline({ p }) {
       if (!blob) throw new Error('No audio was produced.');
       const url = await uploadFile(new File([blob], 'ai-voiceover.mp3', { type: blob.type || 'audio/mpeg' }));
       if (!url) throw new Error('Uploading the voice-over failed.');
-      await setTrack(url, aiMode === 'write' ? `AI voice-over — ${aiTopic.slice(0, 40)}` : 'AI voice-over (your script)', voice?.start || 0);
+      await setTrack(url, aiMode === 'write' ? `AI voice-over — ${aiTopic.slice(0, 40)}` : aiMode === 'describe' ? 'AI voice-over (from your video)' : 'AI voice-over (your script)', voice?.start || 0);
     } finally { setGenerating(false); setGenStatus(''); }
   });
 
@@ -78,12 +83,12 @@ export default function VoiceTimeline({ p }) {
     }} />
     <div className="space-y-1.5 rounded-lg border border-dashed border-fuchsia-500/30 p-2.5">
       <p className="text-[11px] font-semibold text-foreground flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5 text-fuchsia-400" />Generate with AI</p>
-      <div className="flex gap-2"><Chip active={aiMode === 'write'} onClick={() => setAiMode('write')}>Write for me</Chip><Chip active={aiMode === 'script'} onClick={() => setAiMode('script')}>Use my script</Chip></div>
-      {aiMode === 'write'
-        ? <input value={aiTopic} onChange={e => setAiTopic(e.target.value)} placeholder="What should the voice-over talk about?"
-            className="w-full rounded-lg border border-input bg-background p-2 text-xs" />
-        : <textarea value={aiScript} onChange={e => setAiScript(e.target.value)} rows={3} placeholder="Paste or type the exact script to speak…"
+      <div className="flex flex-wrap gap-2"><Chip active={aiMode === 'write'} onClick={() => setAiMode('write')}>Write for me</Chip><Chip active={aiMode === 'script'} onClick={() => setAiMode('script')}>Use my script</Chip><Chip active={aiMode === 'describe'} onClick={() => setAiMode('describe')}>Describe my video</Chip></div>
+      {aiMode === 'write' && <input value={aiTopic} onChange={e => setAiTopic(e.target.value)} placeholder="What should the voice-over talk about?"
             className="w-full rounded-lg border border-input bg-background p-2 text-xs" />}
+      {aiMode === 'script' && <textarea value={aiScript} onChange={e => setAiScript(e.target.value)} rows={3} placeholder="Paste or type the exact script to speak…"
+            className="w-full rounded-lg border border-input bg-background p-2 text-xs" />}
+      {aiMode === 'describe' && <p className="text-[10px] text-muted-foreground">Samples a few frames across your clips in order and writes narration describing what's actually shown, timed to your video's length.</p>}
       <button type="button" className={btn} disabled={generating} onClick={generateAiVoice}>
         {generating ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />{genStatus || 'Working…'}</> : <><Sparkles className="w-3.5 h-3.5" />Generate voice-over</>}
       </button>
