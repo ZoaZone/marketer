@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { clamp, newLayer } from '@/components/media-editor/editorModel';
+import { clamp, newLayer, uid } from '@/components/media-editor/editorModel';
 import { importFile, importAsset, importLayerImage } from '@/components/media-editor/importMedia';
 
 const MAX_CLIPS = 20;
@@ -19,8 +19,16 @@ export default function useEditorProject() {
     finally { setBusy(false); }
   }, []);
 
-  const addClips = items => {
-    setClips(prev => [...prev, ...items].slice(0, MAX_CLIPS));
+  // atIndex inserts after that position in the clip order instead of
+  // appending at the end — "Insert here" on a clip row passes its own
+  // index + 1 so new media lands mid-timeline rather than always last.
+  const addClips = (items, atIndex) => {
+    setClips(prev => {
+      const next = [...prev];
+      const idx = typeof atIndex === 'number' ? clamp(atIndex, 0, next.length) : next.length;
+      next.splice(idx, 0, ...items);
+      return next.slice(0, MAX_CLIPS);
+    });
     setSelClipId(prev => prev || items[0]?.id);
   };
   // The first clip sets the canvas shape, so a vertical video does not get letterboxed.
@@ -29,20 +37,34 @@ export default function useEditorProject() {
     const k = Math.min(1, 1280 / Math.max(first.w, first.h));
     setSizeState({ w: Math.round(first.w * k / 2) * 2, h: Math.round(first.h * k / 2) * 2 });
   };
-  const addFiles = files => run(async () => {
+  const addFiles = (files, atIndex) => run(async () => {
     const list = Array.from(files || []); if (!list.length) return;
     const items = []; for (const f of list) items.push(await importFile(f));
-    adoptSize(items); addClips(items);
+    adoptSize(items); addClips(items, atIndex);
   });
-  const addAssets = assets => run(async () => {
+  const addAssets = (assets, atIndex) => run(async () => {
     const items = []; for (const a of assets) items.push(await importAsset(a));
-    adoptSize(items); addClips(items);
+    adoptSize(items); addClips(items, atIndex);
   });
   const updateClip = (id, patch) => setClips(prev => prev.map(c => (c.id === id ? { ...c, ...patch } : c)));
   const removeClip = id => { setClips(prev => prev.filter(c => c.id !== id)); setSelClipId(prev => (prev === id ? null : prev)); };
   const moveClip = (id, dir) => setClips(prev => {
     const i = prev.findIndex(c => c.id === id), j = i + dir; if (j < 0 || j >= prev.length) return prev;
     const next = [...prev]; [next[i], next[j]] = [next[j], next[i]]; return next;
+  });
+  // Cuts a video clip into two independent clips at its trimmed midpoint, so
+  // each half can be trimmed, reordered or deleted on its own. Images use
+  // "Show for" duration instead of a split, since there's no footage to cut.
+  const splitClip = id => setClips(prev => {
+    const i = prev.findIndex(c => c.id === id); if (i < 0) return prev;
+    const c = prev[i];
+    if (c.kind !== 'video') return prev;
+    const mid = (c.trimStart + c.trimEnd) / 2;
+    if (mid - c.trimStart < 0.3 || c.trimEnd - mid < 0.3) return prev;
+    const left = { ...c, trimEnd: mid };
+    const right = { ...c, id: uid(), name: `${c.name} (2)`, trimStart: mid };
+    const next = [...prev]; next.splice(i, 1, left, right);
+    return next;
   });
   const setSize = (w, h) => setSizeState({ w: clamp(Math.round(w / 2) * 2 || 720, 240, 2160), h: clamp(Math.round(h / 2) * 2 || 720, 240, 2160) });
 
@@ -63,6 +85,6 @@ export default function useEditorProject() {
   return {
     size, setSize, clips, selClipId, setSelClipId, layers, selLayerId, setSelLayerId, music, setMusic, musicPreset, setMusicPreset,
     voice, setVoice, clipVolume, setClipVolume, mix, setMix, busy, error, setError, run,
-    addFiles, addAssets, updateClip, removeClip, moveClip, addLayer, addMediaLayer, updateLayer, removeLayer, uploadAudio,
+    addFiles, addAssets, updateClip, removeClip, moveClip, splitClip, addLayer, addMediaLayer, updateLayer, removeLayer, uploadAudio,
   };
 }
