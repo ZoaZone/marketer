@@ -1,5 +1,16 @@
 // byokLlm.block.ts — provider-first LLM text generation.
 //
+// ⚠️ DEPRECATED LOCATION — DO NOT IMPORT THIS FILE.
+// Base44 Edge Functions cannot import a relative module from outside their
+// own function directory unless it lives under a top-level `shared/` folder
+// (no leading underscore). Every function that imported
+// '.../_shared/byokLlm.block.ts' failed to bundle/deploy with "Relative
+// imports can't reach outside the function" (discovered and fixed Nov 2026).
+// The real, importable copy of this module now lives at
+// base44/shared/byokLlm.block.ts — import from there instead. This file is
+// kept only as historical design-doc reference and should not gain new
+// importers.
+//
 // Why this exists
 // ---------------
 // Every AI feature in this app used to call base44.integrations.Core.InvokeLLM
