@@ -746,12 +746,87 @@ export default function MovieMaker() {
     }
   };
 
+  // Dialogue (multiple characters, each with its own voice). scene.dialogue
+  // is additive, not a replacement for the single description/narration
+  // textarea: when it has lines, generateSceneVoiceover synthesizes each one
+  // separately (its own ElevenLabs voice ID) and concatenates them into one
+  // track; when it's empty, scene.text is narrated exactly as before.
+  const newDialogueLine = (speaker) => ({ id: Date.now() + Math.random(), speaker: speaker || "", voiceId: "", text: "" });
+  const addDialogueLine = (scene) => updateScene(scene.id, { dialogue: [...(scene.dialogue || []), newDialogueLine(`Character ${(scene.dialogue?.length || 0) + 1}`)] });
+  const updateDialogueLine = (scene, lineId, patch) => updateScene(scene.id, { dialogue: (scene.dialogue || []).map(l => (l.id === lineId ? { ...l, ...patch } : l)) });
+  const removeDialogueLine = (scene, lineId) => updateScene(scene.id, { dialogue: (scene.dialogue || []).filter(l => l.id !== lineId) });
+
+  // AI-writes a short back-and-forth between named characters for this
+  // scene, based on its description. Reuses a voice ID already assigned to
+  // a repeat speaker (case-insensitive name match) so re-generating keeps
+  // the same cast's voices.
+  const generateSceneDialogue = async (scene) => {
+    if (!scene.text.trim()) return setError("Add a scene description first so AI has something to write dialogue about.");
+    setDialogueLoading(p => ({ ...p, [scene.id]: true })); setError("");
+    try {
+      const result = await base44.integrations.Core.InvokeLLM({
+        prompt: `Write ENTIRELY in ${language}. Write 2 to 4 short lines of spoken DIALOGUE between named characters for this scene of a ${genre.toLowerCase()} film: "${scene.text}". Give each line a short character name (reuse names already established in the story where it makes sense) and the exact words that character says - no stage directions, no parentheticals, no scene labels.`,
+        response_json_schema: { type: "object", properties: { lines: { type: "array", items: { type: "object", properties: { speaker: { type: "string" }, text: { type: "string" } } } } } },
+      });
+      const lines = Array.isArray(result?.lines) ? result.lines.filter(l => l?.text?.trim()) : [];
+      if (!lines.length) throw new Error("No dialogue was generated.");
+      const existingVoices = {};
+      for (const l of scene.dialogue || []) if (l.speaker) existingVoices[l.speaker.trim().toLowerCase()] = l.voiceId;
+      updateScene(scene.id, {
+        dialogue: lines.map(l => ({
+          id: Date.now() + Math.random(),
+          speaker: (l.speaker || "Narrator").trim(),
+          voiceId: existingVoices[(l.speaker || "").trim().toLowerCase()] || "",
+          text: l.text.trim(),
+        })),
+      });
+    } catch (e) { setError(e?.message || "Dialogue generation failed."); }
+    setDialogueLoading(p => ({ ...p, [scene.id]: false }));
+  };
+
+  // How many shots (at the scene's chosen clip length) are needed to cover
+  // `seconds` of audio, capped at MAX_SHOTS_PER_SCENE.
+  const shotsNeededFor = (scene, seconds) => {
+    const clipSeconds = clampToValidClipDuration(scene.clipDuration || 5);
+    return Math.max(1, Math.min(MAX_SHOTS_PER_SCENE, Math.ceil((seconds || 0) / clipSeconds)));
+  };
+
+  // Generates additional AI video shots so this scene's own visual length
+  // covers its voiceover — the alternative to the render worker's SCENE_FILL
+  // silently stretching or freezing a single clip to fill the gap. A no-op
+  // once the scene already covers its own narration. This regenerates every
+  // shot in the scene (same as pressing "Regenerate clips" after changing
+  // the shot count), so it's offered as an explicit button with its credit
+  // cost shown, not run automatically.
+  const matchSceneShotsToVoice = async (scene) => {
+    const needed = shotsNeededFor(scene, scene.voiceSeconds || 0);
+    const patchedScene = { ...scene, shotsPerScene: needed };
+    updateScene(scene.id, { shotsPerScene: needed });
+    await generateSceneVideoClip(patchedScene);
+  };
+
   const generateSceneVoiceover = async (scene) => {
-    if (!scene.text.trim()) return setError("Add dialogue text first.");
+    const dialogueLines = (scene.dialogue || []).filter(l => l.text.trim());
+    if (!dialogueLines.length && !scene.text.trim()) return setError("Add dialogue text first.");
     setVoiceLoading(p => ({ ...p, [scene.id]: true })); setError("");
     try {
-      const spoken = await toSpokenDialogue(scene.text);
-      const blob = await generateVoiceover(spoken);
+      let blob;
+      if (dialogueLines.length) {
+        // Each character's line is synthesized separately so each can use its
+        // own ElevenLabs voice ID, then stitched into one track with a short
+        // pause between lines (concatAudioBlobs) — the render worker and
+        // every other timing computation on this page only know about ONE
+        // voiceUrl per scene.
+        const lineBlobs = [];
+        for (const line of dialogueLines) {
+          const spoken = await toSpokenDialogue(line.text);
+          lineBlobs.push(await generateVoiceover(spoken, { voiceId: line.voiceId || undefined }));
+        }
+        blob = await concatAudioBlobs(lineBlobs, 0.4);
+      } else {
+        const spoken = await toSpokenDialogue(scene.text);
+        blob = await generateVoiceover(spoken);
+      }
       if (blob) {
         const url = URL.createObjectURL(blob);
         // Measure the narration now, while the audio is in hand. The render
