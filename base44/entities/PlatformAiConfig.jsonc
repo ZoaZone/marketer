@@ -1,0 +1,55 @@
+{
+  "name": "PlatformAiConfig",
+  "type": "object",
+  "properties": {
+    "default_backend": {
+      "type": "string",
+      "enum": ["platform", "openai", "anthropic", "custom"],
+      "default": "platform",
+      "description": "Which LLM backend the whole platform uses unless a section override says otherwise. 'platform' = Base44 built-in AI (consumes integration credits). 'openai'/'anthropic'/'custom' = the platform's own provider key from env, which preserves Base44 integration credits."
+    },
+    "default_model": {
+      "type": "string",
+      "description": "Model id for the default backend. Leave empty for the provider default."
+    },
+    "default_base_url": {
+      "type": "string",
+      "description": "Base URL, only used when default_backend is 'custom' (any OpenAI-compatible endpoint)."
+    },
+    "section_overrides": {
+      "type": "array",
+      "description": "Per-section backend overrides. A section is a named slice of the product (capture, video, marketing, whatsapp, studio, ...). The first entry whose section matches the caller's section wins.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "section": {
+            "type": "string",
+            "description": "Section key, e.g. 'capture', 'video', 'marketing', 'whatsapp'."
+          },
+          "backend": {
+            "type": "string",
+            "enum": ["platform", "openai", "anthropic", "custom"]
+          },
+          "model": {
+            "type": "string"
+          },
+          "base_url": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "active": {
+      "type": "boolean",
+      "default": true,
+      "description": "When false the resolver ignores this row entirely and falls back to the built-in chain."
+    },
+    "updated_by": {
+      "type": "string",
+      "description": "Email of the admin who last changed the config."
+    },
+    "notes": {
+      "type": "string"
+    }
+  }
+}

@@ -289,8 +289,17 @@ async function clickLikelySubmitButton(page) {
 // needed at all).
 async function submitLoginForm(page, credentials, passwordLocator) {
   if (credentials.submitSelector) {
-    await page.click(credentials.submitSelector, { timeout: 5000 }).catch(() => { });
-    return;
+    // A selector that doesn't match (or matches a hidden control) used to
+    // return here regardless, so the form was never submitted and the
+    // failure came back to the user as "login failed / wrong password".
+    // Only stop when the click actually landed; otherwise fall through to
+    // the generic submit-button / Enter path.
+    const clicked = await page
+      .click(credentials.submitSelector, { timeout: 5000 })
+      .then(() => true)
+      .catch(() => false);
+    if (clicked) return;
+    console.log("[capture] login: submitSelector did not match a clickable control — falling back to the generic submit path.");
   }
   if (await clickLikelySubmitButton(page)) return;
   await passwordLocator.press("Enter").catch(() => { });
@@ -330,17 +339,32 @@ async function checkLoginSuccess(page, credentials) {
 // button stays disabled and the click is a no-op. Falls back to fill() on error.
 async function reactSafeFill(locator, value) {
   const v = String(value ?? "");
-  await locator.fill(v).catch(() => {});
-  await locator.evaluate((el, val) => {
+  // Set the value ONCE through the native setter and fire the events React
+  // listens for. The previous version also called locator.fill() first,
+  // which fired a second input/change cycle on controlled inputs — on a
+  // masked or value-transforming password field that could leave a mangled
+  // value behind, which surfaced to users as "wrong password sometimes".
+  const applied = await locator.evaluate((el, val) => {
     const proto = el instanceof HTMLTextAreaElement
-    ? HTMLTextAreaElement.prototype
-    : HTMLInputElement.prototype;
+      ? HTMLTextAreaElement.prototype
+      : HTMLInputElement.prototype;
     const setter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
     if (setter) setter.call(el, val);
     else el.value = val;
     el.dispatchEvent(new Event("input", { bubbles: true }));
     el.dispatchEvent(new Event("change", { bubbles: true }));
-  }, v).catch(() => {});
+    return el.value === val;
+  }, v).catch(() => false);
+
+  // The field rejected the programmatic value (a readonly/disabled input, or
+  // a component that reformats on input) — fall back to a real fill().
+  if (!applied) await locator.fill(v).catch(() => {});
+
+  // Verify what actually landed. A mismatch here is the difference between a
+  // login that works and one that reports a bogus credentials failure, so
+  // it is worth the extra round-trip.
+  const ok = await locator.evaluate((el, val) => el.value === val, v).catch(() => true);
+  if (!ok) await locator.fill(v).catch(() => {});
 }
 
 async function performLogin(page, credentials, targetOrigin) {
@@ -397,7 +421,16 @@ async function performLogin(page, credentials, targetOrigin) {
       await reactSafeFill(usernameLocator, credentials.username || "");
     }
     await reactSafeFill(passwordLocator, credentials.password || "");
-    await passwordLocator.evaluate((el) => el.blur()).catch(() => {});
+    // Do NOT blur before submitting. Blurring a React-controlled password
+    // field runs the form's own onBlur validation, which on several login
+    // implementations clears the field (and browser autocomplete can wipe
+    // it too) — the submit then posts an empty password and the site
+    // correctly answers "wrong password". Re-assert the value instead and
+    // give React a beat to commit it.
+    const pwdHeld = await passwordLocator
+      .evaluate((el, expected) => el.value === expected, credentials.password || "")
+      .catch(() => true);
+    if (!pwdHeld) await reactSafeFill(passwordLocator, credentials.password || "");
     await page.waitForTimeout(400);
 
     await submitLoginForm(page, credentials, passwordLocator);
@@ -900,6 +933,10 @@ export async function runLiveHandoffCapture(spec, onProgress = () => { }) {
   if (!targetUrl) throw new Error("A valid http(s) url is required.");
   const targetOrigin = new URL(targetUrl).origin;
   const log = (msg) => console.log(`[live-capture] ${msg}`);
+  // Non-fatal degradations (missing voiceover, no music bed) collected so the
+  // caller learns the video is not what was asked for, rather than getting a
+  // silent/partial file with no explanation.
+  const warnings = [];
 
   const workDir = await fs.mkdtemp(path.join(os.tmpdir(), "capture-"));
   let browser = null;
@@ -995,9 +1032,17 @@ export async function runLiveHandoffCapture(spec, onProgress = () => { }) {
       } catch (e) {
         log(`narration failed, shipping the silent recording: ${e.message}`);
         finalPath = mp4Path;
+        warnings.push(`Narration could not be generated (${e.message}) — the video was saved without voiceover.`);
       }
     } else {
-      log("no narration produced (ELEVENLABS_API_KEY not set or no page text) — shipping the silent recording.");
+      // Previously this only wrote a log line, so the caller received a
+      // silent video with no explanation and reasonably read it as a bug.
+      // Say so in the result the client actually sees.
+      const why = !hasNarration
+        ? "there was no page text to narrate"
+        : "ELEVENLABS_API_KEY is not configured on the capture worker";
+      log(`no narration produced (${why}) — shipping the silent recording.`);
+      warnings.push(`The video was saved without voiceover because ${why}.`);
     }
 
     onProgress({ fraction: 0.97 });
@@ -1008,6 +1053,7 @@ export async function runLiveHandoffCapture(spec, onProgress = () => { }) {
       videoUrl,
       durationSeconds,
       pageInfo,
+      warnings,
       steps: steps.map((s, i) => ({ path: s.url || s.path || null, label: s.label || null, narration: stepNarrations[i] || "" })),
     };
   } finally {

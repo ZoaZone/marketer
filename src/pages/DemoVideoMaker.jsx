@@ -21,7 +21,12 @@ import {
 import PageHeader from "@/components/ui/PageHeader";
 
 const CAPTURE_POLL_MS = 3000;
-const CAPTURE_TIMEOUT_MS = 5 * 60 * 1000;
+// The capture worker runs ONE job at a time (headless Chromium + video
+// encoding is too heavy to parallelise on one instance), so a capture can
+// legitimately sit behind another for several minutes. A 5-minute client
+// timeout expired while the job was still queued and was reported to the
+// user as a failure — this now matches the render worker's own timeout.
+const CAPTURE_TIMEOUT_MS = 15 * 60 * 1000;
 const LIVE_FRAME_POLL_MS = 350;
 // 1920x1080 is the real viewport the worker's browser renders at (see
 // server-capture/capture.js's VIEWPORT) — every relayed click/scroll
@@ -159,7 +164,7 @@ export default function DemoVideoMaker() {
       setScreenshotUrl(`https://image.thum.io/get/width/1280/${cleanUrl}`);
 
       const prompt = `Write a short, engaging voiceover script (about 60-90 seconds when read aloud, plain prose, no scene labels, no markdown, no preamble) for a demo video introducing this website/product.\nURL: ${cleanUrl}\nBusiness summary: ${analysis?.business_summary || "N/A"}\nServices: ${(analysis?.services_found || []).join(", ") || "N/A"}\nKeywords: ${(analysis?.keywords_found || []).join(", ") || "N/A"}`;
-      const generatedScript = await generateText({ type: "video_script", prompt, tone: analysis?.tone || "Professional" });
+      const generatedScript = await generateText({ type: "video_script", prompt, tone: analysis?.tone || "Professional", section: "capture" });
       setScript((generatedScript || "").trim());
     } catch (e) {
       setError(e?.message || "Scan failed.");
@@ -175,7 +180,7 @@ export default function DemoVideoMaker() {
     try {
       const cleanUrl = url.startsWith("http") ? url : `https://${url}`;
       const prompt = `Write a short, engaging voiceover script (about 60-90 seconds when read aloud, plain prose, no scene labels, no markdown, no preamble) for a demo video introducing this website/product.\nURL: ${cleanUrl}\nDescription: ${description}\nServices: ${(scan?.services_found || []).join(", ") || "N/A"}\nKeywords: ${(scan?.keywords_found || []).join(", ") || "N/A"}`;
-      const generatedScript = await generateText({ type: "video_script", prompt, tone: scan?.tone || "Professional" });
+      const generatedScript = await generateText({ type: "video_script", prompt, tone: scan?.tone || "Professional", section: "capture" });
       setScript((generatedScript || "").trim());
     } catch (e) {
       setError(e?.message || "Script generation failed.");
@@ -635,7 +640,7 @@ if (realVideo) {
     setRevising(true); setError("");
     try {
       const prompt = `Revise this voiceover script to address the feedback below. Keep it the same rough length (60-90 seconds read aloud), plain prose, no scene labels, no markdown, no preamble.\n\nCurrent script:\n${script}\n\nFeedback to address:\n${revisionNotes.trim()}`;
-      const revised = await generateText({ type: "video_script", prompt, tone: scan?.tone || "Professional" });
+      const revised = await generateText({ type: "video_script", prompt, tone: scan?.tone || "Professional", section: "capture" });
       setScript((revised || "").trim());
       setRevisionNotes("");
       await generateWalkthrough();

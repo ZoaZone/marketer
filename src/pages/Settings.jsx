@@ -9,6 +9,7 @@ import {
 import { base44 } from "@/api/base44Client";
 import { mine } from "@/utils/scope";
 import { LLM_MODELS } from "@/utils/llmModels";
+import PlatformAiBackendCard from "@/components/settings/PlatformAiBackendCard";
 
 const ACCOUNT_STATUS = {
   active:       { dot: "bg-emerald-400", text: "text-emerald-400", label: "Active" },
@@ -501,6 +502,8 @@ export default function SettingsPage() {
             <p><strong className="text-foreground">2. Platform backup model</strong> — used automatically if the built-in AI is briefly unavailable.</p>
             <p><strong className="text-foreground">3. Your own LLM key</strong> (Account → Integrations) — when set, your requests use it first, before falling back to 1 and 2.</p>
           </div>
+
+          {isAdmin && <PlatformAiBackendCard />}
 
           <div>
             <label className="text-sm font-medium text-foreground block mb-1">Preferred platform model</label>

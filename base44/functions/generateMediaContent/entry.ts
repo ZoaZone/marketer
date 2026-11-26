@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { tryPlatformBackend } from '../../_shared/aiBackend.block.ts';
 
 // BYOK (Work Package F): user.settings.api_keys.llm is stored encrypted
 // (AES-256-GCM) — this decrypts it in-memory just long enough to make the
@@ -86,7 +87,7 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { type, platform, tone, prompt, client_id, website_scan_id, model } = await req.json();
+    const { type, platform, tone, prompt, client_id, website_scan_id, model, section } = await req.json();
     if (!type || !prompt) {
       return Response.json({ error: 'type and prompt are required' }, { status: 400 });
     }
@@ -157,6 +158,24 @@ Deno.serve(async (req) => {
         } catch (_ownLlmError) {
           result = undefined; // fall through to platform defaults
         }
+      }
+    }
+
+    // 1b. Platform-level backend selection (PlatformAiConfig). Lets the owner
+    // run a section — or the whole platform — on their own OpenAI/Anthropic/
+    // custom key so Base44 integration credits are preserved. Returns null
+    // when the platform is set to "platform", when the provider key isn't
+    // configured, or when the provider call fails, so every one of those
+    // cases falls through to the previous behaviour unchanged.
+    let platformBackend: string | undefined;
+    if (!result) {
+      const viaPlatform = await tryPlatformBackend(base44, {
+        section: typeof section === 'string' ? section : undefined,
+        prompt: finalPromptWithGuardrail,
+      }).catch(() => null);
+      if (viaPlatform?.text) {
+        result = viaPlatform.text;
+        platformBackend = viaPlatform.backend;
       }
     }
 

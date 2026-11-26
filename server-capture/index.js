@@ -149,6 +149,7 @@ async function processQueue() {
       job.durationSeconds = result.durationSeconds;
       job.pageInfo = result.pageInfo ?? null;
       job.steps = result.steps ?? null;
+      job.warnings = Array.isArray(result.warnings) ? result.warnings : null;
     }
     scheduleCleanup(next.id);
   } catch (e) {
@@ -548,9 +549,17 @@ app.get("/captures/:id", requireSecret, (req, res) => {
   const job = jobs.get(req.params.id);
   if (!job) return res.status(404).json({ error: "Capture not found" });
   const percent = typeof job.progress === "number" ? Math.round(job.progress * 100) : undefined;
+  // This worker runs ONE capture at a time (headless Chromium + video
+  // encoding is too heavy to parallelise on a single instance), so a queued
+  // job can sit behind another user's for minutes. Reporting the position
+  // lets the client show "waiting behind N capture(s)" instead of appearing
+  // hung until its own timeout fires.
+  const queueIndex = job.status === "queued" ? queue.findIndex((q) => q.id === job.id) : -1;
   res.json({
     captureId: job.id,
     status: job.status,
+    queuePosition: queueIndex >= 0 ? queueIndex + 1 : 0,
+    queueLength: queue.length,
     stepIndex: job.stepIndex,
     stepTotal: job.stepTotal,
     percent,
@@ -560,6 +569,7 @@ app.get("/captures/:id", requireSecret, (req, res) => {
     steps: job.steps,
     hasCredentials: job.hasCredentials,
     hasAuthToken: job.hasAuthToken,
+    warnings: job.warnings || null,
     error: job.error,
     createdAt: job.createdAt,
   });

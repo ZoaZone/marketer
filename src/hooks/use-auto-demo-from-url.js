@@ -8,7 +8,12 @@ import {
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const CAPTURE_POLL_MS = 3000;
-const CAPTURE_TIMEOUT_MS = 5 * 60 * 1000; // capture worker's own cap defaults to 60s; this covers queueing + ffmpeg + upload overhead
+// The capture worker runs ONE job at a time (headless Chromium + video
+// encoding is too heavy to parallelise on one instance), so a capture can
+// legitimately sit behind another for several minutes. A 5-minute client
+// timeout expired while the job was still queued and was reported to the
+// user as a failure — this now matches the render worker's own timeout.
+const CAPTURE_TIMEOUT_MS = 15 * 60 * 1000; // capture worker's own cap defaults to 60s; this covers queueing + ffmpeg + upload overhead
 const RENDER_POLL_MS = 3000;
 const RENDER_TIMEOUT_MS = 20 * 60 * 1000; // matches MovieMaker.jsx's own render timeout
 
@@ -157,7 +162,7 @@ export function useAutoDemoFromUrl(user) {
         `Key sections: ${headingsText || "N/A"}`,
         `Description: ${pageInfo.description || "N/A"}`,
       ].join("\n");
-      const script = await generateText({ type: "video_script", prompt: scriptPrompt, tone: "Professional" });
+      const script = await generateText({ type: "video_script", prompt: scriptPrompt, tone: "Professional", section: "capture" });
       if (!script?.trim()) throw new Error("Couldn't write a narration script for this page.");
       if (cancelledRef.current) return;
 

@@ -505,6 +505,7 @@ export default function MovieMaker() {
         type: "video_script",
                 prompt: `Write ENTIRELY in ${language}. The complete film script - every scene and every line of narration and dialogue - MUST be written in ${language} and in no other language. Write a ${genre.toLowerCase()} film script. Create ${scenes.length} clearly-separated scenes, each 2-3 sentences of narration/dialogue. No markdown, no asterisks, no headers - plain prose only. Label each scene as "SCENE 1:", "SCENE 2:" etc. Title: "${title || "Untitled"}". Story: ${kit.withBrand(storyPrompt)}`,
         tone: "Cinematic",
+        section: "video",
       });
       setScript(result);
       const parsed = splitScriptIntoScenes(result, scenes.length);
@@ -748,6 +749,7 @@ export default function MovieMaker() {
         type: "script",
                 prompt: `Write ENTIRELY in ${language}. Rewrite the following as natural spoken dialogue/narration only, in ${language} and in no other language, ${genre.toLowerCase()} tone. Remove any scene labels, visual directions, parentheticals, or stage directions - return plain spoken text only, nothing else.\n\n${cleaned}`,
         tone: genre,
+        section: "video",
       });
       return rewritten?.trim() || cleaned;
     } catch (_e) {

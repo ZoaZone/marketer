@@ -35,11 +35,15 @@ async function getDefaultPlatformModel() {
  * platform's own default model, so the caller can surface a notice instead
  * of leaving the user unaware their chosen model wasn't actually used.
  */
-export async function generateText({ type = "caption", prompt, platform = "General", tone = "Professional", model, onModelFallback }) {
+export async function generateText({ type = "caption", prompt, platform = "General", tone = "Professional", model, section, onModelFallback }) {
   const chosenModel = model || (await getDefaultPlatformModel());
   const res = await base44.functions.invoke("generateMediaContent", {
     type, prompt, platform, tone,
     model: chosenModel || undefined,
+    // Tells the backend which slice of the product this generation belongs
+    // to, so a platform-level per-section AI backend override can apply
+    // (Settings > AI Backend). Omitted callers just get the platform default.
+    section: section || undefined,
   });
   const data = res?.data ?? res;
   if (chosenModel && data?.model_fallback) onModelFallback?.();
