@@ -24,6 +24,7 @@ import {
 import { BASE44_VIDEO_CREDITS_PER_5S } from "@/config/plans";
 import LibraryPickButton from "@/components/media-editor/LibraryPickButton";
 import { generateText, generateVoiceover, generateMusic, MAX_MUSIC_SECONDS, uploadFile, generateImage, splitScriptIntoScenes, submitRender, getRenderStatus, generateSceneVideo, dubAudioFile, dubVideoFile as dubVideoJob, probeMediaDuration } from "@/utils/lane2";
+import { concatAudioBlobs } from "@/utils/audioConcat";
 // dubVideoFile (the aiClient job function) is imported as dubVideoJob — the
 // Dubbing Studio already has a dubVideoFile *state variable* holding the
 // raw uploaded File object for the manual translate+voiceover flow below,
@@ -84,6 +85,11 @@ const DUB_LANGUAGES = [
 // limit so long-form films are possible without becoming unbounded.
 const MAX_SCENES = 12;
 
+// Mood presets for a scene's own background music — feeds the AI music
+// prompt (generateSceneMusic below) so the score can change scene by scene
+// instead of one track looping under the whole film.
+const MOODS = ["Neutral", "Happy", "Tense", "Sad", "Romantic", "Action", "Mysterious", "Triumphant"];
+
 function newScene(n) {
   return {
     id: Date.now() + n, text: "", caption: "", imageUrl: "", videoUrl: "", voiceBlob: null, voiceUrl: "",
@@ -94,10 +100,19 @@ function newScene(n) {
     // "Scene duration" label/slider isn't visibly out of sync with the
     // highlighted chip before the user touches either control.
     duration: 5, clipDuration: 5,
-    // Multi-shot chaining: 1-3 clips generated back-to-back for this one
-    // scene. Empty by default — see sceneHasVisual/sceneDuration below for
-    // the backward-compatible fallback to the single videoUrl/duration.
+    // Multi-shot chaining: 1-MAX_SHOTS_PER_SCENE clips generated back-to-back
+    // for this one scene. Empty by default — see sceneHasVisual/sceneDuration
+    // below for the backward-compatible fallback to the single
+    // videoUrl/duration.
     clips: [], shotsPerScene: 1,
+    // Multi-character dialogue: [{ id, speaker, voiceId, text }]. Empty by
+    // default — generateSceneVoiceover falls back to treating scene.text as
+    // single-voice narration when this is empty, so existing projects with
+    // no dialogue lines behave exactly as before.
+    dialogue: [],
+    // This scene's own mood/music — musicUrl is this scene's generated or
+    // uploaded track; falls back to the project-wide musicUrl when empty.
+    mood: "", musicUrl: "", musicFile: null,
   };
 }
 
@@ -244,6 +259,10 @@ export default function MovieMaker() {
   const [musicUrl, setMusicUrl] = useState("");
   const [musicFile, setMusicFile] = useState(null);
   const [musicLoading, setMusicLoading] = useState(false);
+  // Per-scene mood music: { [sceneId]: boolean } while that scene's own
+  // track is generating.
+  const [sceneMusicLoading, setSceneMusicLoading] = useState({});
+  const [dialogueLoading, setDialogueLoading] = useState({});
   const [language, setLanguage] = useState("English");
   const [videoUrl, setVideoUrl] = useState("");
   const [loading, setLoading] = useState(false);
