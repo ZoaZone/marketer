@@ -20,6 +20,7 @@ import { llmText, parseLooseJson } from '../_shared/byokLlm.block.ts';
  * matching what InvokeLLM returned so call sites need no reshaping.
  */
 Deno.serve(async (req) => {
+  // noop-probe
   const cors = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
