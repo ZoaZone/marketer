@@ -266,6 +266,13 @@ export default function MovieMaker() {
   const [musicUrl, setMusicUrl] = useState("");
   const [musicFile, setMusicFile] = useState(null);
   const [musicLoading, setMusicLoading] = useState(false);
+  // How the project track and each scene's own track combine at render
+  // time: "both" layers them (scene track mixed quietly under the project
+  // track, the old default behavior), "project" ignores every scene track
+  // and uses only the one project-wide bed, "scene" ignores the project
+  // track entirely and plays only whatever each scene has set (silence for
+  // a scene with none).
+  const [musicMode, setMusicMode] = useState("both");
   // Per-scene mood music: { [sceneId]: boolean } while that scene's own
   // track is generating.
   const [sceneMusicLoading, setSceneMusicLoading] = useState({});
