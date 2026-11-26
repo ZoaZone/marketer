@@ -356,6 +356,7 @@ export default function MovieMaker() {
         if (loaded.scenes?.length) setScenes(loaded.scenes);
         setMusicUrl(loaded.musicUrl);
         if (loaded.musicUrl) setMusicFile({ name: "Saved track" }); // display-only placeholder — matches the AI-generated-score pattern elsewhere in this file
+        if (loaded.musicMode) setMusicMode(loaded.musicMode);
         setTitleCard(loaded.titleCard);
         setVideoUrl(loaded.videoUrl);
       }
@@ -379,10 +380,11 @@ export default function MovieMaker() {
       step,
       scenes: JSON.stringify(scenesForSave(scenes)),
       music_url: musicUrl,
+      music_mode: musicMode,
       title_card_enabled: titleCard,
       final_video_url: videoUrl,
     });
-  }, [projectHydrated, title, genre, language, storyPrompt, script, step, scenes, musicUrl, titleCard, videoUrl]);
+  }, [projectHydrated, title, genre, language, storyPrompt, script, step, scenes, musicUrl, musicMode, titleCard, videoUrl]);
 
   // "New project" — detaches from the current saved record (dropping any
   // pending debounced save for it) and resets every stage back to blank,
@@ -392,7 +394,7 @@ export default function MovieMaker() {
     movieProject.newProject();
     setTitle(""); setGenre("Drama"); setLanguage("English"); setStoryPrompt(""); setScript("");
     setStep(0); setScenes([newScene(0), newScene(1), newScene(2)]);
-    setMusicUrl(""); setMusicFile(null); setTitleCard(true); setVideoUrl("");
+    setMusicUrl(""); setMusicFile(null); setMusicMode("both"); setTitleCard(true); setVideoUrl("");
     setWarnings([]); setError("");
   };
 
