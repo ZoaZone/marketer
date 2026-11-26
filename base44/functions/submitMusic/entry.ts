@@ -1,5 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
-import { llmText } from '../../_shared/byokLlm.block.ts';
+import { llmText } from '../../shared/byokLlm.block.ts';
 
 /**
  * submitMusic — server-side proxy that hands an AI music-generation job off
