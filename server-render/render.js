@@ -505,6 +505,66 @@ async function concatShots(shotPaths, sceneIndex, workDir) {
  * gates every drawtext call in this function and in buildShotClip — when
  * false, scene.subtitle is never burned into the picture at all.
  */
+// Downloads a scene's own music track (project.scenes[i].musicUrl), if any
+// — non-fatal, matching every other optional-asset download in this file:
+// a scene whose own music can't be fetched or read renders without it
+// rather than failing the whole render. Lets a film's score change scene
+// by scene/mood instead of one track looping under the whole film.
+async function prepareSceneMusic(musicUrl, workDir, sceneIndex) {
+  if (!musicUrl) return null;
+  try {
+    const musicPath = assetPath(workDir, `scene-${sceneIndex}-music`);
+    await downloadTo(musicUrl, musicPath);
+    const natural = await probeDuration(musicPath).catch(() => 0);
+    if (natural <= 0) throw new Error("no readable audio stream");
+    return { path: musicPath, natural };
+  } catch (e) {
+    console.error(`[render] scene ${sceneIndex} music failed (${musicUrl}): ${e.message} — rendering this scene without its own music.`);
+    return null;
+  }
+}
+
+// Builds the ffmpeg input args + filter_complex fragments + final audio map
+// for one scene's combined audio: its own voice-over (if any) mixed with
+// its own music (if any), each looped/padded to exactly clipSeconds.
+// Shared by both the single-shot and multi-shot paths below so the
+// voice+music / voice-only / music-only / silent cases are handled once
+// instead of twice. `nextInputIndex` is the ffmpeg input index this call's
+// first new input will take (1 when only the visual occupies input 0).
+function sceneAudioGraph(voicePath, music, clipSeconds, nextInputIndex) {
+  const extraInputArgs = [];
+  const filterParts = [];
+  let idx = nextInputIndex;
+  let voiceLabel = null, musicLabel = null;
+
+  if (voicePath) {
+    extraInputArgs.push("-i", voicePath);
+    voiceLabel = `v${idx}`;
+    filterParts.push(`[${idx}:a]apad=whole_dur=${clipSeconds}[${voiceLabel}]`);
+    idx += 1;
+  }
+  if (music) {
+    extraInputArgs.push(...(music.natural < clipSeconds ? ["-stream_loop", "-1", "-i", music.path] : ["-i", music.path]));
+    musicLabel = `m${idx}`;
+    // A touch quieter when there's also a voice track in this same short
+    // scene, so it doesn't compete with dialogue — a simple version of the
+    // duck idea the project-level music mix already applies over the
+    // whole film.
+    const vol = voiceLabel ? 0.15 : 0.25;
+    filterParts.push(`[${idx}:a]atrim=0:${clipSeconds},apad=whole_dur=${clipSeconds},volume=${vol}[${musicLabel}]`);
+    idx += 1;
+  }
+
+  if (voiceLabel && musicLabel) {
+    filterParts.push(`[${voiceLabel}][${musicLabel}]amix=inputs=2:duration=first:dropout_transition=0[a]`);
+    return { extraInputArgs, filterParts, audioMap: "[a]" };
+  }
+  if (voiceLabel) return { extraInputArgs, filterParts, audioMap: `[${voiceLabel}]` };
+  if (musicLabel) return { extraInputArgs, filterParts, audioMap: `[${musicLabel}]` };
+  extraInputArgs.push("-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100");
+  return { extraInputArgs, filterParts, audioMap: `${idx}:a` };
+}
+
 async function buildSceneClip(scene, sceneIndex, posterImagePath, workDir, w, h, burnSubtitles) {
   const shots = resolveSceneShots(scene);
 
