@@ -1003,12 +1003,16 @@ export default function MovieMaker() {
           seconds: sceneDuration(s),
           voiceUrl: s.voiceUrl || undefined,
           // This scene's own mood music, if set — see generateSceneMusic and
-          // server-render/render.js's sceneAudioGraph. A scene with none
-          // still gets the project-wide musicUrl below, mixed over the
-          // whole film as before.
-          musicUrl: s.musicUrl || undefined,
+          // server-render/render.js's sceneAudioGraph. Whether it's used
+          // alongside or instead of the project-wide track below is decided
+          // by musicMode, picked in the Music step:
+          //   "both"    — layer the scene track under the project track
+          //   "project" — ignore every scene track, project track only
+          //   "scene"   — ignore the project track, this scene's track only
+          //               (silence for a scene with none)
+          musicUrl: musicMode === "project" ? undefined : (s.musicUrl || undefined),
         })),
-        musicUrl: musicUrl || undefined,
+        musicUrl: musicMode === "scene" ? undefined : (musicUrl || undefined),
         // Subtitles are already offered as a separate downloadable .srt
         // (see downloadSubtitles below) — don't also hardcode them into
         // the exported video by default.
