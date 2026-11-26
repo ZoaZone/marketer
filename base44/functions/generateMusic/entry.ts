@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { llmText } from '../../_shared/byokLlm.block.ts';
 
 /**
  * generateMusic — server-side AI background-music generation proxy.
@@ -371,9 +372,10 @@ async function composeMusicBrief(base44: any, spec: any): Promise<string | null>
 
   const instruction = buildBriefInstruction(spec);
 
-  // 1. Base44 InvokeLLM — the default producer.
+  // 1. Provider-first: Anthropic, then OpenAI, then Base44's built-in AI.
+  // Integration credits are exhausted, so InvokeLLM alone now always fails.
   try {
-    const result = await base44.integrations.Core.InvokeLLM({ prompt: instruction });
+    const result = await llmText(base44, instruction, { tag: 'digitalstudio music brief', maxTokens: 800 });
     const brief = sanitizeBrief(result);
     if (brief) return brief;
   } catch (_baseError) { /* fall through to OpenAI */ }

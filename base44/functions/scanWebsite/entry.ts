@@ -1,4 +1,15 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
+import { llmText, parseLooseJson } from '../../_shared/byokLlm.block.ts';
+
+// Provider-first JSON call. Integration credits are exhausted, so InvokeLLM
+// alone always fails. llmText tries Anthropic then OpenAI and keeps InvokeLLM
+// as the last resort; parseLooseJson handles a markdown-fenced reply.
+// The call keeps the original shape, so no paren changes were needed.
+const invokeJson = async (db: any, params: any, tag: string) => {
+  const out = await llmText(db, params?.prompt || "", { tag, invokeParams: params });
+  if (out && typeof out === "object") return out;
+  try { return parseLooseJson(String(out)); } catch { return { raw: String(out || "") }; }
+};
 
 Deno.serve(async (req) => {
   // Hoisted so the catch below can mark a half-finished scan as failed
@@ -63,7 +74,7 @@ Deno.serve(async (req) => {
     // the whole create path at step one.
     let analysis: any;
     try {
-      analysis = await base44.integrations.Core.InvokeLLM({
+      analysis = await invokeJson(base44, {
         prompt: analysisPrompt,
         response_json_schema: analysisSchema,
       });

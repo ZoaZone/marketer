@@ -1,3 +1,4 @@
+import { llmText } from './byokLlm.block.ts';
 /* ── Music brief: Base44 InvokeLLM (default) -> OpenAI -> verbatim ─────
  *
  * The provider chain for the AUDIO itself is ElevenLabs/Suno/Replicate —
@@ -69,9 +70,9 @@ async function composeMusicBrief(base44: any, spec: any): Promise<string | null>
 
   const instruction = buildBriefInstruction(spec);
 
-  // 1. Base44 InvokeLLM — the default producer.
+  // 1. Provider-first: Anthropic, then OpenAI, then Base44's built-in AI.
   try {
-    const result = await base44.integrations.Core.InvokeLLM({ prompt: instruction });
+    const result = await llmText(base44, instruction, { tag: 'digitalstudio music brief', maxTokens: 800 });
     const brief = sanitizeBrief(result);
     if (brief) return brief;
   } catch (_baseError) { /* fall through to OpenAI */ }
