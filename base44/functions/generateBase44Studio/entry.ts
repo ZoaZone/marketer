@@ -1,7 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import OpenAI from 'npm:openai@6.45.0';
 import { chargeStudioCredits, creditsForSeconds, refundCredits } from '../../shared/base44Video.ts';
-import { llmText, parseLooseJson } from '../../_shared/byokLlm.block.ts';
+import { llmText, parseLooseJson } from '../../shared/byokLlm.block.ts';
 
 // Provider-first JSON call. Integration credits are exhausted, so InvokeLLM
 // alone always fails. llmText tries Anthropic then OpenAI and keeps InvokeLLM
