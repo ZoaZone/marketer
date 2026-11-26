@@ -8,6 +8,7 @@
  * user session. Always fails safe to an empty reply.
  */
 import { createClientFromRequest } from "npm:@base44/sdk@0.8.38";
+import { llmText } from "../../_shared/byokLlm.block.ts";
 
 const RELAY_SECRET = Deno.env.get("ZOABOT_RELAY_SECRET") || "";
 
@@ -32,7 +33,7 @@ async function handle(req: Request): Promise<Response> {
 Answer helpfully in at most 60 words. Explain what the platform does, how to get started (sign up at chitra.medha.io), or answer their question directly. This is a text message, not a report, so keep it short and conversational, with no markdown formatting. If you genuinely cannot help, say a Medha.io team member will follow up.`;
 
   try {
-    const answer = await db.integrations.Core.InvokeLLM({ prompt });
+    const answer = await llmText(db, prompt, { tag: "digitalstudio whatsappKbReply" });
     return Response.json({ reply: String(answer || "").trim().slice(0, 1500) });
   } catch (err) {
     console.error("[digitalstudio whatsappKbReply] InvokeLLM error:", (err as Error)?.message || err);
