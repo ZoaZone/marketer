@@ -1,5 +1,16 @@
 // aiBackend.block.ts — platform-wide / per-section LLM backend selection.
 //
+// ⚠️ DEPRECATED LOCATION — DO NOT IMPORT THIS FILE.
+// Base44 Edge Functions cannot import a relative module from outside their
+// own function directory unless it lives under a top-level `shared/` folder
+// (no leading underscore) — this file's only importer (generateMediaContent)
+// failed to bundle/deploy with "Relative imports can't reach outside the
+// function" (discovered Nov 2026) and was removed rather than fixed, since
+// its PlatformAiConfig admin-override feature was never actually configured
+// (always resolved to a no-op). If this per-section backend-override feature
+// is wanted again, move this file to base44/shared/aiBackend.block.ts first
+// and import it from there.
+//
 // Why this exists
 // ---------------
 // Every LLM call used to fall through to `base44.integrations.Core.InvokeLLM`,
