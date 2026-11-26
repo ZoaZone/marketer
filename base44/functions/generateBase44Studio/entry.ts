@@ -2,6 +2,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import OpenAI from 'npm:openai@6.45.0';
 import { chargeStudioCredits, creditsForSeconds, refundCredits } from '../../shared/base44Video.ts';
 import { llmText, parseLooseJson } from '../../shared/byokLlm.block.ts';
+import { generateImageWithReplicate } from '../../shared/replicateImage.block.ts';
 
 // Provider-first JSON call. Integration credits are exhausted, so InvokeLLM
 // alone always fails. llmText tries Anthropic then OpenAI and keeps InvokeLLM
@@ -105,18 +106,38 @@ export default async function(req) {
     if (!Array.isArray(referenceImageUrls) || referenceImageUrls.length > 6 || referenceImageUrls.some(url => typeof url !== 'string' || !url.startsWith('https://'))) {
       return Response.json({ error: 'Use up to six HTTPS reference images.' }, { status: 400 });
     }
-    // This isolated path uses only managed Core integrations. No BYOK,
-    // provider secrets, external render worker, or provider fallback.
+    // Video still uses only managed Core integrations — no BYOK fallback.
+    // Replicate video generation is async/job-based (see submitVideo), a
+    // different shape than this function's synchronous request/response, so
+    // it isn't a drop-in fallback here; Lane 2's Movie Maker/Quick Create
+    // video paths already route through Replicate via submitVideo instead.
+    // Image DOES have a fallback: the owner's own Replicate key (Flux), tried
+    // first when there are no reference images to preserve identity from, so
+    // this quick-generate path keeps working when Base44's integration
+    // credits run out.
     { const refused = await charge(); if (refused) return refused; }
-    const result = action === 'video'
-      ? await base44.asServiceRole.integrations.Core.GenerateVideo({
-          prompt: `${await direct(prompt.trim(), false)}\nNo visible lettering, captions, watermarks or logos. Branding will be composited separately.`, duration, aspect_ratio: aspectRatio, generate_audio: audio,
-        })
-      : await base44.asServiceRole.integrations.Core.GenerateImage({
+    let url: string | undefined;
+    if (action === 'video') {
+      const result = await base44.asServiceRole.integrations.Core.GenerateVideo({
+        prompt: `${await direct(prompt.trim(), false)}\nNo visible lettering, captions, watermarks or logos. Branding will be composited separately.`, duration, aspect_ratio: aspectRatio, generate_audio: audio,
+      });
+      url = result?.url || result?.file_url;
+    } else {
+      if (!referenceImageUrls.length && Deno.env.get('REPLICATE_API_TOKEN')?.trim()) {
+        try {
+          url = await generateImageWithReplicate(`${prompt.trim()}\nCompose the image for ${aspectRatio} framing. Do not render any text, lettering, watermarks or logos; branding is added separately.`);
+        } catch (err) {
+          console.error('[generateBase44Studio] Replicate BYOK fallback failed, trying Base44:', (err as Error)?.message);
+        }
+      }
+      if (!url) {
+        const result = await base44.asServiceRole.integrations.Core.GenerateImage({
           prompt: `${prompt.trim()}\nCompose the image for ${aspectRatio} framing. Do not render any text, lettering, watermarks or logos; branding is added separately. ${referenceImageUrls.length ? 'Keep the subjects and style of the reference images.' : ''}`,
           ...(referenceImageUrls.length ? { existing_image_urls: referenceImageUrls } : {}),
         });
-    const url = result?.url || result?.file_url;
+        url = result?.url || result?.file_url;
+      }
+    }
     if (!url) throw new Error('Base44 did not return a media file. Please try again.');
     return Response.json({ url, type: action });
     } catch (failure) {
