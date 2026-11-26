@@ -166,6 +166,13 @@ const clampToValidClipDuration = (value) =>
 
 // How many chained clips generateSceneVideoClip generates for one scene.
 const SHOT_COUNTS = [1, 2, 3];
+// The manual chip row above stops at 3 for simplicity, but matchSceneShotsToVoice
+// (below) can go further on its own so a scene with a longer multi-line
+// dialogue track can still be covered entirely by added shots, instead of
+// the render worker stretching/freezing a single clip to fill the gap
+// (SCENE_FILL) — that's the "cinematic lag"/"static scene" feeling this
+// exists to avoid.
+const MAX_SHOTS_PER_SCENE = 6;
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
@@ -616,7 +623,7 @@ export default function MovieMaker() {
   // videoUrl field (the scene preview `<video>` tag, mainly).
   const generateSceneVideoClip = async (scene) => {
     if (!scene.text.trim() && !scene.imageUrl) return setError("Add dialogue/description or an image to this scene first.");
-    const shotCount = Math.max(1, Math.min(3, scene.shotsPerScene || 1));
+    const shotCount = Math.max(1, Math.min(MAX_SHOTS_PER_SCENE, scene.shotsPerScene || 1));
     const clipSeconds = clampToValidClipDuration(scene.clipDuration || 5);
     setSceneVideoLoading(p => ({ ...p, [scene.id]: true }));
     setError("");
