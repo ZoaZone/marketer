@@ -1736,21 +1736,77 @@ export default function MovieMaker() {
                 <Mic className="w-3.5 h-3.5" /> Generate All
               </button>
             </div>
-            {scenes.map((scene, i) => (
+            {scenes.map((scene, i) => {
+              const dialogue = scene.dialogue || [];
+              const needsMoreShots = scene.voiceUrl && shotsNeededFor(scene, scene.voiceSeconds || 0) > (scene.shotsPerScene || 1);
+              return (
               <div key={scene.id} className="p-4 rounded-xl bg-card border border-border space-y-2">
                 <p className="text-xs font-semibold text-muted-foreground">Scene {i + 1}</p>
                 <p className="text-sm text-foreground line-clamp-2">{scene.text || <span className="text-muted-foreground/50 italic">No dialogue yet</span>}</p>
+
+                {/* Dialogue — optional, additive: lines here are spoken
+                    instead of scene.text above, each in its own ElevenLabs
+                    voice. Leave empty to narrate scene.text as a single
+                    voice, same as before. */}
+                <div className="space-y-1.5 rounded-lg border border-dashed border-border p-2.5">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[11px] font-semibold text-foreground">Dialogue (optional — multiple characters, each with their own voice)</p>
+                    <button onClick={() => generateSceneDialogue(scene)} disabled={!scene.text || dialogueLoading[scene.id]}
+                      className="flex items-center gap-1 text-[11px] font-semibold text-cyan-400 hover:text-cyan-300 disabled:opacity-50">
+                      {dialogueLoading[scene.id] ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                      Write with AI
+                    </button>
+                  </div>
+                  {dialogue.map(line => (
+                    <div key={line.id} className="flex items-center gap-1.5">
+                      <input value={line.speaker} onChange={e => updateDialogueLine(scene, line.id, { speaker: e.target.value })}
+                        placeholder="Character" className="w-24 shrink-0 px-2 py-1 rounded-lg bg-background border border-border text-xs" />
+                      <input value={line.text} onChange={e => updateDialogueLine(scene, line.id, { text: e.target.value })}
+                        placeholder="What they say…" className="flex-1 min-w-0 px-2 py-1 rounded-lg bg-background border border-border text-xs" />
+                      <input value={line.voiceId} onChange={e => updateDialogueLine(scene, line.id, { voiceId: e.target.value })}
+                        placeholder="Voice ID (optional)" title="An ElevenLabs voice ID — leave blank to use the default voice"
+                        className="w-28 shrink-0 px-2 py-1 rounded-lg bg-background border border-border text-[11px]" />
+                      <button onClick={() => removeDialogueLine(scene, line.id)} className="text-muted-foreground hover:text-red-400">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                  <button onClick={() => addDialogueLine(scene)}
+                    className="flex items-center gap-1 text-[11px] font-semibold text-muted-foreground hover:text-foreground">
+                    <Plus className="w-3 h-3" /> Add line
+                  </button>
+                </div>
+
                 <div className="flex items-center gap-3">
                   <button onClick={() => generateSceneVoiceover(scene)}
-                    disabled={!scene.text || voiceLoading[scene.id]}
+                    disabled={(!scene.text && !dialogue.some(l => l.text.trim())) || voiceLoading[scene.id]}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-semibold hover:bg-cyan-500/20 disabled:opacity-50 transition-colors">
                     {voiceLoading[scene.id] ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mic className="w-3.5 h-3.5" />}
                     {scene.voiceUrl ? "Redo" : "Generate"}
                   </button>
                   {scene.voiceUrl && <audio controls src={scene.voiceUrl} className="flex-1 h-8" />}
                 </div>
+
+                {/* Shown once the generated voiceover/dialogue runs longer than
+                    this scene's current video — the fix for a scene sitting on
+                    a frozen/stretched clip to fill that gap (SCENE_FILL on the
+                    render worker). Adds AI video shots instead. */}
+                {needsMoreShots && (
+                  <div className="flex items-center gap-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                    <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <p className="text-[11px] text-amber-400 flex-1">
+                      This scene's voice runs {Math.round(scene.voiceSeconds)}s but its video only covers {Math.round(sceneVisualDuration(scene))}s — it'll hold/stretch to fill the gap.
+                    </p>
+                    <button onClick={() => matchSceneShotsToVoice(scene)} disabled={sceneVideoLoading[scene.id]}
+                      className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 text-[11px] font-semibold hover:bg-amber-500/30 disabled:opacity-50">
+                      {sceneVideoLoading[scene.id] ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+                      Add shots to match (≈{Math.ceil(clampToValidClipDuration(scene.clipDuration || 5) * BASE44_VIDEO_CREDITS_PER_5S / 5) * shotsNeededFor(scene, scene.voiceSeconds || 0)} credits)
+                    </button>
+                  </div>
+                )}
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
