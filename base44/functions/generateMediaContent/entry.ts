@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 import { tryPlatformBackend } from '../../_shared/aiBackend.block.ts';
+import { llmText } from '../../_shared/byokLlm.block.ts';
 
 // BYOK (Work Package F): user.settings.api_keys.llm is stored encrypted
 // (AES-256-GCM) — this decrypts it in-memory just long enough to make the
@@ -135,8 +136,15 @@ Deno.serve(async (req) => {
 
     // LLM provider chain:
     //  1. Bring-your-own LLM (Growth/Agency plans, or admin) — if configured in Settings > AI Provider
-    //  2. Base44's built-in AI — the default for every plan
-    //  3. Admin-configured OpenAI key — last-resort platform fallback
+    //  2. Platform-level backend selection (PlatformAiConfig admin override)
+    //  3. The owner's own ANTHROPIC_API_KEY / OPENAI_API_KEY env keys (via
+    //     byokLlm.block.ts's llmText) — tried BEFORE Base44's built-in AI so this
+    //     feature keeps working the moment the Base44 integration-credit pool
+    //     runs dry. The previous chain only had a hardcoded OpenAI-only
+    //     last resort *after* Base44's AI (so it never even ran until that
+    //     call failed) and no Anthropic fallback at all.
+    //  4. Base44's built-in AI (InvokeLLM) — true last resort, spends
+    //     integration credits (reached only if no env key is configured).
     let result: string | undefined;
 
     const apiKeys = user.settings?.api_keys || {};
@@ -180,48 +188,38 @@ Deno.serve(async (req) => {
     }
 
     // If the caller asked for a specific model (account-wide default from
-    // Settings, or a per-generation override) and it fails or is rejected,
-    // retry once on the platform's own default model before falling all the
-    // way through to the hardcoded last-resort fallback. `modelFallback`
-    // tells the frontend this happened, so it can show a notice instead of
+    // Settings, or a per-generation override), honor it via Base44's own
+    // model selection first — that's a Base44-specific feature the env-key
+    // providers below can't fulfill. `modelFallback` tells the frontend when
+    // the requested model wasn't used, so it can show a notice instead of
     // silently swapping models on the user.
     let modelFallback = false;
+    if (!result && model) {
+      try {
+        result = await base44.integrations.Core.InvokeLLM({ prompt: finalPromptWithGuardrail, model });
+      } catch (_modelError) {
+        result = undefined;
+        modelFallback = true;
+      }
+    }
+
+    // Provider-key chain (Anthropic → OpenAI → Base44 built-in AI). Runs
+    // whenever nothing above produced a result — including the common case
+    // where no specific model was requested at all, so an env key is tried
+    // before Base44's built-in AI rather than only after it fails.
     if (!result) {
       try {
-        const invokeParams: { prompt: string; model?: string } = { prompt: finalPromptWithGuardrail };
-        if (model) invokeParams.model = model;
-        result = await base44.integrations.Core.InvokeLLM(invokeParams);
-      } catch (llmError) {
-        if (model) {
-          try {
-            result = await base44.integrations.Core.InvokeLLM({ prompt: finalPromptWithGuardrail });
-            modelFallback = true;
-          } catch (_retryError) {
-            result = undefined;
-          }
-        }
+        result = await llmText(base44, finalPromptWithGuardrail, {
+          tag: 'generateMediaContent',
+          maxTokens: 2048,
+        });
+      } catch (_e) {
+        result = undefined;
       }
     }
 
     if (!result) {
-      const openaiKey = Deno.env.get("OPENAI_API_KEY");
-      if (!openaiKey) throw new Error("Base44 built-in AI is unavailable and no fallback is configured.");
-      if (model) modelFallback = true;
-      const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${openaiKey}` },
-        body: JSON.stringify({
-          model: "gpt-4o-mini",
-          // finalPromptWithGuardrail, not finalPrompt: the spelling/brand-voice
-          // guardrail applies to every provider in the chain. Sending the bare
-          // prompt here meant a Base44 AI outage silently downgraded output
-          // quality on top of switching models.
-          messages: [{ role: "user", content: finalPromptWithGuardrail }],
-        }),
-      });
-      if (!openaiRes.ok) throw new Error(`OpenAI fallback failed: ${await openaiRes.text()}`);
-      const openaiData = await openaiRes.json();
-      result = openaiData.choices[0].message.content;
+      throw new Error("Base44 built-in AI is unavailable and no fallback is configured. Set ANTHROPIC_API_KEY or OPENAI_API_KEY to keep this feature running during a credit outage.");
     }
 
     // Persist to ContentAsset
