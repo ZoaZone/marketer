@@ -1841,6 +1841,39 @@ export default function MovieMaker() {
             </button>
 
             {musicUrl && <audio controls src={musicUrl} className="w-full rounded-xl" />}
+
+            <div className="pt-2 border-t border-border space-y-3">
+              <p className="text-sm font-semibold text-foreground">Scene mood &amp; music (optional)</p>
+              <p className="text-xs text-muted-foreground">Give a scene its own mood and track so the score changes scene by scene instead of one track playing under the whole film. A scene left blank here still gets the track above.</p>
+              {scenes.map((scene, i) => (
+                <div key={scene.id} className="p-3 rounded-xl bg-card border border-border space-y-2">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <p className="text-xs font-semibold text-muted-foreground">Scene {i + 1}</p>
+                    <select value={scene.mood} onChange={e => updateScene(scene.id, { mood: e.target.value })}
+                      className="px-2 py-1 rounded-lg bg-background border border-border text-xs">
+                      <option value="">No mood set</option>
+                      {MOODS.map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                    <button onClick={() => generateSceneMusic(scene)} disabled={sceneMusicLoading[scene.id]}
+                      className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-semibold hover:bg-cyan-500/20 disabled:opacity-50">
+                      {sceneMusicLoading[scene.id] ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                      {scene.musicUrl ? "Regenerate" : "Generate scene music"}
+                    </button>
+                    <label className="flex items-center gap-1.5 px-3 py-1 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground cursor-pointer">
+                      <Upload className="w-3.5 h-3.5" /> Upload
+                      <input type="file" accept="audio/*" className="hidden" onChange={e => handleSceneMusicUpload(scene, e.target.files?.[0])} />
+                    </label>
+                    {scene.musicUrl && (
+                      <button onClick={() => updateScene(scene.id, { musicUrl: "", musicFile: null })}
+                        className="text-muted-foreground hover:text-red-400" title="Remove this scene's music">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  {scene.musicUrl && <audio controls src={scene.musicUrl} className="w-full h-8" />}
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
