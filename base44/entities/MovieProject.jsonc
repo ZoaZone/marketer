@@ -24,15 +24,25 @@
     "step": {
       "type": "number",
       "default": 0,
-      "description": "Wizard step index (0=Story, 1=Reference, 2=Scenes, 3=Voiceover, 4=Music, 5=Export, 6=Dubbing) — resumed on load."
+      "description": "Wizard step index (0=Story, 1=Reference, 2=Scenes, 3=Voiceover, 4=Music, 5=Export, 6=Dubbing) \u2014 resumed on load."
     },
     "scenes": {
       "type": "string",
       "maxLength": 100000,
-      "description": "JSON-serialized array of scene objects: {id, text, caption, imageUrl, videoUrl, clips:[{videoUrl,imageUrl,seconds}], voiceUrl, duration, clipDuration, shotsPerScene}. Never includes voiceBlob (a browser-only, non-serializable Blob) — only the durable, uploaded voiceUrl."
+      "description": "JSON-serialized array of scene objects: {id, text, caption, imageUrl, videoUrl, clips:[{videoUrl,imageUrl,seconds}], voiceUrl, duration, clipDuration, shotsPerScene}. Never includes voiceBlob (a browser-only, non-serializable Blob) \u2014 only the durable, uploaded voiceUrl."
     },
     "music_url": {
       "type": "string"
+    },
+    "music_mode": {
+      "type": "string",
+      "enum": [
+        "both",
+        "project",
+        "scene"
+      ],
+      "default": "both",
+      "description": "How the project-wide track and each scene's own mood track combine at render time: both layers them, project uses only the project-wide track, scene uses only each scene's own track."
     },
     "title_card_enabled": {
       "type": "boolean",
@@ -45,7 +55,7 @@
     "last_saved_at": {
       "type": "string",
       "format": "date-time",
-      "description": "Set on every autosave — the sort key for 'most recent project', since it's more reliable than trusting a platform-managed update timestamp to change on every .update() call."
+      "description": "Set on every autosave \u2014 the sort key for 'most recent project', since it's more reliable than trusting a platform-managed update timestamp to change on every .update() call."
     }
   },
   "required": [],
