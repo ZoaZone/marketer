@@ -1827,6 +1827,24 @@ export default function MovieMaker() {
         {step === 4 && (
           <div className="space-y-4">
             <p className="text-xs text-muted-foreground">Upload a background music track. It will be mixed under the voiceover narration during export.</p>
+
+            <div className="p-3 rounded-xl bg-card border border-border space-y-2">
+              <p className="text-xs font-semibold text-foreground">How should music play?</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {[
+                  { id: "both", label: "Both, layered", hint: "Project track plays throughout; any scene's own track mixes in quietly under it." },
+                  { id: "project", label: "Project track only", hint: "Ignore every scene's own music — just the one track below, for the whole film." },
+                  { id: "scene", label: "Per-scene only", hint: "Ignore the project track — each scene plays only its own music (silent if it has none)." },
+                ].map(opt => (
+                  <button key={opt.id} type="button" onClick={() => setMusicMode(opt.id)}
+                    className={`text-left p-2.5 rounded-xl border text-xs transition-all ${musicMode === opt.id ? "border-cyan-500 bg-cyan-500/10" : "border-border hover:border-cyan-500/40"}`}>
+                    <p className={`font-semibold ${musicMode === opt.id ? "text-cyan-400" : "text-foreground"}`}>{opt.label}</p>
+                    <p className="text-muted-foreground mt-0.5">{opt.hint}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div onClick={() => musicInputRef.current?.click()}
               className="border-2 border-dashed border-border rounded-2xl p-10 text-center cursor-pointer hover:border-cyan-500/50 hover:bg-cyan-500/5 transition-all group">
               <input ref={musicInputRef} type="file" accept="audio/*" className="hidden"
