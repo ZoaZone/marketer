@@ -657,19 +657,13 @@ async function buildSceneClip(scene, sceneIndex, posterImagePath, workDir, w, h,
     const outPath = path.join(workDir, `scene-${sceneIndex}.mp4`);
     const args = ["-y", ...inputArgs];
 
-    if (voicePath) {
-      args.push("-i", voicePath);
-      args.push(
-        "-filter_complex", `[0:v]${vf}[v];[1:a]apad=whole_dur=${clipSeconds}[a]`,
-        "-map", "[v]", "-map", "[a]"
-      );
-    } else {
-      args.push("-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100");
-      args.push(
-        "-filter_complex", `[0:v]${vf}[v]`,
-        "-map", "[v]", "-map", "1:a"
-      );
-    }
+    const sceneMusic = await prepareSceneMusic(scene.musicUrl, workDir, sceneIndex);
+    const audio = sceneAudioGraph(voicePath, sceneMusic, clipSeconds, 1);
+    args.push(...audio.extraInputArgs);
+    args.push(
+      "-filter_complex", [`[0:v]${vf}[v]`, ...audio.filterParts].join(";"),
+      "-map", "[v]", "-map", audio.audioMap
+    );
 
     args.push(
       "-t", String(clipSeconds),
@@ -709,17 +703,14 @@ async function buildSceneClip(scene, sceneIndex, posterImagePath, workDir, w, h,
 
   const outPath = path.join(workDir, `scene-${sceneIndex}.mp4`);
   const args = ["-y", ...inputArgs];
-  if (voicePath) {
-    args.push("-i", voicePath);
-    const filterParts = [];
-    if (videoFilterComplex) filterParts.push(videoFilterComplex);
-    filterParts.push(`[1:a]apad=whole_dur=${clipSeconds}[a]`);
-    args.push("-filter_complex", filterParts.join(";"), "-map", videoMap, "-map", "[a]");
-  } else {
-    args.push("-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100");
-    if (videoFilterComplex) args.push("-filter_complex", videoFilterComplex);
-    args.push("-map", videoMap, "-map", "1:a");
-  }
+  const sceneMusic = await prepareSceneMusic(scene.musicUrl, workDir, sceneIndex);
+  const audio = sceneAudioGraph(voicePath, sceneMusic, clipSeconds, 1);
+  args.push(...audio.extraInputArgs);
+  const filterParts = [];
+  if (videoFilterComplex) filterParts.push(videoFilterComplex);
+  filterParts.push(...audio.filterParts);
+  if (filterParts.length) args.push("-filter_complex", filterParts.join(";"));
+  args.push("-map", videoMap, "-map", audio.audioMap);
   args.push(
     "-t", String(clipSeconds),
     "-r", String(FPS),
