@@ -859,6 +859,35 @@ export default function MovieMaker() {
     setLoading(false);
   };
 
+  const handleSceneMusicUpload = async (scene, file) => {
+    if (!file) return;
+    setSceneMusicLoading(p => ({ ...p, [scene.id]: true }));
+    try { const url = await uploadFile(file); updateScene(scene.id, { musicUrl: url, musicFile: file }); }
+    catch { setError("Music upload failed."); }
+    setSceneMusicLoading(p => ({ ...p, [scene.id]: false }));
+  };
+
+  // Generates a short AI music cue scoped to THIS scene's own mood, instead
+  // of (or layered under, depending on mix) the one project-wide track —
+  // this is what lets the score actually change scene by scene. The render
+  // worker mixes scene.musicUrl, when present, into that scene's own audio
+  // (server-render/render.js's sceneAudioGraph); a scene with no music of
+  // its own is unaffected and still gets the project-wide track if one is set.
+  const generateSceneMusic = async (scene) => {
+    setSceneMusicLoading(p => ({ ...p, [scene.id]: true })); setError("");
+    try {
+      const mood = scene.mood || "neutral";
+      const music = await generateMusic({
+        prompt: `${genre} film score, ${mood.toLowerCase()} mood, matching this scene: ${scene.text || storyPrompt}`,
+        instrumental: true,
+        durationSeconds: Math.min(MAX_MUSIC_SECONDS, Math.max(10, sceneDuration(scene))),
+      });
+      if (music?.url) updateScene(scene.id, { musicUrl: music.url, musicFile: { name: `AI score — ${mood}` } });
+      else setError("No music was generated for this scene. Try again or upload a track.");
+    } catch (e) { setError(e?.message || "Scene music generation failed."); }
+    setSceneMusicLoading(p => ({ ...p, [scene.id]: false }));
+  };
+
   // Same duration math as the Export step's "Est. duration" summary and
   // assembleMovie's sceneDurations, so the generated track is scored to the
   // film's actual length.
