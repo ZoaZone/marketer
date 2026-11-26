@@ -993,6 +993,11 @@ export default function MovieMaker() {
           subtitle: s.text || "",
           seconds: sceneDuration(s),
           voiceUrl: s.voiceUrl || undefined,
+          // This scene's own mood music, if set — see generateSceneMusic and
+          // server-render/render.js's sceneAudioGraph. A scene with none
+          // still gets the project-wide musicUrl below, mixed over the
+          // whole film as before.
+          musicUrl: s.musicUrl || undefined,
         })),
         musicUrl: musicUrl || undefined,
         // Subtitles are already offered as a separate downloadable .srt
