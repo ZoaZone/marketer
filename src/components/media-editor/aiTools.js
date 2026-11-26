@@ -1,6 +1,7 @@
 import { base44 } from '@/api/base44Client';
 import { drawFrame } from '@/components/media-editor/drawFrame';
 import { makeMediaElement } from '@/components/media-editor/renderProject';
+import { invokeAI } from "@/lib/aiInvoke";
 
 const errorOf = e => e?.response?.data?.error || e?.message || 'AI request failed.';
 
@@ -12,7 +13,7 @@ export async function proofreadText(text) {
 }
 
 export async function suggestCopy(brief, size) {
-  return base44.integrations.Core.InvokeLLM({
+  return invokeAI({
     prompt: `Write short on-screen text for a ${size.w}x${size.h} social video or image. Correct spelling, keep every name and fact from the brief, add no new claims. Each line must be under 60 characters.\n<brief>${brief.slice(0, 800)}</brief>`,
     response_json_schema: { type: 'object', properties: { headline: { type: 'string' }, tagline: { type: 'string' }, cta: { type: 'string' } } },
   });
@@ -47,7 +48,7 @@ export async function writeScriptFromVideo(clips, size, seconds) {
     catch { /* a frame that fails to capture is skipped — the rest still give useful context */ }
   }
   if (!urls.length) throw new Error('Could not read any frames from your video to describe.');
-  const result = await base44.integrations.Core.InvokeLLM({
+  const result = await invokeAI({
     file_urls: urls,
     prompt: `These images are frames sampled in order from a video, start to finish. Write natural spoken narration (no scene labels, no stage directions, no quotation marks) describing what is actually happening and shown across these frames, as a voice-over for this video. It should take about ${Math.max(5, Math.round(seconds))} seconds to read aloud at a natural pace. Return only the narration text.`,
     response_json_schema: { type: 'object', properties: { narration: { type: 'string' } } },
@@ -66,7 +67,7 @@ export async function scanClipFrame(clip, size) {
   const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.85));
   const { file_uri } = await base44.integrations.Core.UploadPrivateFile({ file: new File([blob], 'frame.jpg', { type: 'image/jpeg' }) });
   const { signed_url } = await base44.integrations.Core.CreateFileSignedUrl({ file_uri, expires_in: 600 });
-  return base44.integrations.Core.InvokeLLM({
+  return invokeAI({
     file_urls: [signed_url],
     prompt: `You are checking a frame from an AI-generated video. Find any lettering, captions, signs, logos or watermarks that look garbled, misspelled, distorted or unwanted. For each, give a region as fractions of the frame (0 to 1): x and y are the CENTER of the region, w and h are its width and height. Also list 2 to 4 short, practical editing tips for this frame (for example where clean text would fit without covering faces). If nothing looks wrong, return an empty regions list.`,
     response_json_schema: { type: 'object', properties: {

@@ -25,6 +25,7 @@ import { BASE44_VIDEO_CREDITS_PER_5S } from "@/config/plans";
 import LibraryPickButton from "@/components/media-editor/LibraryPickButton";
 import { generateText, generateVoiceover, generateMusic, MAX_MUSIC_SECONDS, uploadFile, generateImage, splitScriptIntoScenes, submitRender, getRenderStatus, generateSceneVideo, dubAudioFile, dubVideoFile as dubVideoJob, probeMediaDuration } from "@/utils/lane2";
 import { concatAudioBlobs } from "@/utils/audioConcat";
+import { invokeAI } from "@/lib/aiInvoke";
 // dubVideoFile (the aiClient job function) is imported as dubVideoJob — the
 // Dubbing Studio already has a dubVideoFile *state variable* holding the
 // raw uploaded File object for the manual translate+voiceover flow below,
@@ -775,7 +776,7 @@ export default function MovieMaker() {
     if (!scene.text.trim()) return setError("Add a scene description first so AI has something to write dialogue about.");
     setDialogueLoading(p => ({ ...p, [scene.id]: true })); setError("");
     try {
-      const result = await base44.integrations.Core.InvokeLLM({
+      const result = await invokeAI({
         prompt: `Write ENTIRELY in ${language}. Write 2 to 4 short lines of spoken DIALOGUE between named characters for this scene of a ${genre.toLowerCase()} film: "${scene.text}". Give each line a short character name (reuse names already established in the story where it makes sense) and the exact words that character says - no stage directions, no parentheticals, no scene labels.`,
         response_json_schema: { type: "object", properties: { lines: { type: "array", items: { type: "object", properties: { speaker: { type: "string" }, text: { type: "string" } } } } } },
       });

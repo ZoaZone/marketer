@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Sparkles, Loader2, Paperclip, X, Check } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import { invokeAI } from "@/lib/aiInvoke";
 
 const SCHEMA = {
   type: 'object',
@@ -51,7 +52,7 @@ export default function VideoFeedbackPanel({ prompt = '', captions = '', scenes 
     setBusy(true); setError(''); setReview(null);
     try {
       const sceneList = scenes.map((s, i) => `Scene ${i + 1}:\n  visual: ${s.text || ''}\n  voice-over/dialogue: ${s.voiceover || ''}\n  caption: ${s.caption || ''}`).join('\n');
-      const res = await base44.integrations.Core.InvokeLLM({
+      const res = await invokeAI({
         prompt: `You are a video director and copy editor. A user generated a video and wants it improved.
 Overall prompt: """${prompt}"""
 Current captions: """${captions}"""
