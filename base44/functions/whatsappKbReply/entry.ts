@@ -8,7 +8,61 @@
  * user session. Always fails safe to an empty reply.
  */
 import { createClientFromRequest } from "npm:@base44/sdk@0.8.38";
-import { llmText } from "../../_shared/byokLlm.block.ts";
+
+// ---------------------------------------------------------------------------
+// Inlined from base44/_shared/byokLlm.block.ts — Base44 Edge Functions can't
+// import relative modules from outside their own directory, so this is
+// hand-copied here (same convention as rateLimit.block.ts elsewhere in
+// base44/functions). Keep in sync by hand if the shared version changes.
+// ---------------------------------------------------------------------------
+async function byokCallAnthropic(prompt: string, key: string, maxTokens: number): Promise<string> {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: maxTokens,
+      messages: [{ role: "user", content: prompt }],
+    }),
+  });
+  if (!res.ok) throw new Error(`anthropic ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}`);
+  const data = await res.json();
+  const text = (data?.content || []).map((c: any) => c?.text || "").join("").trim();
+  if (!text) throw new Error("anthropic returned empty content");
+  return text;
+}
+
+async function byokCallOpenAi(prompt: string, key: string, maxTokens: number): Promise<string> {
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "content-type": "application/json" },
+    body: JSON.stringify({ model: "gpt-4o-mini", max_tokens: maxTokens, messages: [{ role: "user", content: prompt }] }),
+  });
+  if (!res.ok) throw new Error(`openai ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}`);
+  const data = await res.json();
+  const text = (data?.choices?.[0]?.message?.content || "").trim();
+  if (!text) throw new Error("openai returned empty content");
+  return text;
+}
+
+async function llmText(db: any, prompt: string, o: { tag?: string; maxTokens?: number } = {}): Promise<string> {
+  const tag = o.tag || "llm";
+  const maxTokens = o.maxTokens ?? 1024;
+
+  const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
+  if (anthropicKey) {
+    try { return await byokCallAnthropic(prompt, anthropicKey, maxTokens); }
+    catch (err) { console.error(`[${tag}] anthropic BYOK failed, trying next provider:`, (err as Error)?.message); }
+  }
+
+  const openaiKey = Deno.env.get("OPENAI_API_KEY");
+  if (openaiKey) {
+    try { return await byokCallOpenAi(prompt, openaiKey, maxTokens); }
+    catch (err) { console.error(`[${tag}] openai BYOK failed, falling back to built-in AI:`, (err as Error)?.message); }
+  }
+
+  return await db.integrations.Core.InvokeLLM({ prompt });
+}
 
 const RELAY_SECRET = Deno.env.get("ZOABOT_RELAY_SECRET") || "";
 
