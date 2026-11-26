@@ -1,6 +1,95 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
-import { tryPlatformBackend } from '../../_shared/aiBackend.block.ts';
-import { llmText } from '../../_shared/byokLlm.block.ts';
+
+// ---------------------------------------------------------------------------
+// Inlined from base44/_shared/byokLlm.block.ts — Base44 Edge Functions can't
+// import relative modules from outside their own directory, so this is
+// hand-copied here (same convention as rateLimit.block.ts elsewhere in
+// base44/functions). Keep in sync by hand if the shared version changes.
+//
+// The PlatformAiConfig admin-override step (aiBackend.block.ts's
+// tryPlatformBackend) that used to sit between steps 1 and 3 below has been
+// removed rather than inlined: it required an explicit admin-created
+// PlatformAiConfig row that was never set up, so it always resolved to
+// "platform" (a no-op) anyway, and it had the same cross-directory import bug.
+// If per-section backend overrides are wanted later, reinstate it as its own
+// hand-copied block.
+// ---------------------------------------------------------------------------
+const BYOK_ANTHROPIC_DEFAULT_MODEL = "claude-haiku-4-5-20251001";
+const BYOK_OPENAI_DEFAULT_MODEL = "gpt-4o-mini";
+
+async function byokCallAnthropic(prompt: string, key: string, maxTokens: number): Promise<string> {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": key,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model: BYOK_ANTHROPIC_DEFAULT_MODEL,
+      max_tokens: maxTokens,
+      messages: [{ role: "user", content: prompt }],
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`anthropic ${res.status}: ${body.slice(0, 200)}`);
+  }
+  const data = await res.json();
+  const text = (data?.content || []).map((c: any) => c?.text || "").join("").trim();
+  if (!text) throw new Error("anthropic returned empty content");
+  return text;
+}
+
+async function byokCallOpenAi(prompt: string, key: string, maxTokens: number): Promise<string> {
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "content-type": "application/json" },
+    body: JSON.stringify({
+      model: BYOK_OPENAI_DEFAULT_MODEL,
+      max_tokens: maxTokens,
+      messages: [{ role: "user", content: prompt }],
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`openai ${res.status}: ${body.slice(0, 200)}`);
+  }
+  const data = await res.json();
+  const text = (data?.choices?.[0]?.message?.content || "").trim();
+  if (!text) throw new Error("openai returned empty content");
+  return text;
+}
+
+/**
+ * Owner's own ANTHROPIC_API_KEY / OPENAI_API_KEY env keys, tried in that
+ * order, falling back to Base44's built-in AI (InvokeLLM) only if neither
+ * key is set or both calls fail.
+ */
+async function llmText(db: any, prompt: string, o: { tag?: string; maxTokens?: number } = {}): Promise<string> {
+  const tag = o.tag || "llm";
+  const maxTokens = o.maxTokens ?? 2048;
+
+  const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
+  if (anthropicKey) {
+    try {
+      return await byokCallAnthropic(prompt, anthropicKey, maxTokens);
+    } catch (err) {
+      console.error(`[${tag}] anthropic BYOK failed, trying next provider:`, (err as Error)?.message);
+    }
+  }
+
+  const openaiKey = Deno.env.get("OPENAI_API_KEY");
+  if (openaiKey) {
+    try {
+      return await byokCallOpenAi(prompt, openaiKey, maxTokens);
+    } catch (err) {
+      console.error(`[${tag}] openai BYOK failed, falling back to built-in AI:`, (err as Error)?.message);
+    }
+  }
+
+  return await db.integrations.Core.InvokeLLM({ prompt });
+}
 
 // BYOK (Work Package F): user.settings.api_keys.llm is stored encrypted
 // (AES-256-GCM) — this decrypts it in-memory just long enough to make the
@@ -136,14 +225,13 @@ Deno.serve(async (req) => {
 
     // LLM provider chain:
     //  1. Bring-your-own LLM (Growth/Agency plans, or admin) — if configured in Settings > AI Provider
-    //  2. Platform-level backend selection (PlatformAiConfig admin override)
-    //  3. The owner's own ANTHROPIC_API_KEY / OPENAI_API_KEY env keys (via
-    //     byokLlm.block.ts's llmText) — tried BEFORE Base44's built-in AI so this
-    //     feature keeps working the moment the Base44 integration-credit pool
-    //     runs dry. The previous chain only had a hardcoded OpenAI-only
-    //     last resort *after* Base44's AI (so it never even ran until that
-    //     call failed) and no Anthropic fallback at all.
-    //  4. Base44's built-in AI (InvokeLLM) — true last resort, spends
+    //  2. The owner's own ANTHROPIC_API_KEY / OPENAI_API_KEY env keys (llmText,
+    //     above) — tried BEFORE Base44's built-in AI so this feature keeps
+    //     working the moment the Base44 integration-credit pool runs dry. The
+    //     previous chain only had a hardcoded OpenAI-only last resort *after*
+    //     Base44's AI (so it never even ran until that call failed) and no
+    //     Anthropic fallback at all.
+    //  3. Base44's built-in AI (InvokeLLM) — true last resort, spends
     //     integration credits (reached only if no env key is configured).
     let result: string | undefined;
 
@@ -166,24 +254,6 @@ Deno.serve(async (req) => {
         } catch (_ownLlmError) {
           result = undefined; // fall through to platform defaults
         }
-      }
-    }
-
-    // 1b. Platform-level backend selection (PlatformAiConfig). Lets the owner
-    // run a section — or the whole platform — on their own OpenAI/Anthropic/
-    // custom key so Base44 integration credits are preserved. Returns null
-    // when the platform is set to "platform", when the provider key isn't
-    // configured, or when the provider call fails, so every one of those
-    // cases falls through to the previous behaviour unchanged.
-    let platformBackend: string | undefined;
-    if (!result) {
-      const viaPlatform = await tryPlatformBackend(base44, {
-        section: typeof section === 'string' ? section : undefined,
-        prompt: finalPromptWithGuardrail,
-      }).catch(() => null);
-      if (viaPlatform?.text) {
-        result = viaPlatform.text;
-        platformBackend = viaPlatform.backend;
       }
     }
 
