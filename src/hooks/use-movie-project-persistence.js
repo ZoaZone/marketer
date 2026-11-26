@@ -98,6 +98,7 @@ export function useMovieProjectPersistence(user) {
         step: typeof record.step === "number" ? record.step : 0,
         scenes,
         musicUrl: record.music_url || "",
+        musicMode: record.music_mode || "both",
         titleCard: record.title_card_enabled ?? true,
         videoUrl: record.final_video_url || "",
       };
