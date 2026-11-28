@@ -117,7 +117,12 @@ export default function PitchDeckMaker() {
             <textarea rows={7} value={(slide.bullets || []).join("\n")} className={`${inputCls} resize-none text-xs`}
               onChange={e => patch({ bullets: e.target.value.split("\n") })} placeholder="One bullet per line" />
             <div className="flex gap-2">
-              <button disabled={exporting} onClick={async () => { setExporting(true); await downloadDeck(deckTitle, slides, kit.brand, kit.logo); setExporting(false); }}
+              <button disabled={exporting} onClick={async () => {
+                setExporting(true); setError("");
+                try { await downloadDeck(deckTitle, slides, kit.brand, kit.logo); }
+                catch (e) { setError(e?.message || "Export failed."); }
+                setExporting(false);
+              }}
                 className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border text-sm font-semibold hover:bg-muted/20">
                 {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} PPTX + PDF
               </button>

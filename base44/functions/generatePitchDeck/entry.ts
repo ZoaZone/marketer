@@ -2,6 +2,8 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.54';
 // Must import from base44/shared/ (no underscore): base44/_shared/ silently
 // fails to bundle on this platform and the function keeps running stale code.
 import { llmText, parseLooseJson } from '../../shared/byokLlm.block.ts';
+import { buildPptxBase64, buildPdfBase64, fetchLogo } from '../../shared/pitchDeckFiles.ts';
+import type { DeckSlide } from '../../shared/pitchDeckFiles.ts';
 
 const clip = (v: unknown, n: number) => String(v ?? '').trim().slice(0, n);
 const list = (v: unknown) => (Array.isArray(v) ? v.map((x) => clip(x, 80)).filter(Boolean).slice(0, 15) : []);
@@ -14,8 +16,11 @@ const list = (v: unknown) => (Array.isArray(v) ? v.map((x) => clip(x, 80)).filte
  * Returns: { deckTitle, slides: [{ title, bullets: string[] }] }
  *
  * Text generation goes through the BYOK-first helper (Anthropic, then OpenAI,
- * Base44 InvokeLLM only as a last resort). The .pptx / PDF files themselves
- * are assembled in the browser from the returned slides.
+ * Base44 InvokeLLM only as a last resort).
+ *
+ * Body { action: "export", deckTitle, slides, brand?, logoUrl? } builds the
+ * editable .pptx (pptxgenjs) and the PDF (jsPDF) from that same deck and
+ * returns { pptx, pdf } as base64.
  */
 export default async function (req: Request): Promise<Response> {
   try {
@@ -24,6 +29,28 @@ export default async function (req: Request): Promise<Response> {
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json().catch(() => ({}));
+
+    // action "export": build BOTH files from one (possibly user-edited) deck.
+    if (body.action === 'export') {
+      const exportSlides: DeckSlide[] = (Array.isArray(body.slides) ? body.slides : [])
+        .map((s: any) => ({
+          title: clip(s?.title, 120),
+          bullets: (Array.isArray(s?.bullets) ? s.bullets : []).map((b: unknown) => clip(b, 200)).filter(Boolean).slice(0, 8),
+        }))
+        .filter((s: DeckSlide) => s.title)
+        .slice(0, 20);
+      if (!exportSlides.length) return Response.json({ error: 'slides are required' }, { status: 400 });
+
+      const deckTitle = clip(body.deckTitle, 120) || exportSlides[0].title;
+      const brand = body.brand && typeof body.brand === 'object' ? body.brand : undefined;
+      const logo = await fetchLogo(clip(body.logoUrl, 1000));
+      const [pptx, pdf] = await Promise.all([
+        buildPptxBase64(deckTitle, exportSlides, brand, logo),
+        Promise.resolve(buildPdfBase64(deckTitle, exportSlides, brand, logo)),
+      ]);
+      return Response.json({ pptx, pdf });
+    }
+
     const url = clip(body.url, 500);
     if (!url) return Response.json({ error: 'url is required' }, { status: 400 });
 
