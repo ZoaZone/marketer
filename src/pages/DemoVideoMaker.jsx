@@ -266,6 +266,11 @@ export default function DemoVideoMaker() {
           const style = sceneStyles[i % sceneStyles.length];
           imgUrl = await generateImage({ prompt: context + "Distinct marketing visual for scene " + (i + 1) + " of a product walkthrough. " + style + ". Depict specifically: " + sceneScripts[i].text + ". No text, no words, no captions in the image.", referenceImageUrls: screenshotUrl ? [screenshotUrl] : [] });
         }
+        if (!imgUrl) {
+          if (!screenshotUrl) throw new Error(`No visual was available for scene ${i + 1}. Try analyzing the website again.`);
+          imgUrl = screenshotUrl;
+          setWarnings(prev => [...prev, `Scene ${i + 1} is using the site screenshot because an AI image could not be generated.`]);
+        }
         scenes.push({ imageUrl: imgUrl, text: sceneScripts[i].text, seconds: 8 });
       }
 
@@ -275,10 +280,15 @@ export default function DemoVideoMaker() {
       const wantMusic = audioMode === "music" || audioMode === "both";
       if (wantVoice) {
         setStatusMsg("Generating voiceover...");
-        const blob = (await castNarration(scenes.map(s => s.text), script).catch(() => null))
-          || await generateVoiceover(scenes.map(s => s.text).join(". "));
-        if (blob) voiceoverUrl = await uploadFile(new File([blob], "demo-vo.mp3", { type: blob.type || "audio/mpeg" }));
-        else setWarnings(prev => [...prev, "No voiceover was produced — shipping silent instead."]);
+        try {
+          const blob = (await castNarration(scenes.map(s => s.text), script).catch(() => null))
+            || await generateVoiceover(scenes.map(s => s.text).join(". "));
+          if (!blob) throw new Error("No audio was returned.");
+          voiceoverUrl = await uploadFile(new File([blob], "demo-vo.mp3", { type: blob.type || "audio/mpeg" }));
+          if (!voiceoverUrl) throw new Error("The audio could not be stored.");
+        } catch (e) {
+          setWarnings(prev => [...prev, `Continuing without voiceover: ${e?.response?.data?.error || e?.message || "Audio unavailable."}`]);
+        }
       }
       if (wantMusic && !finalMusicUrl) {
         // No track uploaded: generate AI background music (Lane 2).
@@ -327,13 +337,13 @@ if (realVideo) {
     setProgress(0.4 + (i / scenes.length) * 0.35);
     let clipUrl = null;
     try {
-      const clip = await generateSceneVideo({ prompt: sceneScripts[i].text, imageUrl: scenes[i].imageUrl, durationSeconds: Math.max(4, Math.round(scenes[i].seconds || 5)) });
+      const clip = await generateSceneVideo({ prompt: sceneScripts[i].text, imageUrl: scenes[i].imageUrl, durationSeconds: scenes[i].seconds, aspectRatio: ratio });
       clipUrl = typeof clip === "string" ? clip : (clip && (clip.url || clip.videoUrl)) || null;
     } catch (_e) { clipUrl = null; }
     videoScenes.push({ imageUrl: scenes[i].imageUrl, videoUrl: clipUrl, seconds: scenes[i].seconds, subtitle: scenes[i].text });
   }
   setStatusMsg("Rendering your video...");
-  const jobId = await submitRender({ scenes: videoScenes, audioMode: effectiveAudioMode, voiceoverUrl, musicUrl: finalMusicUrl, burnSubtitles: false });
+  const jobId = await submitRender({ scenes: videoScenes, ratio, resolution, audioMode: effectiveAudioMode, voiceoverUrl, musicUrl: finalMusicUrl, burnSubtitles: false });
   const startedAt = Date.now();
   while (true) {
     if (Date.now() - startedAt > CAPTURE_TIMEOUT_MS) throw new Error("Video render timed out. Please try again.");
@@ -351,10 +361,11 @@ if (realVideo) {
     voiceoverUrl, musicUrl: finalMusicUrl,
   }, { onProgress: (p) => setProgress(0.4 + p * 0.6) });
 }
+      if (!hostedUrl) throw new Error("The render finished without a playable video.");
       setProgress(1);
       setWalkthroughResult({ url: hostedUrl });
     } catch (e) {
-      setError(e?.message || "Video generation failed.");
+      setError(e?.response?.data?.error || e?.message || "Video generation failed.");
     }
     setGeneratingVideo(false); setStatusMsg("");
   };
