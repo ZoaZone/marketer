@@ -7,26 +7,15 @@ const hexToRgb = (hex, fallback) => {
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 };
 
-// Best-effort: a logo that blocks cross-origin reads is simply left out.
-async function loadLogo(url) {
-  if (!url) return null;
-  try {
-    const blob = await (await fetch(url)).blob();
-    const dataUrl = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob); });
-    const dims = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res({ w: i.width, h: i.height }); i.onerror = rej; i.src = dataUrl; });
-    return { dataUrl, ...dims };
-  } catch { return null; }
-}
-
 // Landscape 16:9 PDF, one slide per page, styled with the shared brand kit.
 // jsPDF only ships standard fonts, so a serif brand font maps to Times and
 // everything else to Helvetica.
-export async function exportDeckPdf(deckTitle, slides, brand, logoUrl) {
+// `logo` is the result of loadLogo() or null.
+export function exportDeckPdf(deckTitle, slides, brand, logo) {
   const primary = hexToRgb(brand?.primary_color, [124, 58, 237]);
   const secondary = hexToRgb(brand?.secondary_color, [168, 85, 247]);
   const accent = hexToRgb(brand?.accent_color, [236, 72, 153]);
   const font = /playfair|georgia|times|serif/i.test(brand?.font_family || "") ? "times" : "helvetica";
-  const logo = await loadLogo(logoUrl);
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: [960, 540] });
   slides.forEach((s, i) => {
     if (i > 0) doc.addPage([960, 540], "landscape");

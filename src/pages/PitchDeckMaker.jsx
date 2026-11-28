@@ -6,7 +6,7 @@ import BrandKitPanel from "@/components/brand-kit/BrandKitPanel";
 import { Presentation, Loader2, Download, Wand2, ChevronLeft, ChevronRight, AlertTriangle, Save, CheckCircle2 } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 import SlidePreview from "@/components/pitch-deck/SlidePreview";
-import { exportDeckPdf } from "@/components/pitch-deck/exportDeckPdf";
+import { downloadDeck } from "@/components/pitch-deck/downloadDeck";
 import { invokeAI } from "@/lib/aiInvoke";
 import { base44 } from "@/api/base44Client";
 
@@ -31,6 +31,7 @@ export default function PitchDeckMaker() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const generate = async () => {
     if (!source?.url) { setError("Analyze a website in Create Demo first."); return; }
@@ -134,9 +135,9 @@ Each non-title slide: a short title and 3-4 concise bullets (max 14 words each).
             <textarea rows={7} value={(slide.bullets || []).join("\n")} className={`${inputCls} resize-none text-xs`}
               onChange={e => patch({ bullets: e.target.value.split("\n") })} placeholder="One bullet per line" />
             <div className="flex gap-2">
-              <button onClick={() => exportDeckPdf(deckTitle, slides.map(s => ({ ...s, bullets: (s.bullets || []).filter(b => b.trim()) })), kit.brand, kit.logo)}
+              <button disabled={exporting} onClick={async () => { setExporting(true); await downloadDeck(deckTitle, slides, kit.brand, kit.logo); setExporting(false); }}
                 className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border text-sm font-semibold hover:bg-muted/20">
-                <Download className="w-4 h-4" /> PDF
+                {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} PPTX + PDF
               </button>
               <button onClick={saveDeck} disabled={saved}
                 className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-fuchsia-500/15 border border-fuchsia-500/50 text-fuchsia-400 text-sm font-semibold disabled:opacity-60">
