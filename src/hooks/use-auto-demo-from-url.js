@@ -1,4 +1,5 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import recordSignedInTab from "@/components/movie-maker/recordSignedInTab";
 import { base44 } from "@/api/base44Client";
 import uploadVideoMedia from "@/components/quick-create/uploadVideoMedia";
 import {
@@ -52,7 +53,8 @@ const RENDER_TIMEOUT_MS = 20 * 60 * 1000; // matches MovieMaker.jsx's own render
  * credentials were usable/given) or "login_failed" (credentials were given
  * but didn't work), never the credentials themselves.
  *
- * `phase` is one of: idle | capturing | writing_script | generating_voice |
+ * Current-session capture records the tab selected by the user, without moving its login session.
+ * `phase` is one of: idle | capturing | recording | writing_script | generating_voice |
  * generating_music | assembling | saving | done | error | login_required |
  * login_failed.
  */
@@ -63,89 +65,93 @@ export function useAutoDemoFromUrl(user) {
   const [error, setError] = useState("");
   const [warnings, setWarnings] = useState([]);
   const [result, setResult] = useState(null); // { assetId, fileUrl, title }
-  const cancelledRef = useRef(false);
+  const runRef = useRef(null);
+  const stopRef = useRef(null);
+  useEffect(() => () => runRef.current?.abort(), []);
 
   const reset = useCallback(() => {
-    cancelledRef.current = false;
-    setPhase("idle");
-    setStepLabel("");
+    runRef.current?.abort();
+    setPhase('idle');
+    setStepLabel('');
     setPercent(0);
-    setError("");
+    setError('');
     setWarnings([]);
     setResult(null);
   }, []);
 
-  const cancel = useCallback(() => {
-    cancelledRef.current = true;
-  }, []);
+  const stopRecording = useCallback(() => stopRef.current?.(), []);
 
-  const generate = useCallback(async (rawUrl, { credentials, consented, useSessionToken } = {}) => {
+  const generate = useCallback(async (rawUrl, { credentials, consented, useCurrentSession } = {}) => {
     if (!user?.email) return;
-    const url = String(rawUrl || "").trim();
-    if (!url) { setError("Enter a URL first."); return; }
+    const url = String(rawUrl || '').trim();
     try {
-      new URL(url);
+      if (!['http:', 'https:'].includes(new URL(url).protocol)) throw new Error();
     } catch {
-      setError("Enter a valid http(s) URL.");
+      setPhase('error');
+      setError(url ? 'Enter a valid http(s) URL.' : 'Enter a URL first.');
       return;
     }
-    // Independent backstop, on top of whatever the calling UI's own
-    // consent checkbox already enforces — credentials are never sent
-    // without an explicit true here.
-    if (credentials && consented !== true) {
+    if (!useCurrentSession && credentials && consented !== true) {
+      setPhase('error');
       setError("Please confirm you're authorized to log in with these credentials first.");
       return;
     }
 
-    cancelledRef.current = false;
-    setPhase("capturing");
-    setStepLabel(useSessionToken ? "Starting the walkthrough capture (using your session)…" : credentials ? "Starting the walkthrough capture (logging in first)…" : "Starting the walkthrough capture…");
+    runRef.current?.abort();
+    const run = new AbortController();
+    runRef.current = run;
+    const { signal } = run;
+    setPhase('capturing');
+    setStepLabel(useCurrentSession ? 'Choose your signed-in tab in the share picker…' : credentials ? 'Starting the walkthrough capture (logging in first)…' : 'Starting the walkthrough capture…');
     setPercent(0);
-    setError("");
+    setError('');
     setWarnings([]);
     setResult(null);
 
     try {
-      const captureId = await submitCapture(
-        useSessionToken ? { url, useSessionToken: true } : credentials ? { url, credentials } : { url }
-      );
-
-      let capture = null;
-      const captureStartedAt = Date.now();
-      for (;;) {
-        if (cancelledRef.current) return;
-        if (Date.now() - captureStartedAt > CAPTURE_TIMEOUT_MS) {
-          throw new Error("Capturing the walkthrough timed out. Please try again.");
+      let capture;
+      if (useCurrentSession) {
+        const { file, durationSeconds } = await recordSignedInTab({ signal, stopRef, onRecording: () => {
+          setPhase('recording');
+          setStepLabel('Recording your tab. Finish here or stop sharing in your browser.');
+        } });
+        if (signal.aborted) return;
+        setPhase('capturing');
+        setStepLabel('Uploading your walkthrough…');
+        capture = { videoUrl: await uploadVideoMedia(file), durationSeconds };
+      } else {
+        const captureId = await submitCapture(credentials ? { url, credentials } : { url });
+        const captureStartedAt = Date.now();
+        for (;;) {
+          if (signal.aborted) return;
+          if (Date.now() - captureStartedAt > CAPTURE_TIMEOUT_MS) throw new Error('Capturing the walkthrough timed out. Please try again.');
+          await sleep(CAPTURE_POLL_MS);
+          if (signal.aborted) return;
+          const job = await getCaptureStatus(captureId);
+          if (signal.aborted) return;
+          if (typeof job?.stepIndex === 'number' && typeof job?.stepTotal === 'number' && job.stepTotal > 0) {
+            setStepLabel(`Capturing walkthrough… step ${Math.min(job.stepIndex + 1, job.stepTotal)} of ${job.stepTotal}`);
+          }
+          if (typeof job?.percent === 'number') setPercent(job.percent / 100);
+          if (job?.status === 'done') { capture = job; break; }
+          if (job?.status === 'login_required') {
+            setPhase('login_required');
+            setError(job.error || "This page requires a login and can't be captured yet.");
+            return;
+          }
+          if (job?.status === 'login_failed') {
+            setPhase('login_failed');
+            setError('Password sign-in failed. For Google, email codes or magic links, sign in on the site first, then choose “Use my current session” to record that tab.');
+            return;
+          }
+          if (job?.status === 'error') throw new Error(job.error || 'Capturing the walkthrough failed.');
         }
-        await sleep(CAPTURE_POLL_MS);
-        const job = await getCaptureStatus(captureId);
-        if (typeof job?.stepIndex === "number" && typeof job?.stepTotal === "number" && job.stepTotal > 0) {
-          setStepLabel(`Capturing walkthrough… step ${Math.min(job.stepIndex + 1, job.stepTotal)} of ${job.stepTotal}`);
-        }
-        if (typeof job?.percent === "number") setPercent(job.percent / 100);
-        if (job?.status === "done") { capture = job; break; }
-        if (job?.status === "login_required") {
-          setPhase("login_required");
-          setError(job.error || "This page requires a login and can't be captured yet.");
-          return;
-        }
-        if (job?.status === "login_failed") {
-          // Deliberately generic — job.error from the worker already never
-          // contains the credentials, but this hook doesn't even trust
-          // that: it substitutes its own fixed message rather than ever
-          // surfacing anything the worker sent for this status.
-          setPhase("login_failed");
-          setError("Login failed. The target site may use email-OTP or magic-link auth (no password login). If this is your own Base44 app, try 'Use my current session' instead.");
-          return;
-        }
-        if (job?.status === "error") throw new Error(job.error || "Capturing the walkthrough failed.");
-        // else "queued" / "processing" — keep polling
       }
-      if (cancelledRef.current) return;
+      if (signal.aborted) return;
 
       const pageInfo = capture.pageInfo || {};
       const captureVideoUrl = capture.videoUrl;
-      const captureSeconds = Math.max(5, Math.round(capture.durationSeconds || 30));
+      const captureSeconds = useCurrentSession ? Math.max(1, Math.round(capture.durationSeconds)) : Math.max(5, Math.round(capture.durationSeconds || 30));
       if (!captureVideoUrl) throw new Error("The capture finished but produced no video.");
 
       // Same generateText({ type: "video_script", ... }) call DemoVideoMaker
@@ -155,9 +161,10 @@ export function useAutoDemoFromUrl(user) {
       setStepLabel("Writing narration script…");
       const headingsText = (pageInfo.headings || []).slice(0, 8).join("; ");
       const scriptPrompt = [
-        "Write a short, engaging voiceover script (about 60-90 seconds when read aloud,",
-        "plain prose, no scene labels, no markdown, no preamble) for a demo video",
-        "introducing this website/product.",
+        useCurrentSession
+          ? `Write a general demo introduction that can be read aloud in ${captureSeconds} seconds. Do not claim specific features or actions not supplied below; the footage was not analyzed.`
+          : 'Write a short, engaging voiceover script (about 60–90 seconds when read aloud) for a demo video introducing this website/product.',
+        'Use plain prose, no scene labels, no markdown, no preamble.',
         `URL: ${url}`,
         `Page title: ${pageInfo.title || "N/A"}`,
         `Key sections: ${headingsText || "N/A"}`,
@@ -166,23 +173,23 @@ export function useAutoDemoFromUrl(user) {
       let script = "";
       let voiceUrl;
       try {
-        script = await generateText({ type: "video_script", prompt: scriptPrompt, tone: "Professional", section: "capture", externalOnly: useSessionToken === true });
+        script = await generateText({ type: "video_script", prompt: scriptPrompt, tone: "Professional", section: "capture", externalOnly: useCurrentSession === true });
         if (!script?.trim()) throw new Error("Couldn't write a narration script for this page.");
-        if (cancelledRef.current) return;
+        if (signal.aborted) return;
 
         setPhase("generating_voice");
         setStepLabel("Generating voiceover…");
-        const voiceBlob = await generateVoiceover(script, useSessionToken ? { provider: "elevenlabs" } : undefined);
-        if (cancelledRef.current) return;
+        const voiceBlob = await generateVoiceover(script, useCurrentSession ? { provider: "elevenlabs" } : undefined);
+        if (signal.aborted) return;
         if (!voiceBlob) throw new Error("Couldn't generate a voiceover for this script.");
         voiceUrl = await uploadVideoMedia(new File([voiceBlob], `auto-demo-voice-${Date.now()}.mp3`, { type: voiceBlob.type || "audio/mpeg" }));
       } catch (e) {
-        if (cancelledRef.current) return;
-        if (!useSessionToken) throw e;
+        if (signal.aborted) return;
+        if (!useCurrentSession) throw e;
         const detail = e?.response?.data?.error || e?.message || "Narration is unavailable.";
         setWarnings(prev => [...prev, `Capture succeeded. Saving without narration: ${detail}`]);
       }
-      if (cancelledRef.current) return;
+      if (signal.aborted) return;
 
       setPhase("generating_music");
       setStepLabel("Adding background music…");
@@ -198,7 +205,7 @@ export function useAutoDemoFromUrl(user) {
         // Non-fatal — the demo still assembles fine with narration alone.
         setWarnings((prev) => [...prev, "Background music generation failed — the demo will play without it."]);
       }
-      if (cancelledRef.current) return;
+      if (signal.aborted) return;
 
       setPhase("assembling");
       setStepLabel("Assembling the demo video…");
@@ -215,18 +222,20 @@ export function useAutoDemoFromUrl(user) {
       let finalVideoUrl = null;
       const renderStartedAt = Date.now();
       for (;;) {
-        if (cancelledRef.current) return;
+        if (signal.aborted) return;
         if (Date.now() - renderStartedAt > RENDER_TIMEOUT_MS) {
           throw new Error("Assembling the demo video timed out. Please try again.");
         }
         await sleep(RENDER_POLL_MS);
+        if (signal.aborted) return;
         const job = await getRenderStatus(renderJobId);
+        if (signal.aborted) return;
         if (typeof job?.progress === "number") setPercent(job.progress);
         if (job?.status === "done") { finalVideoUrl = job.url; break; }
         if (job?.status === "error") throw new Error(job.error || "Assembling the demo video failed.");
         // else "queued" / "processing" — keep polling
       }
-      if (cancelledRef.current) return;
+      if (signal.aborted) return;
       if (!finalVideoUrl) throw new Error("The render finished but returned no video.");
 
       setPhase("saving");
@@ -240,16 +249,19 @@ export function useAutoDemoFromUrl(user) {
         status: "ready",
       });
 
+      if (signal.aborted) return;
       setResult({ assetId: asset.id, fileUrl: finalVideoUrl, title: asset.title });
       setPhase("done");
       setStepLabel("Done — saved to Media Library.");
       setPercent(1);
     } catch (e) {
-      if (cancelledRef.current) return;
+      if (signal.aborted) return;
       setPhase("error");
-      setError(e?.response?.data?.error || e?.message || "Auto Demo failed.");
+      setError(useCurrentSession && e?.name === 'NotAllowedError' ? 'Tab sharing was canceled or blocked. Open the published studio in its own browser tab and try again.' : e?.response?.data?.error || e?.message || 'Auto Demo failed.');
+    } finally {
+      if (runRef.current === run) runRef.current = null;
     }
   }, [user]);
 
-  return { phase, stepLabel, percent, error, warnings, result, generate, reset, cancel };
+  return { phase, stepLabel, percent, error, warnings, result, generate, reset, cancel: reset, stopRecording };
 }

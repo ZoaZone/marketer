@@ -226,7 +226,7 @@ export default function MovieMaker() {
   // immediately after a generate() call fires (see handleGenerateDemo)
   // rather than lingering in state for the rest of the session.
   const [showDemoLogin, setShowDemoLogin] = useState(false);
-  const [useDemoSessionToken, setUseDemoSessionToken] = useState(false);
+  const [useCurrentSession, setUseCurrentSession] = useState(false);
   const [showDemoLoginAdvanced, setShowDemoLoginAdvanced] = useState(false);
   const [demoLoginUrl, setDemoLoginUrl] = useState("");
   const [demoUsername, setDemoUsername] = useState("");
@@ -249,7 +249,7 @@ export default function MovieMaker() {
           password: demoPassword,
         }
       : undefined;
-    autoDemo.generate(demoUrl, { credentials, consented: demoLoginConsent, useSessionToken: useDemoSessionToken || undefined });
+    autoDemo.generate(demoUrl, { credentials, consented: demoLoginConsent, useCurrentSession });
     // The password (and username) only ever need to exist in state for
     // this one submit — clear them immediately rather than leaving them
     // sitting in memory/React DevTools for the rest of the session.
@@ -1359,18 +1359,22 @@ export default function MovieMaker() {
                 <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground cursor-pointer w-fit">
                   <input type="checkbox" checked={showDemoLogin}
                     onChange={e => setShowDemoLogin(e.target.checked)}
-                    disabled={!AUTO_DEMO_IDLE_PHASES.includes(autoDemo.phase) || useDemoSessionToken}
+                    disabled={!AUTO_DEMO_IDLE_PHASES.includes(autoDemo.phase) || useCurrentSession}
                     className="accent-cyan-500" />
                   <Lock className="w-3 h-3" /> This page requires login (optional)
                 </label>
-                <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground cursor-pointer w-fit" title="Uses your current login session — works for Base44 apps that use email-OTP auth (no password needed)">
-                  <input type="checkbox" checked={useDemoSessionToken}
-                    onChange={e => setUseDemoSessionToken(e.target.checked)}
-                    disabled={!AUTO_DEMO_IDLE_PHASES.includes(autoDemo.phase) || showDemoLogin}
+                <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground cursor-pointer w-fit" title="Record a browser tab where you are already signed in">
+                  <input type="checkbox" checked={useCurrentSession}
+                    onChange={e => { setUseCurrentSession(e.target.checked); if (e.target.checked) { setShowDemoLogin(false); setDemoPassword(""); setDemoUsername(""); } }}
+                    disabled={!AUTO_DEMO_IDLE_PHASES.includes(autoDemo.phase)}
                     className="accent-cyan-500" />
-                  <Sparkles className="w-3 h-3" /> Use my current session (Base44 apps)
+                  <Sparkles className="w-3 h-3" /> Use my current session (record a signed-in tab)
                 </label>
               </div>
+
+              {useCurrentSession && (
+                <p className="text-xs text-muted-foreground">Open the target site in another tab and sign in there first. After clicking Generate Demo, select that tab in the browser’s share picker and walk through the site for up to 60 seconds. Only share screens you’re comfortable uploading to Google Cloud Storage; anyone with the video link can view it.</p>
+              )}
 
               {showDemoLogin && (
                 <div className="p-3 rounded-xl bg-background border border-border space-y-2.5">
@@ -1439,6 +1443,7 @@ export default function MovieMaker() {
                     <div className="h-full bg-gradient-to-r from-cyan-500 to-blue-600 transition-all"
                       style={{ width: `${Math.round((autoDemo.percent || 0) * 100)}%` }} />
                   </div>
+                  {autoDemo.phase === "recording" && <button type="button" onClick={autoDemo.stopRecording} className="mr-3 text-xs font-semibold text-foreground underline">Finish recording</button>}
                   <button onClick={autoDemo.cancel} className="text-[11px] text-muted-foreground hover:text-foreground underline">Cancel</button>
                 </div>
               )}

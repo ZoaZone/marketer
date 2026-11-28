@@ -58,22 +58,8 @@ Deno.serve(async (req) => {
     // this actually being trustworthy.
     spec.userId = user.email;
 
-    // Session-token injection: when the caller asks to use their own
-    // session (useSessionToken: true), extract the access token from the
-    // request's Authorization header and forward it to the capture worker
-    // as authToken. The worker injects it into the headless browser's
-    // localStorage, bypassing the login form entirely — this works for
-    // Base44 apps that use OTP/magic-link auth, where password-based
-    // performLogin can't succeed (the /auth/login endpoint returns 400).
-    if (spec.useSessionToken) {
-      const authHeader = req.headers.get('authorization') || '';
-      const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
-      if (token) {
-        spec.authToken = token;
-        delete spec.useSessionToken;
-        // authToken takes precedence — clear any credentials.
-        delete spec.credentials;
-      }
+    if (spec.useSessionToken || Object.hasOwn(spec, 'authToken')) {
+      return Response.json({ error: 'To use your existing sign-in, refresh the studio and record your signed-in browser tab.' }, { status: 400, headers: CORS });
     }
 
     let workerRes: Response;
