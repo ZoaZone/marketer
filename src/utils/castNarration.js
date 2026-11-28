@@ -27,8 +27,9 @@ export async function castNarration(sceneTexts) {
     type: "script",
     prompt:
       `Turn these ${sceneTexts.length} scenes into spoken lines, exactly one short line per scene, in the same language as the scenes. ` +
-      `If the content naturally involves more than one person (a customer and a host, two colleagues), write it as a conversation between ` +
-      `differently named characters. If it is a single presenter, use ONE speaker named NARRATOR. ` +
+      `Only use more than one speaker if the scenes themselves explicitly name or describe several distinct characters talking; ` +
+      `then give each a different name. Never invent characters. For plain narration, a product description or a single presenter, ` +
+      `keep the original wording and use ONE speaker named NARRATOR. ` +
       `Format every line as "1| NAME: words". No stage directions, no quotation marks, nothing else.\n\n${numbered}`,
     tone: "Conversational",
   });
