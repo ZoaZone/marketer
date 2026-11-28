@@ -7,16 +7,8 @@ import { Presentation, Loader2, Download, Wand2, ChevronLeft, ChevronRight, Aler
 import PageHeader from "@/components/ui/PageHeader";
 import SlidePreview from "@/components/pitch-deck/SlidePreview";
 import { downloadDeck } from "@/components/pitch-deck/downloadDeck";
-import { invokeAI } from "@/lib/aiInvoke";
 import { base44 } from "@/api/base44Client";
 
-const SCHEMA = {
-  type: "object",
-  properties: {
-    deckTitle: { type: "string" },
-    slides: { type: "array", items: { type: "object", properties: { title: { type: "string" }, bullets: { type: "array", items: { type: "string" } } } } },
-  },
-};
 const AUDIENCES = ["Investors", "Customers", "Partners", "Internal team"];
 const inputCls = "w-full rounded-xl border border-input bg-background text-sm p-3 focus:outline-none focus:ring-2 focus:ring-ring";
 
@@ -37,22 +29,12 @@ export default function PitchDeckMaker() {
     if (!source?.url) { setError("Analyze a website in Create Demo first."); return; }
     setBusy(true); setError(""); setSaved(false);
     try {
-      const res = await invokeAI({
-        prompt: `Create a ${count}-slide pitch deck for ${audience.toLowerCase()}.
-Website: ${source.url}
-Business summary: """${source.description || "N/A"}"""
-Services: ${(source.services || []).join(", ") || "N/A"}
-Keywords: ${(source.keywords || []).join(", ") || "N/A"}
-Competitors: ${(source.competitors || []).join(", ") || "N/A"}
-Tone: ${source.tone || "Professional"}
-${kit.brief ? `Brand: ${kit.brief}` : ""}
-Slide 1 is the title slide: title = company or deck name, bullets = [one-line tagline].
-Then cover: problem, solution, product, market size, business model, traction, competition, go-to-market, team, financial ask/closing — adapted to the audience and trimmed or merged to fit exactly ${count} slides.
-Each non-title slide: a short title and 3-4 concise bullets (max 14 words each). Do not invent specific numbers; use clearly marked placeholders like [X%] when data is unknown.`,
-        response_json_schema: SCHEMA,
-        add_context_from_internet: true,
-      }, { tag: "pitch_deck" });
-      if (!res?.slides?.length) throw new Error("No slides were produced. Try again.");
+      const { data: res } = await base44.functions.invoke("generatePitchDeck", {
+        url: source.url, description: source.description, services: source.services,
+        keywords: source.keywords, competitors: source.competitors, tone: source.tone,
+        audience, count, brandBrief: kit.brief,
+      });
+      if (res?.error || !res?.slides?.length) throw new Error("No slides were produced. Try again.");
       setDeckTitle(res.deckTitle || "Pitch Deck");
       setSlides(res.slides);
       setCurrent(0);
