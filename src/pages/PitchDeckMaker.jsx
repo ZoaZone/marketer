@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { loadDemoSource } from "@/utils/demoSource";
+import useBrandKit from "@/components/brand-kit/useBrandKit";
+import BrandKitPanel from "@/components/brand-kit/BrandKitPanel";
 import { Presentation, Loader2, Download, Wand2, ChevronLeft, ChevronRight, AlertTriangle, Save, CheckCircle2 } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 import SlidePreview from "@/components/pitch-deck/SlidePreview";
@@ -20,6 +22,7 @@ const inputCls = "w-full rounded-xl border border-input bg-background text-sm p-
 
 export default function PitchDeckMaker() {
   const [source] = useState(() => loadDemoSource());
+  const kit = useBrandKit();
   const [audience, setAudience] = useState(AUDIENCES[0]);
   const [count, setCount] = useState(10);
   const [deckTitle, setDeckTitle] = useState("");
@@ -41,6 +44,7 @@ Services: ${(source.services || []).join(", ") || "N/A"}
 Keywords: ${(source.keywords || []).join(", ") || "N/A"}
 Competitors: ${(source.competitors || []).join(", ") || "N/A"}
 Tone: ${source.tone || "Professional"}
+${kit.brief ? `Brand: ${kit.brief}` : ""}
 Slide 1 is the title slide: title = company or deck name, bullets = [one-line tagline].
 Then cover: problem, solution, product, market size, business model, traction, competition, go-to-market, team, financial ask/closing — adapted to the audience and trimmed or merged to fit exactly ${count} slides.
 Each non-title slide: a short title and 3-4 concise bullets (max 14 words each). Do not invent specific numbers; use clearly marked placeholders like [X%] when data is unknown.`,
@@ -84,6 +88,7 @@ Each non-title slide: a short title and 3-4 concise bullets (max 14 words each).
             {source?.url ? "Change the URL or description in Create Demo" : "Enter a URL in Create Demo"}
           </Link>
         </div>
+        <BrandKitPanel kit={kit} />
         <div className="grid sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">Audience</label>
@@ -108,7 +113,7 @@ Each non-title slide: a short title and 3-4 concise bullets (max 14 words each).
       {slide && (
         <div className="grid lg:grid-cols-[1fr_320px] gap-5">
           <div className="space-y-3">
-            <SlidePreview slide={slide} index={current} total={slides.length} title={deckTitle} />
+            <SlidePreview slide={slide} index={current} total={slides.length} title={deckTitle} brand={kit.brand} logo={kit.logo} />
             <div className="flex items-center justify-between">
               <button onClick={() => setCurrent(c => Math.max(0, c - 1))} disabled={current === 0}
                 className="flex items-center gap-1 px-3 py-2 rounded-xl border border-border text-sm disabled:opacity-30"><ChevronLeft className="w-4 h-4" /> Prev</button>
@@ -129,7 +134,7 @@ Each non-title slide: a short title and 3-4 concise bullets (max 14 words each).
             <textarea rows={7} value={(slide.bullets || []).join("\n")} className={`${inputCls} resize-none text-xs`}
               onChange={e => patch({ bullets: e.target.value.split("\n") })} placeholder="One bullet per line" />
             <div className="flex gap-2">
-              <button onClick={() => exportDeckPdf(deckTitle, slides.map(s => ({ ...s, bullets: (s.bullets || []).filter(b => b.trim()) })))}
+              <button onClick={() => exportDeckPdf(deckTitle, slides.map(s => ({ ...s, bullets: (s.bullets || []).filter(b => b.trim()) })), kit.brand, kit.logo)}
                 className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border text-sm font-semibold hover:bg-muted/20">
                 <Download className="w-4 h-4" /> PDF
               </button>
