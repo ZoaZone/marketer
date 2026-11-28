@@ -452,6 +452,7 @@ Deno.serve(async (req) => {
       lang?: string;
       voiceId?: string;
       voice?: string;
+      provider?: 'elevenlabs';
       stability?: number;
       style?: number;
     };
@@ -470,7 +471,7 @@ Deno.serve(async (req) => {
     // 1,500 characters, so a long script costs proportionally more.
     // Base44's built-in speech is the primary engine (no ElevenLabs surcharge);
     // an explicit ElevenLabs voice choice, or any Base44 failure, uses ElevenLabs.
-    const wantsElevenLabs = !!body.voiceId?.trim();
+    const wantsElevenLabs = body.provider === 'elevenlabs' || !!body.voiceId?.trim();
     if (wantsElevenLabs && !apiKey?.trim()) {
       return Response.json({ error: 'ELEVENLABS_API_KEY is not configured.' }, { status: 500, headers: CORS });
     }

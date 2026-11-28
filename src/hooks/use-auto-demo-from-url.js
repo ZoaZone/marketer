@@ -1,7 +1,8 @@
 import { useCallback, useRef, useState } from "react";
 import { base44 } from "@/api/base44Client";
+import uploadVideoMedia from "@/components/quick-create/uploadVideoMedia";
 import {
-  generateText, generateVoiceover, generateMusic, uploadFile,
+  generateText, generateVoiceover, generateMusic,
   submitRender, getRenderStatus, submitCapture, getCaptureStatus,
 } from "@/utils/lane2";
 
@@ -162,15 +163,25 @@ export function useAutoDemoFromUrl(user) {
         `Key sections: ${headingsText || "N/A"}`,
         `Description: ${pageInfo.description || "N/A"}`,
       ].join("\n");
-      const script = await generateText({ type: "video_script", prompt: scriptPrompt, tone: "Professional", section: "capture" });
-      if (!script?.trim()) throw new Error("Couldn't write a narration script for this page.");
-      if (cancelledRef.current) return;
+      let script = "";
+      let voiceUrl;
+      try {
+        script = await generateText({ type: "video_script", prompt: scriptPrompt, tone: "Professional", section: "capture", externalOnly: useSessionToken === true });
+        if (!script?.trim()) throw new Error("Couldn't write a narration script for this page.");
+        if (cancelledRef.current) return;
 
-      setPhase("generating_voice");
-      setStepLabel("Generating voiceover…");
-      const voiceBlob = await generateVoiceover(script);
-      if (!voiceBlob) throw new Error("Couldn't generate a voiceover for this script.");
-      const voiceUrl = await uploadFile(new File([voiceBlob], `auto-demo-voice-${Date.now()}.mp3`, { type: voiceBlob.type || "audio/mpeg" }));
+        setPhase("generating_voice");
+        setStepLabel("Generating voiceover…");
+        const voiceBlob = await generateVoiceover(script, useSessionToken ? { provider: "elevenlabs" } : undefined);
+        if (cancelledRef.current) return;
+        if (!voiceBlob) throw new Error("Couldn't generate a voiceover for this script.");
+        voiceUrl = await uploadVideoMedia(new File([voiceBlob], `auto-demo-voice-${Date.now()}.mp3`, { type: voiceBlob.type || "audio/mpeg" }));
+      } catch (e) {
+        if (cancelledRef.current) return;
+        if (!useSessionToken) throw e;
+        const detail = e?.response?.data?.error || e?.message || "Narration is unavailable.";
+        setWarnings(prev => [...prev, `Capture succeeded. Saving without narration: ${detail}`]);
+      }
       if (cancelledRef.current) return;
 
       setPhase("generating_music");
@@ -236,7 +247,7 @@ export function useAutoDemoFromUrl(user) {
     } catch (e) {
       if (cancelledRef.current) return;
       setPhase("error");
-      setError(e?.message || "Auto Demo failed.");
+      setError(e?.response?.data?.error || e?.message || "Auto Demo failed.");
     }
   }, [user]);
 

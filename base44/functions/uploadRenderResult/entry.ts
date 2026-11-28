@@ -2,9 +2,8 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 import { writeMedia } from '../../shared/googleVideoStorage.ts';
 
 /**
- * uploadRenderResult — receives the finished MP4 from the standalone render
- * worker (server-render/, deployed separately, e.g. on Railway) and stores
- * it in Base44 storage, returning a persistent { file_url }.
+ * uploadRenderResult — receives a finished video or generated audio from the standalone workers (deployed separately, e.g.
+ * on Railway) and stores it in Google Cloud, returning a persistent { file_url }.
  *
  * Unlike every other function in this project, the caller here is NOT a
  * logged-in app user — it's the render worker itself, a machine-to-machine
@@ -51,7 +50,7 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'A "file" field is required (multipart/form-data).' }, { status: 400, headers: CORS });
     }
 
-    if (file.type === 'video/mp4' || file.type === 'video/webm') {
+    if (/^(?:video\/(?:mp4|webm)|audio\/[\w.+-]+)$/.test(file.type)) {
       return Response.json({ file_url: await writeMedia(req, file, 'exports') }, { headers: CORS });
     }
 

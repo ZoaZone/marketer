@@ -35,11 +35,12 @@ async function getDefaultPlatformModel() {
  * platform's own default model, so the caller can surface a notice instead
  * of leaving the user unaware their chosen model wasn't actually used.
  */
-export async function generateText({ type = "caption", prompt, platform = "General", tone = "Professional", model, section, onModelFallback }) {
-  const chosenModel = model || (await getDefaultPlatformModel());
+export async function generateText({ type = "caption", prompt, platform = "General", tone = "Professional", model, section, onModelFallback, externalOnly = false }) {
+  const chosenModel = externalOnly ? undefined : model || (await getDefaultPlatformModel());
   const res = await base44.functions.invoke("generateMediaContent", {
     type, prompt, platform, tone,
     model: chosenModel || undefined,
+    ...(externalOnly ? { externalOnly: true } : {}),
     // Tells the backend which slice of the product this generation belongs
     // to, so a platform-level per-section AI backend override can apply
     // (Settings > AI Backend). Omitted callers just get the platform default.
@@ -125,7 +126,7 @@ export async function proxyImageAsObjectUrl(url) {
  *   backend responding without audio) — callers should catch this and show
  *   it, rather than treating a real failure the same as empty input.
  */
-export async function generateVoiceover(text, { lang, voiceId, voice } = {}) {
+export async function generateVoiceover(text, { lang, voiceId, voice, provider } = {}) {
   if (!text?.trim()) return null;
   let data;
   try {
@@ -137,7 +138,7 @@ export async function generateVoiceover(text, { lang, voiceId, voice } = {}) {
     // `voiceId` — so passing a custom voice silently did nothing. Renamed
     // to match the backend's actual contract; no caller relied on the old
     // (broken) behavior, since nothing was ever setting it to begin with.
-    const res = await base44.functions.invoke("generateVoiceover", { text: text.slice(0, 20000), ...(lang ? { lang } : {}), ...(voiceId ? { voiceId } : {}), ...(voice && !voiceId ? { voice } : {}) });
+    const res = await base44.functions.invoke("generateVoiceover", { text: text.slice(0, 20000), ...(lang ? { lang } : {}), ...(voiceId ? { voiceId } : {}), ...(voice && !voiceId ? { voice } : {}), ...(provider ? { provider } : {}) });
     data = res?.data ?? res;
   } catch (e) {
     // The backend refuses narration for reasons the user can act on — an

@@ -66,7 +66,7 @@ async function byokCallOpenAi(prompt: string, key: string, maxTokens: number): P
  * order, falling back to Base44's built-in AI (InvokeLLM) only if neither
  * key is set or both calls fail.
  */
-async function llmText(db: any, prompt: string, o: { tag?: string; maxTokens?: number } = {}): Promise<string> {
+async function llmText(db: any, prompt: string, o: { tag?: string; maxTokens?: number; externalOnly?: boolean } = {}): Promise<string> {
   const tag = o.tag || "llm";
   const maxTokens = o.maxTokens ?? 2048;
 
@@ -88,6 +88,7 @@ async function llmText(db: any, prompt: string, o: { tag?: string; maxTokens?: n
     }
   }
 
+  if (o.externalOnly) throw new Error('No external script provider returned a result.');
   return await db.integrations.Core.InvokeLLM({ prompt });
 }
 
@@ -177,7 +178,8 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { type, platform, tone, prompt, client_id, website_scan_id, model, section } = await req.json();
+    const { type, platform, tone, prompt, client_id, website_scan_id, model, section, externalOnly: externalRequested } = await req.json();
+    const externalOnly = externalRequested === true && section === 'capture' && type === 'video_script';
     if (!type || !prompt) {
       return Response.json({ error: 'type and prompt are required' }, { status: 400 });
     }
@@ -264,7 +266,7 @@ Deno.serve(async (req) => {
     // the requested model wasn't used, so it can show a notice instead of
     // silently swapping models on the user.
     let modelFallback = false;
-    if (!result && model) {
+    if (!result && model && !externalOnly) {
       try {
         result = await base44.integrations.Core.InvokeLLM({ prompt: finalPromptWithGuardrail, model });
       } catch (_modelError) {
@@ -282,6 +284,7 @@ Deno.serve(async (req) => {
         result = await llmText(base44, finalPromptWithGuardrail, {
           tag: 'generateMediaContent',
           maxTokens: 2048,
+          externalOnly,
         });
       } catch (_e) {
         result = undefined;
@@ -289,6 +292,7 @@ Deno.serve(async (req) => {
     }
 
     if (!result) {
+      if (externalOnly) throw new Error('The external script providers could not write a narration.');
       throw new Error("Base44 built-in AI is unavailable and no fallback is configured. Set ANTHROPIC_API_KEY or OPENAI_API_KEY to keep this feature running during a credit outage.");
     }
 
