@@ -20,8 +20,16 @@ const clean = (t) => String(t || "").replace(/\*+/g, "").replace(/\([^)]*\)/g, "
  * Returns an audio Blob, or null when the content has only one speaker (or the
  * rewrite could not be parsed) — callers then keep their single-narrator path.
  */
-export async function castNarration(sceneTexts) {
+export async function castNarration(sceneTexts, script = "") {
   const opts = savedVoiceOpts();
+
+  // A script that already labels its speakers ("MAYA: ...") is used as
+  // written, the way Movie Maker treats dialogue: one line per speaker turn.
+  const written = String(script).split(/\r?\n/).map(clean).filter(Boolean);
+  if (written.filter(l => LABEL.test(l)).length >= 2) {
+    const explicit = castVoices(written.map(dialogue => ({ dialogue })), opts.voice);
+    if (explicit.speakers.length >= 2) return speakLines(written, explicit, opts);
+  }
   const numbered = sceneTexts.map((t, i) => `${i + 1}. ${t}`).join("\n");
   const raw = await generateText({
     type: "script",
@@ -45,10 +53,15 @@ export async function castNarration(sceneTexts) {
   const cast = castVoices(lines.map(dialogue => ({ dialogue })), opts.voice);
   if (cast.speakers.length < 2) return null;
 
+  return speakLines(lines.filter(Boolean), cast, opts);
+}
+
+// Each line is spoken with its own character's voice, then joined into one track.
+async function speakLines(lines, cast, opts) {
   const blobs = [];
-  for (const line of lines.filter(Boolean)) {
+  for (const line of lines) {
     const blob = await generateVoiceover(clean(line.replace(LABEL, "")), { lang: opts.lang, voice: cast.voiceFor(line) });
     if (blob) blobs.push(blob);
   }
-  return blobs.length ? concatAudioBlobs(blobs, 0.3) : null;
+  return blobs.length ? concatAudioBlobs(blobs, 0.4) : null;
 }

@@ -275,7 +275,7 @@ export default function DemoVideoMaker() {
       const wantMusic = audioMode === "music" || audioMode === "both";
       if (wantVoice) {
         setStatusMsg("Generating voiceover...");
-        const blob = (await castNarration(scenes.map(s => s.text)).catch(() => null))
+        const blob = (await castNarration(scenes.map(s => s.text), script).catch(() => null))
           || await generateVoiceover(scenes.map(s => s.text).join(". "));
         if (blob) voiceoverUrl = await uploadFile(new File([blob], "demo-vo.mp3", { type: blob.type || "audio/mpeg" }));
         else setWarnings(prev => [...prev, "No voiceover was produced — shipping silent instead."]);
