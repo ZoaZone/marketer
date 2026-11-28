@@ -71,7 +71,7 @@ export default function useAutoVideo({ cinematic, canMotion, canMusic, ratio, re
       try {
         // Multiple characters -> a different voice for each; a single
         // presenter (or an unparseable rewrite) falls through to one narrator.
-        const cast = await castNarration(scenes.map(s => s.text)).catch(() => null);
+        const cast = await castNarration(scenes.map(s => s.text), (prompt.match(/^\s*[A-Za-z][A-Za-z0-9 .'\-]{0,24}:\s*\S/gm) || []).length >= 2 ? prompt : script).catch(() => null);
         if (cast) {
           voiceoverUrl = await uploadFile(new File([cast], "auto-vo.mp3", { type: cast.type || "audio/mpeg" }));
         } else {
