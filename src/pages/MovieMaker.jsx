@@ -25,6 +25,7 @@ import { BASE44_VIDEO_CREDITS_PER_5S } from "@/config/plans";
 import LibraryPickButton from "@/components/media-editor/LibraryPickButton";
 import { generateText, generateVoiceover, generateMusic, MAX_MUSIC_SECONDS, uploadFile, generateImage, splitScriptIntoScenes, submitRender, getRenderStatus, generateSceneVideo, dubAudioFile, dubVideoFile as dubVideoJob, probeMediaDuration } from "@/utils/lane2";
 import { concatAudioBlobs } from "@/utils/audioConcat";
+import { sceneLines, castSpeakers } from "@/components/movie-maker/sceneVoiceCast";
 import { invokeAI } from "@/lib/aiInvoke";
 // dubVideoFile (the aiClient job function) is imported as dubVideoJob — the
 // Dubbing Studio already has a dubVideoFile *state variable* holding the
@@ -818,7 +819,8 @@ export default function MovieMaker() {
   };
 
   const generateSceneVoiceover = async (scene) => {
-    const dialogueLines = (scene.dialogue || []).filter(l => l.text.trim());
+    const dialogueLines = sceneLines(scene);
+    const voiceFor = castSpeakers(scenes);
     if (!dialogueLines.length && !scene.text.trim()) return setError("Add dialogue text first.");
     setVoiceLoading(p => ({ ...p, [scene.id]: true })); setError("");
     try {
@@ -832,7 +834,7 @@ export default function MovieMaker() {
         const lineBlobs = [];
         for (const line of dialogueLines) {
           const spoken = await toSpokenDialogue(line.text);
-          lineBlobs.push(await generateVoiceover(spoken, { voiceId: line.voiceId || undefined }));
+          lineBlobs.push(await generateVoiceover(spoken, line.voiceId ? { voiceId: line.voiceId } : { voice: voiceFor(line.speaker) }));
         }
         blob = await concatAudioBlobs(lineBlobs, 0.4);
       } else {
