@@ -449,6 +449,12 @@ async function pollSceneVideo(jobId, onProgress) {
  * friendly message if the worker is unreachable, or a generic one for any
  * other failure to start the job.
  */
+function surfaceCaptureAuthError(error) {
+  const body = error?.response?.data;
+  if (body?.code === "capture_worker_auth_failed") throw new Error(body.error);
+  throw error;
+}
+
 export async function submitCapture(spec) {
   return submitWorkerJob("submitCapture", spec, {
     idField: "captureId",
@@ -467,7 +473,7 @@ export async function submitCapture(spec) {
  * support that, no video was produced).
  */
 export async function getCaptureStatus(captureId) {
-  const res = await base44.functions.invoke("getCaptureStatus", { captureId });
+  const res = await base44.functions.invoke("getCaptureStatus", { captureId }).catch(surfaceCaptureAuthError);
   return res?.data ?? res;
 }
 
@@ -482,7 +488,7 @@ export async function getCaptureStatus(captureId) {
  * polling/input; they're already scoped to this one session via `token`.
  */
 export async function startLiveCapture({ url }) {
-  const res = await base44.functions.invoke("startLiveCapture", { url });
+  const res = await base44.functions.invoke("startLiveCapture", { url }).catch(surfaceCaptureAuthError);
   const data = res?.data ?? res;
   if (!data?.sessionId) throw new Error(data?.error || "Could not start a live login session.");
   return data;

@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { captureWorkerAuthError } from '../../shared/captureWorkerAuth.ts';
 
 /**
  * getCaptureStatus — polls the standalone capture worker for a capture
@@ -48,6 +49,7 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'capture_worker_unreachable' }, { status: 502, headers: CORS });
     }
 
+    if (workerRes.status === 401) return captureWorkerAuthError(CORS);
     if (workerRes.status === 404) {
       return Response.json({ error: 'Capture not found' }, { status: 404, headers: CORS });
     }
