@@ -125,7 +125,7 @@ export async function proxyImageAsObjectUrl(url) {
  *   backend responding without audio) — callers should catch this and show
  *   it, rather than treating a real failure the same as empty input.
  */
-export async function generateVoiceover(text, { lang, voiceId } = {}) {
+export async function generateVoiceover(text, { lang, voiceId, voice } = {}) {
   if (!text?.trim()) return null;
   let data;
   try {
@@ -137,7 +137,7 @@ export async function generateVoiceover(text, { lang, voiceId } = {}) {
     // `voiceId` — so passing a custom voice silently did nothing. Renamed
     // to match the backend's actual contract; no caller relied on the old
     // (broken) behavior, since nothing was ever setting it to begin with.
-    const res = await base44.functions.invoke("generateVoiceover", { text: text.slice(0, 20000), ...(lang ? { lang } : {}), ...(voiceId ? { voiceId } : {}) });
+    const res = await base44.functions.invoke("generateVoiceover", { text: text.slice(0, 20000), ...(lang ? { lang } : {}), ...(voiceId ? { voiceId } : {}), ...(voice && !voiceId ? { voice } : {}) });
     data = res?.data ?? res;
   } catch (e) {
     // The backend refuses narration for reasons the user can act on — an

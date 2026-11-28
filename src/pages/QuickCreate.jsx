@@ -16,6 +16,8 @@ import useBrandKit from "@/components/brand-kit/useBrandKit";
 import { buildStoryBible, shotFor, framePrompt, clipPrompt } from "@/components/quick-create/sceneContinuity";
 import { VIDEO_RATIOS } from "@/utils/videoAssembler";
 import { BASE44_VIDEO_CREDITS_PER_5S } from "@/config/plans";
+import CharacterVoices from "@/components/quick-create/CharacterVoices";
+import { castVoices, speakerOf } from "@/components/quick-create/castVoices";
 import StudioEngineSelector from "@/components/quick-create/StudioEngineSelector";
 import Base44Studio from "@/components/quick-create/Base44Studio";
 import StudioMakerCards from "@/components/quick-create/StudioMakerCards";
@@ -345,6 +347,14 @@ export default function QuickCreate() {
   const [vo, setVo] = useVoiceOptions();
   const voLangName = (LANGUAGES.find(([c]) => c === vo.lang) || [])[1] || "English";
   const referenceImageUrls = [...new Set([...attachments.map(a => a.url), ...kit.imageUrls])];
+  // Per-character voices: explicit picks live in state, everything else is
+  // derived so a new speaker always gets a voice nobody else has.
+  const [voicePicks, setVoicePicks] = useState({});
+  const cast = castVoices(scenes, vo.voice, voicePicks);
+  const pickCharacterVoice = (key, voice) => {
+    setVoicePicks(prev => ({ ...prev, [key]: voice }));
+    setScenes(prev => prev.map(sc => speakerOf(sc.dialogue) === key ? { ...sc, voiceUrl: "", voiceSeconds: 0 } : sc));
+  };
 
   // ── Image (quick) generation ──
   const generateImageQuick = async () => {
@@ -512,6 +522,7 @@ export default function QuickCreate() {
         type: "script",
         prompt:
           `Write the spoken DIALOGUE for a ${scenes.length}-scene short video about: ${prompt || script}.${kit.voice ? ` Brand voice: ${kit.voice}.` : ""}\n\n` +
+          `If the story has more than one character, give them different names and let them talk to each other across the scenes. ` +
           `Speak AS the people on screen, in their own words. Do not describe them, do not narrate the picture, ` +
           `and do not write in the third person. Exactly one line per scene, short enough to say aloud in about ` +
           `${MOTION_CLIP_SECONDS} seconds. Where a character has a name, prefix their line with it, like "MAYA: ...". ` +
@@ -551,7 +562,7 @@ export default function QuickCreate() {
     setError("");
     let ok = false;
     try {
-      const blob = await generateVoiceover(toSpokenLine(line), vo);
+      const blob = await generateVoiceover(toSpokenLine(line), { ...vo, voice: cast.voiceFor(line) });
       if (!blob) throw new Error("No audio was produced for this line.");
       const url = await uploadFile(new File([blob], `scene-${index + 1}-line.mp3`, { type: blob.type || "audio/mpeg" }));
       if (!url) throw new Error("Uploading the line's audio failed.");
@@ -1196,6 +1207,8 @@ export default function QuickCreate() {
                         {voiceBatch ? `Speaking line ${voiceBatch.done + 1} of ${voiceBatch.total}…` : "Speak all lines"}
                       </button>
                     </div>
+
+                    <CharacterVoices speakers={cast.speakers} onChange={pickCharacterVoice} disabled={!!voiceBatch} />
 
                     {/* Per-scene lines. Editable, because a line the user
                         writes themselves should be no harder than one the
