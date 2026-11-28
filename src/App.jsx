@@ -46,6 +46,7 @@ import QuickCreate from './pages/QuickCreate';
 import QuickVideoMaker from './pages/QuickVideoMaker';
 import DemoVideoMaker from './pages/DemoVideoMaker';
 import MediaEditor from './pages/MediaEditor';
+import PitchDeckMaker from './pages/PitchDeckMaker';
 import MovieMaker from './pages/MovieMaker';
 import SongCreator from './pages/SongCreator';
 import Studio from './pages/Studio';
@@ -146,6 +147,7 @@ const AuthenticatedApp = () => {
         <Route path="/quick-create" element={<QuickCreate />} />
         <Route path="/quick-video" element={<QuickVideoMaker />} />
         <Route path="/demo-video" element={<DemoVideoMaker />} />
+        <Route path="/pitch-deck" element={<PitchDeckMaker />} />
         <Route path="/media-editor" element={<MediaEditor />} />
         <Route path="/movie-maker" element={<MovieMaker />} />
         <Route path="/song-creator" element={<SongCreator />} />

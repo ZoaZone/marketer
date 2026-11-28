@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { mine } from "@/utils/scope";
 import { BRAND } from "@/lib/brand";
-import { Film, Music, Sliders, Monitor, Plus, Image as ImageIcon, ArrowRight, Briefcase, Clapperboard, Zap } from "lucide-react";
+import { Film, Music, Sliders, Monitor, Plus, Image as ImageIcon, ArrowRight, Briefcase, Clapperboard, Zap, Presentation } from "lucide-react";
 
 // The two lanes (Work Package G): Lane 1 (Business/Marketing — Base44-native
 // generation + FFmpeg assembly, no paid Replicate/ElevenLabs calls) and
@@ -32,6 +32,7 @@ const TOOLS = [
   { to: "/song-creator", icon: Music,   gradient: "from-violet-500 to-pink-600", label: "Song Creator", description: "AI lyrics, voiceover, and multilingual dubbing" },
   { to: "/media-editor", icon: Sliders, gradient: "from-fuchsia-500 to-purple-600", label: "Edit Media", description: "Trim, crop, text, logos, PiP, music, voice-over and AI fixes" },
   { to: "/demo-video",   icon: Monitor, gradient: "from-fuchsia-500 to-purple-600", label: "Demo Video", description: "Turn any URL into a narrated demo video" },
+  { to: "/pitch-deck",   icon: Presentation, gradient: "from-amber-500 to-orange-600", label: "Pitch Deck", description: "Generate an editable slide deck from your idea or website" },
 ];
 
 export default function Studio() {
