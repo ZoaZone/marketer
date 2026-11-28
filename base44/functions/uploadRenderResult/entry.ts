@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { writeMedia } from '../../shared/googleVideoStorage.ts';
 
 /**
  * uploadRenderResult — receives the finished MP4 from the standalone render
@@ -48,6 +49,10 @@ Deno.serve(async (req) => {
     const file = form?.get('file');
     if (!(file instanceof File)) {
       return Response.json({ error: 'A "file" field is required (multipart/form-data).' }, { status: 400, headers: CORS });
+    }
+
+    if (file.type === 'video/mp4' || file.type === 'video/webm') {
+      return Response.json({ file_url: await writeMedia(req, file, 'exports') }, { headers: CORS });
     }
 
     const base44 = createClientFromRequest(req);

@@ -389,15 +389,7 @@ export async function getVideoStatus(jobId) {
  *   its still image.
  */
 export async function generateSceneVideo({ prompt, imageUrl, durationSeconds = 5, aspectRatio = "16:9", onProgress } = {}) {
-  // Base44 video is tried first by the server; if that clip fails, the same
-  // scene is resubmitted once to Kling (provider: "kling"), which only works
-  // for accounts whose plan includes it.
-  try {
-    return await pollSceneVideo(await submitVideo({ prompt, imageUrl, durationSeconds, aspectRatio }), onProgress);
-  } catch (e) {
-    if (e?.billing || !e?.base44Clip) throw e;
-    return pollSceneVideo(await submitVideo({ prompt, imageUrl, durationSeconds, aspectRatio, provider: "kling" }), onProgress);
-  }
+  return pollSceneVideo(await submitVideo({ prompt, imageUrl, durationSeconds, aspectRatio }), onProgress);
 }
 
 async function pollSceneVideo(jobId, onProgress) {

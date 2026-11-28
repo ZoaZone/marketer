@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { BASE44_JOB_PREFIX, base44ClipStatus } from '../../shared/base44Video.ts';
+import { VERTEX_PREFIX, vertexVideoStatus } from '../../shared/vertexVideo.ts';
 
 /**
  * getVideoStatus — polls the standalone render worker for a per-scene
@@ -29,6 +30,19 @@ Deno.serve(async (req) => {
 
     const { jobId } = await req.json().catch(() => ({}));
     if (!jobId) return Response.json({ error: 'jobId is required' }, { status: 400, headers: CORS });
+
+    if (typeof jobId === 'string' && jobId.startsWith(VERTEX_PREFIX)) {
+      const id = jobId.slice(VERTEX_PREFIX.length);
+      if (!/^[a-zA-Z0-9_-]{1,100}$/.test(id)) return Response.json({ status: 'error', error: 'Video job not found.' }, { headers: CORS });
+      const job = await base44.entities.StudioVideoJob.get(id).catch(e => (e.status === 404 || e.status === 403 ? null : Promise.reject(e)));
+      if (!job || job.owner_id !== user.id || !job.video_id?.startsWith(VERTEX_PREFIX)) return Response.json({ status: 'error', error: 'Video job not found.' }, { headers: CORS });
+      try {
+        const result = await vertexVideoStatus(req, job);
+        return Response.json({ status: result.status === 'completed' ? 'done' : result.status === 'failed' ? 'error' : 'processing', url: result.url, error: result.error?.message, progress: result.url ? 1 : undefined }, { headers: CORS });
+      } catch (e) {
+        return Response.json({ status: 'error', error: e.message }, { headers: CORS });
+      }
+    }
 
     // Base44-generated clips are polled through the Base44 gateway.
     if (String(jobId).startsWith(BASE44_JOB_PREFIX)) {

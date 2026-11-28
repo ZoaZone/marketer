@@ -160,7 +160,7 @@ export default function QuickVideoMaker() {
       setError(e?.billing
         ? `${e.message} Real AI video resumes once the provider account is funded.`
         : (e?.upgradeRequired
-          ? `${e.message} (This only affects the Kling fallback — Base44's own video generation should still work on your plan; please try again.)`
+          ? e.message
           : (e?.message || "Video generation failed.")));
     }
     setLoading(false);

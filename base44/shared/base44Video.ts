@@ -27,14 +27,14 @@ const ALLOWANCE_AC: Record<string, number> = {
  * allowance and then overage unless overage is switched off. Returns a Response
  * to send back when the charge is refused, otherwise null.
  */
-export async function chargeStudioCredits(base44: any, user: any, credits: number, kind: string): Promise<Response | null> {
+export async function chargeStudioCredits(base44: any, user: any, credits: number, kind: string, provider = `base44_${kind}`): Promise<Response | null> {
   if (user?.role === 'admin' || !(credits > 0)) return null;
   const db = base44.asServiceRole.entities;
   const subs = await db.Subscription.filter({ owner_email: user.email }, '-created_date', 10).catch(() => []);
   const sub = (subs || []).find((s: any) => ['active', 'trialing'].includes(s.status));
   const event = (billed_as: string) => db.UsageEvent.create({
     owner_email: user.email, kind: 'ai_generation', units: credits, ai_credits_charged: credits,
-    render_minutes_charged: 0, billed_as, provider: `base44_${kind}`,
+    render_minutes_charged: 0, billed_as, provider,
   }).catch(() => null);
   if (!sub) {
     const prior = await db.UsageEvent.filter({ owner_email: user.email, billed_as: 'trial' }, '-created_date', 200).catch(() => null);
@@ -43,7 +43,8 @@ export async function chargeStudioCredits(base44: any, user: any, credits: numbe
     if (used + credits > FREE_TRIAL_CREDITS) {
       return Response.json({ error: `This needs ${credits} credits and you have ${Math.max(0, FREE_TRIAL_CREDITS - used)} free credits left. Subscribe or buy credits to keep creating.`, code: 'trial_limit_reached' }, { status: 403 });
     }
-    await event('trial');
+    const recorded = await event('trial');
+    if (!recorded) return Response.json({ error: 'Could not record your free-trial usage. Please retry.', code: 'metering_unavailable' }, { status: 503 });
     return null;
   }
   const stale = !sub.usage_period_start || Date.now() - Date.parse(sub.usage_period_start) > 31 * 86400000;

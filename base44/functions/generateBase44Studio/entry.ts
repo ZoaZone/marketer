@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import OpenAI from 'npm:openai@6.45.0';
 import { chargeStudioCredits, creditsForSeconds, refundCredits } from '../../shared/base44Video.ts';
+import { startVertexVideo, vertexVideoStatus, VERTEX_PREFIX } from '../../shared/vertexVideo.ts';
 import { llmText, parseLooseJson } from '../../shared/byokLlm.block.ts';
 import { generateImageWithReplicate } from '../../shared/replicateImage.block.ts';
 
@@ -22,8 +23,9 @@ export default async function(req) {
     const { action, prompt, aspectRatio = '16:9', duration = 6, audio = false, referenceImageUrls = [], recordId, overlayText = '' } = await req.json();
     if (action === 'videoStatus') {
       if (typeof recordId !== 'string' || !recordId) return Response.json({ error: 'Missing video job.' }, { status: 400 });
-      const job = await base44.entities.StudioVideoJob.get(recordId);
+      const job = await base44.entities.StudioVideoJob.get(recordId).catch(e => (e.status === 404 || e.status === 403 ? null : Promise.reject(e)));
       if (!job || job.owner_id !== user.id) return Response.json({ error: 'Video job not found.' }, { status: 404 });
+      if (job.video_id.startsWith(VERTEX_PREFIX)) return Response.json({ recordId, ...await vertexVideoStatus(req, job) });
       const { baseURL, token, headers } = base44.asServiceRole.aiGateway.connection();
       const videos = new OpenAI({ baseURL, apiKey: token, defaultHeaders: headers }).videos;
       const video = await videos.retrieve(job.video_id, { maxRetries: 0 });
@@ -38,7 +40,7 @@ export default async function(req) {
     // Called only after the request has been validated, right before generation.
     const charge = async () => {
       const credits = action === 'image' ? 1 : creditsForSeconds(duration);
-      const refused = await chargeStudioCredits(base44, user, credits, action);
+      const refused = await chargeStudioCredits(base44, user, credits, action, action === 'image' ? 'base44_image' : 'vertex_veo');
       if (!refused) charged = credits;
       return refused;
     };
@@ -73,23 +75,15 @@ export default async function(req) {
       });
       return Response.json({ text: String(text).trim() });
     }
-    if (action === 'videoCreate' || action === 'videoEstimate') {
-      if (!['16:9', '9:16'].includes(aspectRatio) || ![4, 6, 8, 15].includes(duration) || typeof audio !== 'boolean') return Response.json({ error: 'Choose 4, 6, 8 or 15 seconds in landscape or portrait.' }, { status: 400 });
-      if (!Array.isArray(referenceImageUrls) || referenceImageUrls.length > 4 || referenceImageUrls.some(url => typeof url !== 'string' || !(url.startsWith('https://') || url.startsWith('mp/private/')))) return Response.json({ error: 'Use up to four uploaded reference images.' }, { status: 400 });
-      const { baseURL, token, headers } = base44.asServiceRole.aiGateway.connection();
-      const videos = new OpenAI({ baseURL, apiKey: token, defaultHeaders: headers }).videos;
-      const request = {
-        model: 'seedance_2_fast', seconds: duration, aspect_ratio: aspectRatio, resolution: '720p', generate_audio: audio,
-        prompt: `${action === 'videoCreate' ? await direct(prompt.trim(), referenceImageUrls.length > 0) : prompt.trim()}\nNo visible lettering, captions, watermarks or logos. Branding will be composited separately.${referenceImageUrls.length ? '\nUse @Image1 as the main character reference; maintain its distinctive appearance, face, outfit and colors throughout. Do not replace it with a different character.' : ''}${referenceImageUrls.length > 1 ? `\nUse ${referenceImageUrls.slice(1).map((_, i) => `@Image${i + 2}`).join(', ')} as additional characters or scene references that appear in the video; keep each one's appearance consistent with its image.` : ''}`,
-        ...(referenceImageUrls.length ? { input_references: referenceImageUrls.map(url => ({ type: 'image_url', image_url: { url } })) } : {}),
-        ...(action === 'videoEstimate' ? { dry_run: true } : {}),
-      };
-      if (action === 'videoCreate') { const refused = await charge(); if (refused) return refused; }
-      const video = await videos.create(request, { maxRetries: 0 });
-      if (action === 'videoEstimate') return Response.json({ estimatedCredits: video.usage?.base44_credits });
-      if (!video.id) throw new Error('No video job was returned.');
-      const job = await base44.asServiceRole.entities.StudioVideoJob.create({ owner_id: user.id, video_id: video.id, status: video.status });
-      return Response.json({ recordId: job.id, status: video.status, url: video.url, error: video.error }, { status: 202 });
+    if (action === 'video' || action === 'videoCreate' || action === 'videoEstimate') {
+      if (!['16:9', '9:16'].includes(aspectRatio) || ![4, 6, 8].includes(duration) || audio !== false) return Response.json({ error: 'Veo creates silent clips of 4, 6 or 8 seconds in landscape or portrait.' }, { status: 400 });
+      if (!Array.isArray(referenceImageUrls) || referenceImageUrls.length > 1 || referenceImageUrls.some(url => typeof url !== 'string' || url.length > 5000)) return Response.json({ error: 'Veo supports one opening image.' }, { status: 400 });
+      if (action === 'videoEstimate') return Response.json({ estimatedCredits: creditsForSeconds(duration) });
+      const refused = await charge();
+      if (refused) return refused;
+      const brief = await direct(prompt.trim(), referenceImageUrls.length > 0);
+      const job = await startVertexVideo(base44, user, { prompt: `${brief}\nNo visible lettering, captions, watermarks or logos. Branding will be composited separately.`, aspectRatio, durationSeconds: duration, imageUrl: referenceImageUrls[0] });
+      return Response.json({ recordId: job.id, status: 'queued' }, { status: 202 });
     }
     if (action === 'expand') {
       const text = await invokeJson(base44.asServiceRole, {
@@ -97,46 +91,27 @@ export default async function(req) {
       });
       return Response.json({ text });
     }
-    if (action === 'video' && (!['16:9', '9:16'].includes(aspectRatio) || ![4, 6, 8].includes(duration) || typeof audio !== 'boolean')) {
-      return Response.json({ error: 'Base44 video supports 4, 6 or 8 seconds in 16:9 or 9:16.' }, { status: 400 });
-    }
     if (action === 'image' && !['1:1', '16:9', '9:16', '4:5'].includes(aspectRatio)) {
       return Response.json({ error: 'Select a supported image format.' }, { status: 400 });
     }
     if (!Array.isArray(referenceImageUrls) || referenceImageUrls.length > 6 || referenceImageUrls.some(url => typeof url !== 'string' || !url.startsWith('https://'))) {
       return Response.json({ error: 'Use up to six HTTPS reference images.' }, { status: 400 });
     }
-    // Video still uses only managed Core integrations — no BYOK fallback.
-    // Replicate video generation is async/job-based (see submitVideo), a
-    // different shape than this function's synchronous request/response, so
-    // it isn't a drop-in fallback here; Lane 2's Movie Maker/Quick Create
-    // video paths already route through Replicate via submitVideo instead.
-    // Image DOES have a fallback: the owner's own Replicate key (Flux), tried
-    // first when there are no reference images to preserve identity from, so
-    // this quick-generate path keeps working when Base44's integration
-    // credits run out.
     { const refused = await charge(); if (refused) return refused; }
     let url: string | undefined;
-    if (action === 'video') {
-      const result = await base44.asServiceRole.integrations.Core.GenerateVideo({
-        prompt: `${await direct(prompt.trim(), false)}\nNo visible lettering, captions, watermarks or logos. Branding will be composited separately.`, duration, aspect_ratio: aspectRatio, generate_audio: audio,
+    if (!referenceImageUrls.length && Deno.env.get('REPLICATE_API_TOKEN')?.trim()) {
+      try {
+        url = await generateImageWithReplicate(`${prompt.trim()}\nCompose the image for ${aspectRatio} framing. Do not render any text, lettering, watermarks or logos; branding is added separately.`);
+      } catch (err) {
+        console.error('[generateBase44Studio] Replicate BYOK fallback failed, trying Base44:', (err as Error)?.message);
+      }
+    }
+    if (!url) {
+      const result = await base44.asServiceRole.integrations.Core.GenerateImage({
+        prompt: `${prompt.trim()}\nCompose the image for ${aspectRatio} framing. Do not render any text, lettering, watermarks or logos; branding is added separately. ${referenceImageUrls.length ? 'Keep the subjects and style of the reference images.' : ''}`,
+        ...(referenceImageUrls.length ? { existing_image_urls: referenceImageUrls } : {}),
       });
       url = result?.url || result?.file_url;
-    } else {
-      if (!referenceImageUrls.length && Deno.env.get('REPLICATE_API_TOKEN')?.trim()) {
-        try {
-          url = await generateImageWithReplicate(`${prompt.trim()}\nCompose the image for ${aspectRatio} framing. Do not render any text, lettering, watermarks or logos; branding is added separately.`);
-        } catch (err) {
-          console.error('[generateBase44Studio] Replicate BYOK fallback failed, trying Base44:', (err as Error)?.message);
-        }
-      }
-      if (!url) {
-        const result = await base44.asServiceRole.integrations.Core.GenerateImage({
-          prompt: `${prompt.trim()}\nCompose the image for ${aspectRatio} framing. Do not render any text, lettering, watermarks or logos; branding is added separately. ${referenceImageUrls.length ? 'Keep the subjects and style of the reference images.' : ''}`,
-          ...(referenceImageUrls.length ? { existing_image_urls: referenceImageUrls } : {}),
-        });
-        url = result?.url || result?.file_url;
-      }
     }
     if (!url) throw new Error('Base44 did not return a media file. Please try again.');
     return Response.json({ url, type: action });

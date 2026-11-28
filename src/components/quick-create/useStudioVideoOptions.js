@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import uploadVideoMedia from '@/components/quick-create/uploadVideoMedia';
 
 export default function useStudioVideoOptions(setError) {
   const [logo, setLogo] = useState(null), [character, setCharacter] = useState(null), [music, setMusic] = useState(null), [musicPreset, setMusicPreset] = useState(''), [extras, setExtras] = useState([]), [voice, setVoice] = useState(null);
@@ -11,6 +12,12 @@ export default function useStudioVideoOptions(setError) {
     setUploading(kind); setError('');
     try {
       if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 10 * 1024 * 1024) throw new Error('Choose a PNG, JPG or WebP image smaller than 10 MB.');
+      if (kind === 'character') {
+        if (!['image/png', 'image/jpeg'].includes(file.type)) throw new Error('Use a PNG or JPEG for the opening frame.');
+        const url = await uploadVideoMedia(file);
+        setCharacter({ fileUri: url, url, name: file.name });
+        return;
+      }
       const { file_uri } = await base44.integrations.Core.UploadPrivateFile({ file });
       const { signed_url } = await base44.integrations.Core.CreateFileSignedUrl({ file_uri, expires_in: 3600 });
       const asset = { fileUri: file_uri, url: signed_url, name: file.name };

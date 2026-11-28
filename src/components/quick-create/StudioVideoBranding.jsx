@@ -5,7 +5,7 @@ import StudioVoiceRecorder from '@/components/quick-create/StudioVoiceRecorder';
 
 export default function StudioVideoBranding({ showCharacter = true, extras = [], removeExtra, music, uploadMusic, musicPreset = '', setMusicPreset, logo, character, text, setText, upload, uploading, disabled, checking, proofread, suggestion, applySuggestion, clear, fromLibrary, voice, setVoice, setError }) {
   return <div className="space-y-4 border-t border-border pt-4">
-    <div className="grid grid-cols-2 gap-3">{[['logo', 'Logo', logo], ['character', 'Reference character', character]].filter(([kind]) => showCharacter || kind === 'logo').map(([kind, label, asset]) => <div key={kind} className="space-y-2">
+    <div className="grid grid-cols-2 gap-3">{[['logo', 'Logo', logo], ['character', 'Opening frame', character]].filter(([kind]) => showCharacter || kind === 'logo').map(([kind, label, asset]) => <div key={kind} className="space-y-2">
       <p className="text-xs font-semibold text-foreground">{label}</p>
       {asset && <div className="flex items-center gap-2"><img src={asset.url} alt={label} className="h-14 w-14 rounded-lg bg-muted object-contain" /><button type="button" disabled={disabled} onClick={() => clear(kind)} aria-label={`Remove ${label}`}><X className="h-4 w-4" /></button></div>}
       <label className={`flex items-center gap-1.5 rounded-lg border border-border p-2 text-xs text-foreground ${disabled ? 'opacity-50' : 'cursor-pointer'}`}>
@@ -14,17 +14,7 @@ export default function StudioVideoBranding({ showCharacter = true, extras = [],
       </label>
       <LibraryPickButton disabled={disabled} multi={false} onPick={items => fromLibrary(kind, items)} />
     </div>)}</div>
-    <p className="text-xs text-muted-foreground">Logo stays intact in the top-right corner. The reference guides the character’s appearance; an exact likeness is not guaranteed. Upload only images you have permission to use.</p>
-    {showCharacter && <div className="space-y-2">
-      <p className="text-xs font-semibold text-foreground">Other characters &amp; scene references (up to 3)</p>
-      <div className="flex flex-wrap gap-2">{extras.map((asset, i) => <div key={asset.fileUri} className="relative"><img src={asset.url} alt={`Reference ${i + 2}`} className="h-14 w-14 rounded-lg bg-muted object-contain" /><button type="button" disabled={disabled} onClick={() => removeExtra(i)} aria-label={`Remove reference ${i + 2}`} className="absolute -right-1 -top-1 rounded-full bg-background border border-border"><X className="h-3.5 w-3.5" /></button></div>)}</div>
-      {extras.length < 3 && <label className={`flex items-center gap-1.5 rounded-lg border border-border p-2 text-xs text-foreground ${disabled ? 'opacity-50' : 'cursor-pointer'}`}>
-        {uploading === 'extra' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}Add another image
-        <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" disabled={disabled} onChange={e => { upload('extra', e.target.files?.[0]); e.target.value = ''; }} />
-      </label>}
-      {extras.length < 3 && <LibraryPickButton disabled={disabled} onPick={items => fromLibrary('extra', items)} />}
-      <p className="text-xs text-muted-foreground">Add other people, pets, products or places that should appear. Describe what each does in your prompt. Upload only images you have permission to use.</p>
-    </div>}
+    <p className="text-xs text-muted-foreground">Your logo stays in the top-right corner. Veo can animate one PNG or JPEG opening frame. Upload only images you have permission to use.</p>
     {showCharacter && <div className="space-y-2">
       <p className="text-xs font-semibold text-foreground">Background music</p>
       <div className="flex flex-wrap gap-2">{[{ id: '', label: 'None' }, ...MUSIC_PRESETS].map(p => <button key={p.id || 'none'} type="button" disabled={disabled} aria-pressed={musicPreset === p.id} onClick={() => setMusicPreset(p.id)} title={p.hint} className={`rounded-lg border px-3 py-1.5 text-xs ${musicPreset === p.id ? 'border-primary bg-primary/10 text-primary' : 'border-border text-foreground'}`}>{p.label}</button>)}</div>

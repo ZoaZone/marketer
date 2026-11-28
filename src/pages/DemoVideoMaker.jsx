@@ -13,7 +13,7 @@ import { VIDEO_RATIOS } from "@/utils/videoAssembler";
 // AI background music (ElevenLabs Music, paid Lane 2) — enabled for the walkthrough
 // so "Music" mode generates a track instead of shipping silent.
 import { generateMusic, generateSceneVideo, submitRender, getRenderStatus } from "@/utils/lane2";
-import { isRealVideoEntitled } from "@/utils/entitlements";
+import uploadVideoMedia from "@/components/quick-create/uploadVideoMedia";
 import {
   Globe, Loader2, Sparkles, Monitor, Wand2, Play, Square, Download, Save,
   CheckCircle2, AlertTriangle, Mic, ExternalLink, RefreshCw, Music, VolumeX,
@@ -232,7 +232,7 @@ export default function DemoVideoMaker() {
     setUploadingMusic(true);
     setError("");
     try {
-      const url = await uploadFile(file);
+      const url = await uploadVideoMedia(file);
       if (url) { setMusicUrl(url); setMusicName(file.name); }
       else setError("Music upload failed.");
     } catch (e) { setError(e?.message || "Music upload failed."); }
@@ -259,19 +259,15 @@ export default function DemoVideoMaker() {
         setProgress((i / sceneScripts.length) * 0.4);
         let imgUrl;
         if (i === 0 && screenshotUrl) {
-          // Open on a real screenshot of the scanned URL, not a generic AI image.
           imgUrl = screenshotUrl;
         } else {
-          const context = description ? ("Brand context: " + description + ". ") : "";
+          const context = description ? `Brand context: ${description}. ` : "";
           const style = sceneStyles[i % sceneStyles.length];
-          imgUrl = await generateImage({ prompt: context + "Distinct marketing visual for scene " + (i + 1) + " of a product walkthrough. " + style + ". Depict specifically: " + sceneScripts[i].text + ". No text, no words, no captions in the image.", referenceImageUrls: screenshotUrl ? [screenshotUrl] : [] });
+          try {
+            imgUrl = await generateImage({ prompt: `${context}Distinct marketing visual for scene ${i + 1} of a product walkthrough. ${style}. Depict specifically: ${sceneScripts[i].text}. No text, no words, no captions.` });
+          } catch { /* A missing still does not prevent a text-to-video clip. */ }
         }
-        if (!imgUrl) {
-          if (!screenshotUrl) throw new Error(`No visual was available for scene ${i + 1}. Try analyzing the website again.`);
-          imgUrl = screenshotUrl;
-          setWarnings(prev => [...prev, `Scene ${i + 1} is using the site screenshot because an AI image could not be generated.`]);
-        }
-        scenes.push({ imageUrl: imgUrl, text: sceneScripts[i].text, seconds: 8 });
+        scenes.push({ imageUrl: imgUrl || screenshotUrl || undefined, text: sceneScripts[i].text, seconds: 8 });
       }
 
       let voiceoverUrl;
@@ -284,7 +280,7 @@ export default function DemoVideoMaker() {
           const blob = (await castNarration(scenes.map(s => s.text), script).catch(() => null))
             || await generateVoiceover(scenes.map(s => s.text).join(". "));
           if (!blob) throw new Error("No audio was returned.");
-          voiceoverUrl = await uploadFile(new File([blob], "demo-vo.mp3", { type: blob.type || "audio/mpeg" }));
+          voiceoverUrl = await uploadVideoMedia(new File([blob], "demo-vo.mp3", { type: blob.type || "audio/mpeg" }));
           if (!voiceoverUrl) throw new Error("The audio could not be stored.");
         } catch (e) {
           setWarnings(prev => [...prev, `Continuing without voiceover: ${e?.response?.data?.error || e?.message || "Audio unavailable."}`]);
@@ -314,53 +310,44 @@ export default function DemoVideoMaker() {
         }
       }
 
-let realVideo = false;
-try {
-  const me = await base44.auth.me();
-  // Read the admin flag from the authenticated user record rather than
-  // component state — this is the same source the server gates read, so
-  // the two cannot disagree about who gets real generated video.
-  const meIsAdmin = String(me?.role || "").trim().toLowerCase() === "admin";
-  const subs = await base44.entities.Subscription.filter({ owner_email: me?.email }, null, 1);
-  realVideo = isRealVideoEntitled(Array.isArray(subs) ? subs[0] : subs, meIsAdmin);
-} catch (_e) { realVideo = false; }
-
-let hostedUrl;
-if (!wantVoice) voiceoverUrl = undefined;
-if (!wantMusic) finalMusicUrl = undefined;
-// Omitting audioMode makes the renderer mix every supplied track (voice + music).
-const effectiveAudioMode = voiceoverUrl || finalMusicUrl ? undefined : "silent";
-if (realVideo) {
-  const videoScenes = [];
-  for (let i = 0; i < scenes.length; i++) {
-    setStatusMsg(`Generating motion for scene ${i + 1} of ${scenes.length}...`);
-    setProgress(0.4 + (i / scenes.length) * 0.35);
-    let clipUrl = null;
-    try {
-      const clip = await generateSceneVideo({ prompt: sceneScripts[i].text, imageUrl: scenes[i].imageUrl, durationSeconds: scenes[i].seconds, aspectRatio: ratio });
-      clipUrl = typeof clip === "string" ? clip : (clip && (clip.url || clip.videoUrl)) || null;
-    } catch (_e) { clipUrl = null; }
-    videoScenes.push({ imageUrl: scenes[i].imageUrl, videoUrl: clipUrl, seconds: scenes[i].seconds, subtitle: scenes[i].text });
-  }
-  setStatusMsg("Rendering your video...");
-  const jobId = await submitRender({ scenes: videoScenes, ratio, resolution, audioMode: effectiveAudioMode, voiceoverUrl, musicUrl: finalMusicUrl, burnSubtitles: false });
-  const startedAt = Date.now();
-  while (true) {
-    if (Date.now() - startedAt > CAPTURE_TIMEOUT_MS) throw new Error("Video render timed out. Please try again.");
-    const job = await getRenderStatus(jobId);
-    if (job && typeof job.progress === "number") setProgress(0.75 + job.progress * 0.25);
-    if (job && job.status === "done") { hostedUrl = job.url; break; }
-    if (job && job.status === "error") throw new Error(job.error || "Video render failed.");
-    await new Promise((res) => setTimeout(res, CAPTURE_POLL_MS));
-  }
-} else {
-  setStatusMsg("Assembling video...");
-  hostedUrl = await assembleLane1Video({
-    scenes, ratio, resolution,
-    audioMode: effectiveAudioMode,
-    voiceoverUrl, musicUrl: finalMusicUrl,
-  }, { onProgress: (p) => setProgress(0.4 + p * 0.6) });
-}
+      if (!wantVoice) voiceoverUrl = undefined;
+      if (!wantMusic) finalMusicUrl = undefined;
+      const effectiveAudioMode = voiceoverUrl || finalMusicUrl ? undefined : "silent";
+      const videoScenes = [];
+      for (let i = 0; i < scenes.length; i++) {
+        const scene = scenes[i];
+        setStatusMsg(`Generating motion for scene ${i + 1} of ${scenes.length}...`);
+        setProgress(0.4 + (i / scenes.length) * 0.35);
+        let videoUrl;
+        // Keep the real site screenshot for the opening when available. For later
+        // scenes without an AI still, Veo can generate directly from the brief.
+        if (!(scenes.length > 1 && i === 0 && scene.imageUrl === screenshotUrl && screenshotUrl)) {
+          try {
+            videoUrl = await generateSceneVideo({ prompt: `${description ? `Product context: ${description}. ` : ""}${scene.text}`.slice(0, 8000), imageUrl: scene.imageUrl === screenshotUrl ? undefined : scene.imageUrl, durationSeconds: scene.seconds, aspectRatio: ratio });
+          } catch (e) {
+            setWarnings(prev => [...prev, `Scene ${i + 1}: ${videoUrl || scene.imageUrl ? "using a still" : "skipped"}. ${e?.message || "Video generation unavailable."}`]);
+          }
+        }
+        if (videoUrl || scene.imageUrl) videoScenes.push({ ...scene, videoUrl, subtitle: scene.text });
+      }
+      if (!videoScenes.length) throw new Error("No playable scenes were generated. Try another script or website.");
+      let hostedUrl;
+      if (videoScenes.some(scene => scene.videoUrl)) {
+        setStatusMsg("Rendering your video...");
+        const jobId = await submitRender({ scenes: videoScenes, ratio, resolution, audioMode: effectiveAudioMode, voiceoverUrl, musicUrl: finalMusicUrl, burnSubtitles: false });
+        const startedAt = Date.now();
+        while (true) {
+          if (Date.now() - startedAt > CAPTURE_TIMEOUT_MS) throw new Error("Video render timed out. Please try again.");
+          const job = await getRenderStatus(jobId);
+          if (typeof job?.progress === "number") setProgress(0.75 + job.progress * 0.25);
+          if (job?.status === "done") { hostedUrl = job.url; break; }
+          if (job?.status === "error") throw new Error(job.error || "Video render failed.");
+          await new Promise(resolve => setTimeout(resolve, CAPTURE_POLL_MS));
+        }
+      } else {
+        setStatusMsg("Assembling video...");
+        hostedUrl = await assembleLane1Video({ scenes: videoScenes, ratio, resolution, audioMode: effectiveAudioMode, voiceoverUrl, musicUrl: finalMusicUrl }, { onProgress: p => setProgress(0.75 + p * 0.25) });
+      }
       if (!hostedUrl) throw new Error("The render finished without a playable video.");
       setProgress(1);
       setWalkthroughResult({ url: hostedUrl });
