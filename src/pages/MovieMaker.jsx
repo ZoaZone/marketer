@@ -842,7 +842,7 @@ export default function MovieMaker() {
         blob = await generateVoiceover(spoken);
       }
       if (blob) {
-        const url = URL.createObjectURL(blob);
+        const localUrl = URL.createObjectURL(blob);
         // Measure the narration now, while the audio is in hand. The render
         // worker sizes each scene to at least its own voiceover, so without
         // this number every timing on this page (the .srt, caption
@@ -850,8 +850,19 @@ export default function MovieMaker() {
         // against a shorter film than the one that actually gets rendered.
         // A probe failure leaves it at 0, which just restores the old
         // visual-only behaviour rather than breaking the scene.
-        const voiceSeconds = (await probeMediaDuration(url, "audio")) || 0;
-        updateScene(scene.id, { voiceBlob: blob, voiceUrl: url, voiceSeconds });
+        const voiceSeconds = (await probeMediaDuration(localUrl)) || 0;
+        // The render worker runs server-side and can't resolve a blob: URL
+        // (it only exists in this browser tab), so persist the clip before
+        // saving it on the scene -- otherwise Assemble Film silently drops
+        // this scene's narration (see server-render/render.js's voiceUrl
+        // fetch guard).
+        let voiceUrl = localUrl;
+        try {
+          voiceUrl = await uploadFile(new File([blob], `scene-${scene.id}-voice.mp3`, { type: blob.type || 'audio/mpeg' }));
+        } catch (uploadErr) {
+          console.error('Voiceover upload failed, scene will have no narration in export:', uploadErr);
+        }
+        updateScene(scene.id, { voiceBlob: blob, voiceUrl, voiceSeconds });
       } else setError("No voiceover was produced. If this persists, verify the ElevenLabs API key is configured.");
     } catch (e) { setError(e?.message || "Voiceover failed."); }
     setVoiceLoading(p => ({ ...p, [scene.id]: false }));
