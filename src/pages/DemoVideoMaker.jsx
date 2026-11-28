@@ -7,6 +7,7 @@ import { base44 } from "@/api/base44Client";
 // getCaptureStatus reach the capture worker (server-capture/) the same
 // way every other call here reaches the render worker — through a Base44
 // function (no worker URL or shared secret ever touches this client code).
+import { castNarration } from "@/utils/castNarration";
 import { generateText, generateImage, generateVoiceover, uploadFile, splitScriptIntoScenes, assembleLane1Video, submitCapture, getCaptureStatus, startLiveCapture, finishLiveCapture, cancelLiveCapture } from "@/utils/lane1";
 import { VIDEO_RATIOS } from "@/utils/videoAssembler";
 // AI background music (ElevenLabs Music, paid Lane 2) — enabled for the walkthrough
@@ -274,7 +275,8 @@ export default function DemoVideoMaker() {
       const wantMusic = audioMode === "music" || audioMode === "both";
       if (wantVoice) {
         setStatusMsg("Generating voiceover...");
-        const blob = await generateVoiceover(scenes.map(s => s.text).join(". "));
+        const blob = (await castNarration(scenes.map(s => s.text)).catch(() => null))
+          || await generateVoiceover(scenes.map(s => s.text).join(". "));
         if (blob) voiceoverUrl = await uploadFile(new File([blob], "demo-vo.mp3", { type: blob.type || "audio/mpeg" }));
         else setWarnings(prev => [...prev, "No voiceover was produced — shipping silent instead."]);
       }

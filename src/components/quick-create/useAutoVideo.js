@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { base44 } from "@/api/base44Client";
+import { castNarration } from "@/utils/castNarration";
 import { generateText, generateImage, generateVoiceover, uploadFile, splitScriptIntoScenes, assembleLane1Video } from "@/utils/lane1";
 import { renderPresetBlob } from "@/components/quick-create/musicPresets";
 import { buildStoryBible, shotFor, framePrompt, clipPrompt } from "@/components/quick-create/sceneContinuity";
@@ -68,6 +69,12 @@ export default function useAutoVideo({ cinematic, canMotion, canMusic, ratio, re
       setStage("Recording the voice-over"); setProgress(0.72);
       let voiceoverUrl;
       try {
+        // Multiple characters -> a different voice for each; a single
+        // presenter (or an unparseable rewrite) falls through to one narrator.
+        const cast = await castNarration(scenes.map(s => s.text)).catch(() => null);
+        if (cast) {
+          voiceoverUrl = await uploadFile(new File([cast], "auto-vo.mp3", { type: cast.type || "audio/mpeg" }));
+        } else {
         const spoken = (await generateText({
           type: "script",
           prompt: `Rewrite this as natural, warm, conversational spoken narration only, no scene labels or directions. Plain spoken text only.\n\n${scenes.map(s => s.text).join(". ")}`,
@@ -75,6 +82,7 @@ export default function useAutoVideo({ cinematic, canMotion, canMusic, ratio, re
         }) || scenes.map(s => s.text).join(". ")).trim();
         const blob = await generateVoiceover(spoken);
         if (blob) voiceoverUrl = await uploadFile(new File([blob], "auto-vo.mp3", { type: blob.type || "audio/mpeg" }));
+        }
       } catch (e) { warn(`No voice-over: ${e?.message || "failed"}`); }
 
       let musicUrl;
