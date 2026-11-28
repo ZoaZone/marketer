@@ -19,6 +19,7 @@ import {
   Lock, Video, UserCheck, MessageSquareWarning, XCircle,
 } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
+import { saveDemoSource } from "@/utils/demoSource";
 
 const CAPTURE_POLL_MS = 3000;
 // The capture worker runs ONE job at a time (headless Chromium + video
@@ -131,6 +132,20 @@ export default function DemoVideoMaker() {
   // instead of only ever being able to accept or silently discard it.
   const [revisionNotes, setRevisionNotes] = useState("");
   const [revising, setRevising] = useState(false);
+
+  // Share the analysed URL / description with Pitch Deck.
+  useEffect(() => {
+    if (scan && url.trim()) {
+      saveDemoSource({
+        url: url.startsWith("http") ? url : `https://${url}`,
+        description,
+        services: scan.services_found || [],
+        keywords: scan.keywords_found || [],
+        tone: scan.tone || "",
+        competitors: scan.competitors || [],
+      });
+    }
+  }, [scan, url, description]);
 
   const resetResults = () => {
     setWalkthroughResult(null); setWalkthroughSaved(false);

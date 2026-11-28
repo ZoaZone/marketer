@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
+import { loadDemoSource } from "@/utils/demoSource";
 import { Presentation, Loader2, Download, Wand2, ChevronLeft, ChevronRight, AlertTriangle, Save, CheckCircle2 } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 import SlidePreview from "@/components/pitch-deck/SlidePreview";
@@ -17,8 +19,7 @@ const AUDIENCES = ["Investors", "Customers", "Partners", "Internal team"];
 const inputCls = "w-full rounded-xl border border-input bg-background text-sm p-3 focus:outline-none focus:ring-2 focus:ring-ring";
 
 export default function PitchDeckMaker() {
-  const [idea, setIdea] = useState("");
-  const [website, setWebsite] = useState("");
+  const [source] = useState(() => loadDemoSource());
   const [audience, setAudience] = useState(AUDIENCES[0]);
   const [count, setCount] = useState(10);
   const [deckTitle, setDeckTitle] = useState("");
@@ -29,18 +30,22 @@ export default function PitchDeckMaker() {
   const [saved, setSaved] = useState(false);
 
   const generate = async () => {
-    if (!idea.trim()) { setError("Describe your company or idea first."); return; }
+    if (!source?.url) { setError("Analyze a website in Create Demo first."); return; }
     setBusy(true); setError(""); setSaved(false);
     try {
       const res = await invokeAI({
         prompt: `Create a ${count}-slide pitch deck for ${audience.toLowerCase()}.
-Company / idea: """${idea}"""
-${website.trim() ? `Website: ${website}` : ""}
+Website: ${source.url}
+Business summary: """${source.description || "N/A"}"""
+Services: ${(source.services || []).join(", ") || "N/A"}
+Keywords: ${(source.keywords || []).join(", ") || "N/A"}
+Competitors: ${(source.competitors || []).join(", ") || "N/A"}
+Tone: ${source.tone || "Professional"}
 Slide 1 is the title slide: title = company or deck name, bullets = [one-line tagline].
 Then cover: problem, solution, product, market size, business model, traction, competition, go-to-market, team, financial ask/closing — adapted to the audience and trimmed or merged to fit exactly ${count} slides.
 Each non-title slide: a short title and 3-4 concise bullets (max 14 words each). Do not invent specific numbers; use clearly marked placeholders like [X%] when data is unknown.`,
         response_json_schema: SCHEMA,
-        add_context_from_internet: !!website.trim(),
+        add_context_from_internet: true,
       }, { tag: "pitch_deck" });
       if (!res?.slides?.length) throw new Error("No slides were produced. Try again.");
       setDeckTitle(res.deckTitle || "Pitch Deck");
@@ -55,7 +60,7 @@ Each non-title slide: a short title and 3-4 concise bullets (max 14 words each).
   const saveDeck = async () => {
     await base44.entities.ContentAsset.create({
       type: "script", title: `Pitch deck: ${deckTitle}`.slice(0, 80),
-      content: JSON.stringify({ deckTitle, slides }), ai_generated: true, prompt_used: idea.slice(0, 500),
+      content: JSON.stringify({ deckTitle, slides }), ai_generated: true, prompt_used: `${source.url} ${source.description || ""}`.slice(0, 500),
     });
     setSaved(true);
   };
@@ -67,16 +72,19 @@ Each non-title slide: a short title and 3-4 concise bullets (max 14 words each).
       <PageHeader icon={Presentation} iconGradient="from-amber-500 to-orange-600" title="Pitch Deck" subtitle="Turn an idea or website into a ready-to-present slide deck" />
 
       <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
-        <div>
-          <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">Your company or idea</label>
-          <textarea value={idea} onChange={e => setIdea(e.target.value)} rows={4} className={`${inputCls} resize-none`}
-            placeholder="What do you do, who is it for, what makes it different?" />
+        <div className="rounded-xl border border-border p-3 space-y-1">
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Content source (from Create Demo)</p>
+          {source?.url ? (
+            <>
+              <p className="text-sm font-semibold text-foreground break-all">{source.url}</p>
+              {source.description && <p className="text-xs text-muted-foreground line-clamp-4">{source.description}</p>}
+            </>
+          ) : <p className="text-sm text-muted-foreground">No website analyzed yet.</p>}
+          <Link to="/demo-video" className="inline-block text-xs text-fuchsia-400 hover:underline">
+            {source?.url ? "Change the URL or description in Create Demo" : "Enter a URL in Create Demo"}
+          </Link>
         </div>
-        <div className="grid sm:grid-cols-3 gap-3">
-          <div>
-            <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">Website (optional)</label>
-            <input value={website} onChange={e => setWebsite(e.target.value)} placeholder="https://" className={inputCls} />
-          </div>
+        <div className="grid sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">Audience</label>
             <select value={audience} onChange={e => setAudience(e.target.value)} className={inputCls}>
@@ -90,7 +98,7 @@ Each non-title slide: a short title and 3-4 concise bullets (max 14 words each).
             </select>
           </div>
         </div>
-        <button onClick={generate} disabled={busy}
+        <button onClick={generate} disabled={busy || !source?.url}
           className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white text-sm font-bold hover:opacity-90 disabled:opacity-60">
           {busy ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating deck…</> : <><Wand2 className="w-4 h-4" /> {slides.length ? "Regenerate Deck" : "Generate Pitch Deck"}</>}
         </button>
